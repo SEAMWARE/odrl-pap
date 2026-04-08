@@ -67,3 +67,7 @@ lt_eq_operator(leftOperand, rightOperand) if rightOperand >= leftOperand
 default n_eq_operator(leftOperand, rightOperand) := false
 
 n_eq_operator(leftOperand, rightOperand) if leftOperand != rightOperand
+
+## odrl:regex
+default regex_operator(leftOperand, rightOperand) := false
+regex_operator(leftOperand, rightOperand) if regex.match(rightOperand, leftOperand)
