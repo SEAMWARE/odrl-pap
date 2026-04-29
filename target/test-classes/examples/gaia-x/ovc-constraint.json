@@ -1,0 +1,38 @@
+{
+  "@id": "https://mp-operation.org/policy/common/type",
+  "odrl:uid": "https://mp-operation.org/policy/common/type",
+  "@type": "odrl:Policy",
+  "odrl:permission": {
+    "odrl:assigner": {
+      "@id": "https://www.mp-operation.org/"
+    },
+    "odrl:target": "urn:ngsi-ld:product-offering:62d4f929-d29d-4070-ae1f-9fe7dd1de5f6",
+    "odrl:assignee": "urn:ngsi-ld:organization:0b03975e-7ded-4fbd-9c3b-a5d6550df7e2",
+    "odrl:action": {
+      "@id": "odrl:use"
+    },
+    "ovc:constraint": {
+      "ovc:leftOperand": "$.credentialSubject.gx:legalAddress.gx:countrySubdivisionCode",
+      "odrl:operator": "odrl:anyOf",
+      "odrl:rightOperand": [
+        "FR-HDF",
+        "BE-BRU"
+      ],
+      "ovc:credentialSubjectType": "gx:LegalParticipant"
+    }
+  },
+  "@context": {
+    "odrl": {
+      "@id": "http://www.w3.org/ns/odrl/2/",
+      "@prefix": true
+    },
+    "dome-op": {
+      "@id": "https://github.com/DOME-Marketplace/dome-odrl-profile#",
+      "@prefix": true
+    },
+    "xsd": {
+      "@id": "http://www.w3.org/2001/XMLSchema#",
+      "@prefix": true
+    }
+  }
+}

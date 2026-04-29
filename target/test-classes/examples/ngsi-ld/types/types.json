@@ -1,0 +1,44 @@
+{
+  "@id": "https://mp-operation.org/policy/common/type",
+  "odrl:uid": "https://mp-operation.org/policy/common/type",
+  "@type": "odrl:Policy",
+  "odrl:permission": {
+    "odrl:assigner": {
+      "@id": "https://www.mp-operation.org/"
+    },
+    "odrl:target": {
+      "@type": "odrl:AssetCollection",
+      "odrl:source": "urn:asset",
+      "odrl:refinement": {
+        "@type": "odrl:Constraint",
+        "odrl:leftOperand": {
+          "@id": "ngsi-ld:entityType"
+        },
+        "odrl:operator": {
+          "@id": "odrl:eq"
+        },
+        "odrl:rightOperand": "Marketplace"
+      }
+    },
+    "odrl:assignee": {
+      "@id": "vc:any"
+    },
+    "odrl:action": {
+      "@id": "odrl:use"
+    }
+  },
+  "@context": {
+    "odrl": {
+      "@id": "http://www.w3.org/ns/odrl/2/",
+      "@prefix": true
+    },
+    "dome-op": {
+      "@id": "https://github.com/DOME-Marketplace/dome-odrl-profile#",
+      "@prefix": true
+    },
+    "xsd": {
+      "@id": "http://www.w3.org/2001/XMLSchema#",
+      "@prefix": true
+    }
+  }
+}
