@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: org.fiware.odrl.mapping.LeftOperandMapperTest
--------------------------------------------------------------------------------
-Tests run: 42, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.050 s -- in org.fiware.odrl.mapping.LeftOperandMapperTest

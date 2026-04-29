@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: org.fiware.odrl.jsonld.JsonLdHandlerTest
--------------------------------------------------------------------------------
-Tests run: 18, Failures: 0, Errors: 0, Skipped: 18, Time elapsed: 0.009 s -- in org.fiware.odrl.jsonld.JsonLdHandlerTest
