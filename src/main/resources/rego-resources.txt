@@ -657,3 +657,4 @@ rego/vc/assignee.rego
 rego/vc/leftOperand.rego
 rego/http/operator.rego
 rego/http/leftOperand.rego
+rego/utils/generic.rego
