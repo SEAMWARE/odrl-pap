@@ -658,3 +658,5 @@ rego/vc/leftOperand.rego
 rego/http/operator.rego
 rego/http/leftOperand.rego
 rego/utils/generic.rego
+rego/json/action.rego
+rego/json/leftOperand.rego
