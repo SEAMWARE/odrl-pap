@@ -16,9 +16,12 @@ import org.keycloak.representations.JsonWebToken;
 import org.mockserver.client.MockServerClient;
 import org.mockserver.model.JsonBody;
 
+import org.openapi.quarkus.odrl_yaml.model.GenericJsonInput;
+
 import java.net.URI;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -282,5 +285,61 @@ public abstract class OdrlTest {
 		}
 	}
 
+	/**
+	 * Creates a {@link GenericJsonInput} for testing JSON evaluation with a
+	 * "read" action targeting a specific resource.
+	 *
+	 * @param action  the action string (e.g., "read", "write")
+	 * @param type    the payload type (e.g., "document")
+	 * @param target  the target resource URI
+	 * @return a populated {@link GenericJsonInput} instance
+	 */
+	public static GenericJsonInput createJsonInput(String action, String type, String target) {
+		Map<String, Object> payload = new LinkedHashMap<>();
+		payload.put("action", action);
+		payload.put("type", type);
+		payload.put("target", target);
+		payload.put("data", Map.of("status", "active", "name", "Test Document"));
+
+		Map<String, Object> subject = new LinkedHashMap<>();
+		subject.put("id", "urn:example:user:1");
+		subject.put("organization", "urn:example:org:1");
+
+		GenericJsonInput jsonInput = new GenericJsonInput();
+		jsonInput.setPayload(payload);
+		jsonInput.setSubject(subject);
+		return jsonInput;
+	}
+
+	/**
+	 * Creates a simple {@link GenericJsonInput} with only a payload (no
+	 * subject), useful for testing policies that do not require identity info.
+	 *
+	 * @param action the action string
+	 * @param target the target resource URI
+	 * @return a populated {@link GenericJsonInput} with payload only
+	 */
+	public static GenericJsonInput createMinimalJsonInput(String action, String target) {
+		Map<String, Object> payload = new LinkedHashMap<>();
+		payload.put("action", action);
+		payload.put("target", target);
+
+		GenericJsonInput jsonInput = new GenericJsonInput();
+		jsonInput.setPayload(payload);
+		return jsonInput;
+	}
+
+	/**
+	 * Returns JSON example policy paths (for non-HTTP evaluation) suitable for
+	 * inclusion in parameterized test streams.
+	 *
+	 * @return a stream of paths to JSON evaluation test policies
+	 */
+	public static Stream<Arguments> jsonPolicyPaths() {
+		return Stream.of(
+				Arguments.of("/examples/json/7001/_7001.json"),
+				Arguments.of("/examples/json/7002/_7002.json")
+		);
+	}
 
 }
