@@ -1,0 +1,18 @@
+{
+  "@context": {
+    "odrl": "http://www.w3.org/ns/odrl/2/",
+    "json": "https://odrl-pap.io/json#",
+    "pap": "https://odrl-pap.io/context#"
+  },
+  "@id": "urn:example:policy:json-read-7001",
+  "odrl:uid": "urn:example:policy:json-read-7001",
+  "@type": "odrl:Policy",
+  "pap:evaluationContext": "json",
+  "odrl:permission": {
+    "odrl:target": "urn:example:resource:1",
+    "odrl:assignee": "json:any",
+    "odrl:action": {
+      "@id": "json:read"
+    }
+  }
+}

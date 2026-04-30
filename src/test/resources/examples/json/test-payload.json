@@ -1,0 +1,13 @@
+{
+  "action": "read",
+  "type": "document",
+  "target": "urn:example:resource:1",
+  "data": {
+    "status": "active",
+    "name": "Test Document"
+  },
+  "subject": {
+    "id": "urn:example:user:1",
+    "organization": "urn:example:org:1"
+  }
+}

@@ -40,6 +40,7 @@ public class BundleResource implements DefaultApi {
     private static final String REGO_RESOURCES_FILE = "rego-resources.txt";
     private static final String UTILS_PATH = "rego/utils";
     private static final String UTILS_FILE_TEMPLATE = UTILS_PATH + "/%s.rego";
+    private static final String GENERIC_UTILS_FILE = UTILS_PATH + "/generic.rego";
     @Inject
     private PolicyRepository policyRepository;
 
@@ -63,7 +64,9 @@ public class BundleResource implements DefaultApi {
     public void initMethods(@Observes StartupEvent event) throws IOException {
         log.warn("Startup bundle resource!");
         for (String file : getRegoResourceFiles()) {
-            if (file.startsWith(UTILS_PATH) && !file.equals(String.format(UTILS_FILE_TEMPLATE, generalConfig.pep().getValue()))) {
+            if (file.startsWith(UTILS_PATH)
+                    && !file.equals(String.format(UTILS_FILE_TEMPLATE, generalConfig.pep().getValue()))
+                    && !file.equals(GENERIC_UTILS_FILE)) {
                 continue;
             }
             addRegoMethodFromResource(file);

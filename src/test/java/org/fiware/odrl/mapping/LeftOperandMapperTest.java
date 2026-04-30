@@ -99,7 +99,17 @@ public class LeftOperandMapperTest {
 				Arguments.of("my:operand", new OperandObject("theValue", null),
 						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "my", Map.of("operand", new RegoMethod("my", "operand"))), Optional.of("theValue")),
 				Arguments.of("my:operand", new OperandObject(new TestContent("test", true), null),
-						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "my", Map.of("operand", new RegoMethod("my", "operand"))), Optional.of(Map.of("testString", "test", "test", true)))
+						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "my", Map.of("operand", new RegoMethod("my", "operand"))), Optional.of(Map.of("testString", "test", "test", true))),
+				// json: namespace — type equals value means no extractable value (mapped operand)
+				Arguments.of("json:payloadType", "json:payloadType",
+						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "json",
+								Map.of("payloadType", new RegoMethod("json.leftOperand as json_lo", "json_lo.payload_type(generic.payload)"))),
+						Optional.empty()),
+				// json: namespace — OperandObject with @id and @value extracts the value
+				Arguments.of("json:payloadValue", new OperandObject("$.data.status", null),
+						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "json",
+								Map.of("payloadValue", new RegoMethod("json.leftOperand as json_lo", "json_lo.payload_value(generic.payload, %s)"))),
+						Optional.of("$.data.status"))
 		);
 	}
 
@@ -112,7 +122,16 @@ public class LeftOperandMapperTest {
 				Arguments.of("my:leftOperand", new OperandObject("myValue", null), ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "my", Map.of("leftOperand", new RegoMethod("my", "operand"))), "my:leftOperand"),
 				Arguments.of("my:leftOperand", "myValue", ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "my", Map.of("leftOperand", new RegoMethod("my", "operand"))), "my:leftOperand"),
 				Arguments.of("odrl:leftOperand", new OperandObject("myValue", "my:leftOperand"), ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "my", Map.of("leftOperand", new RegoMethod("my", "operand"))), "my:leftOperand"),
-				Arguments.of("odrl:leftOperand", new OperandObject(null, "my:leftOperand"), ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "my", Map.of("leftOperand", new RegoMethod("my", "operand"))), "my:leftOperand"));
+				Arguments.of("odrl:leftOperand", new OperandObject(null, "my:leftOperand"), ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "my", Map.of("leftOperand", new RegoMethod("my", "operand"))), "my:leftOperand"),
+				// json: namespace left operand types
+				Arguments.of("json:payloadType", "myValue",
+						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "json",
+								Map.of("payloadType", new RegoMethod("json.leftOperand as json_lo", "json_lo.payload_type(generic.payload)"))),
+						"json:payloadType"),
+				Arguments.of("json:payloadValue", "myValue",
+						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "json",
+								Map.of("payloadValue", new RegoMethod("json.leftOperand as json_lo", "json_lo.payload_value(generic.payload, %s)"))),
+						"json:payloadValue"));
 	}
 
 	public static Stream<Arguments> invalidLeftOperandKeys() {
@@ -176,7 +195,17 @@ public class LeftOperandMapperTest {
 						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "my",
 								Map.of("leftOperand-1", new RegoMethod("my", "operand"),
 										"leftOperand-2", new RegoMethod("my", "operand"),
-										"leftOperand", new RegoMethod("my", "operand"))))
+										"leftOperand", new RegoMethod("my", "operand")))),
+				// json: namespace left operand entries
+				Arguments.of("json:payloadValue",
+						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "json",
+								Map.of("payloadValue", new RegoMethod("json.leftOperand as json_lo", "json_lo.payload_value(generic.payload, %s)")))),
+				Arguments.of("json:subjectValue",
+						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "json",
+								Map.of("subjectValue", new RegoMethod("json.leftOperand as json_lo", "json_lo.subject_value(generic.subject, %s)")))),
+				Arguments.of("json:payloadType",
+						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.LEFT_OPERAND, "json",
+								Map.of("payloadType", new RegoMethod("json.leftOperand as json_lo", "json_lo.payload_type(generic.payload)"))))
 		);
 	}
 

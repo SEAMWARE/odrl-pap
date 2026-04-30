@@ -1,0 +1,23 @@
+{
+  "@context": {
+    "odrl": "http://www.w3.org/ns/odrl/2/",
+    "json": "https://odrl-pap.io/json#",
+    "pap": "https://odrl-pap.io/context#"
+  },
+  "@id": "urn:example:policy:json-constraint-7002",
+  "odrl:uid": "urn:example:policy:json-constraint-7002",
+  "@type": "odrl:Policy",
+  "pap:evaluationContext": "json",
+  "odrl:permission": {
+    "odrl:target": "urn:example:resource:2",
+    "odrl:assignee": "json:any",
+    "odrl:action": {
+      "@id": "json:use"
+    },
+    "odrl:constraint": {
+      "odrl:leftOperand": "json:payloadType",
+      "odrl:operator": "odrl:eq",
+      "odrl:rightOperand": "document"
+    }
+  }
+}
