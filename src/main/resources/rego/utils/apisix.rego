@@ -24,7 +24,7 @@ headers := http_part.headers
 
 ##
 # the (undecoded) authorization header
-authorization := headers.authorization
+authorization := object.get(headers, "authorization", headers.Authorization)
 
 ##
 # the decoded authorization jwt

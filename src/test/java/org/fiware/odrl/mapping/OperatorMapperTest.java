@@ -12,8 +12,10 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.fiware.odrl.mapping.ConstraintMapperTest.getMappingConfiguration;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class OperatorMapperTest {
 
@@ -78,6 +80,8 @@ public class OperatorMapperTest {
 				Arguments.of("odrl:operator", "odrl:eq", new MappingConfiguration(), "odrl:eq"),
 				Arguments.of("odrl:Operator", "odrl:eq", new MappingConfiguration(), "odrl:eq"),
 				Arguments.of("odrl:operator", new OperandObject(null, "odrl:eq"), new MappingConfiguration(), "odrl:eq"),
+				Arguments.of("odrl:operator", "odrl:regex", new MappingConfiguration(), "odrl:regex"),
+				Arguments.of("odrl:operator", new OperandObject(null, "odrl:regex"), new MappingConfiguration(), "odrl:regex"),
 				Arguments.of("my:operator", new OperandObject("myValue", null), getMappingConfiguration(OdrlAttribute.OPERATOR, "my", Map.of("operator", new RegoMethod("my", "operator"))), "my:operator"),
 				Arguments.of("my:operator", "myValue", getMappingConfiguration(OdrlAttribute.OPERATOR, "my", Map.of("operator", new RegoMethod("my", "operator"))), "my:operator"),
 				Arguments.of("odrl:operator", new OperandObject("myValue", "my:operator"), getMappingConfiguration(OdrlAttribute.OPERATOR, "my", Map.of("operator", new RegoMethod("my", "operator"))), "my:operator"),

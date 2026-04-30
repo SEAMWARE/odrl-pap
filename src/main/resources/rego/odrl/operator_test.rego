@@ -122,3 +122,14 @@ test_n_eq_operator_true if {
 test_n_eq_operator_false if {
 	operator.n_eq_operator(5, 5) == false
 }
+
+# -----------------------
+# regex_operator
+# -----------------------
+test_regex_operator_true if {
+	operator.regex_operator("hello-world", "hello-.*") == true
+}
+
+test_regex_operator_false if {
+	operator.regex_operator("hello-world", "^\\d+$") == false
+}

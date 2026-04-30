@@ -127,6 +127,11 @@
         "description": "Checks that both operands are not equal.",
         "regoPackage": "odrl.operator as odrl_operator",
         "regoMethod": "odrl_operator.n_eq_operator(%s,%s)"
+      },
+      "regex": {
+        "description": "Checks that the leftOperand matches the regular expression provided in the rightOperand.",
+        "regoPackage": "odrl.operator as odrl_operator",
+        "regoMethod": "odrl_operator.regex_operator(%s,%s)"
       }
     }
   },
