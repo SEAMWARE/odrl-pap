@@ -1,6 +1,6 @@
 deployment:
   image:
-    repository: quay.io/wi_stefan/odrl-pap
+    repository: quay.io/seamware/odrl-pap
     # -- tag of the image to be used
     tag: test
     # -- specification of the image pull policy
