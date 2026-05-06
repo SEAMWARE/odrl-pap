@@ -342,7 +342,16 @@ paths:
       tags:
         - UI
       operationId: validatePolicy
-      summary: Validates a policy with a demo request
+      summary: Validates a policy against an HTTP test request or an arbitrary JSON payload
+      description: >
+        Validates a policy by evaluating it against a provided input.
+        Two input modes are supported (mutually exclusive):
+        (1) HTTP mode — provide a `testRequest` with method, host, path, etc. for
+        evaluating policies that target HTTP API gateway requests.
+        (2) JSON mode — provide a `jsonInput` with an arbitrary JSON `payload` and
+        optional `subject` for evaluating policies against non-HTTP data.
+        The policy's own JSON-LD context determines which evaluation path is used.
+        Existing requests that only supply `testRequest` continue to work unchanged.
       requestBody:
         required: true
         content:
@@ -431,11 +440,18 @@ components:
             type: string
     ValidationRequest:
       type: object
+      description: >
+        Request to validate a policy. Provide either `testRequest` (for HTTP
+        request evaluation) or `jsonInput` (for arbitrary JSON payload
+        evaluation). The two are mutually exclusive — supply one or the other.
+        The policy's JSON-LD context determines which evaluation path is used.
       properties:
         policy:
           $ref: '#/components/schemas/OdrlPolicyJson'
         testRequest:
           $ref: '#/components/schemas/TestRequest'
+        jsonInput:
+          $ref: '#/components/schemas/GenericJsonInput'
     TestRequest:
       type: object
       properties:
@@ -453,6 +469,29 @@ components:
           type: object
         headers:
           $ref: '#/components/schemas/Headers'
+    GenericJsonInput:
+      type: object
+      description: >
+        Input for evaluating policies against arbitrary JSON payloads (non-HTTP).
+        The `payload` contains the data to evaluate, and the optional `subject`
+        carries identity or credential information about the requesting party.
+      required:
+        - payload
+      properties:
+        payload:
+          type: object
+          description: >
+            Arbitrary JSON payload to evaluate the policy against. This can
+            represent any data structure — e.g., a resource, an event, or a
+            document — that the policy's rules will inspect.
+          additionalProperties: true
+        subject:
+          type: object
+          description: >
+            Optional identity or credential information about the party
+            requesting access. Used by assignee and subject-based policy
+            constraints (e.g., verifiable credentials, roles, organization).
+          additionalProperties: true
     Headers:
       type: object
       properties:

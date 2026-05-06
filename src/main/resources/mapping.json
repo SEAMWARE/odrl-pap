@@ -57,6 +57,33 @@
         "regoPackage": "ngsild.action as ngsild_action",
         "regoMethod": "ngsild_action.is_creation(helper.http_part)"
       }
+    },
+    "json": {
+      "read": {
+        "description": "Checks if the action field in the JSON payload indicates a read operation.",
+        "regoPackage": "json.action as json_action",
+        "regoMethod": "json_action.is_read(generic.payload)"
+      },
+      "write": {
+        "description": "Checks if the action field in the JSON payload indicates a write operation.",
+        "regoPackage": "json.action as json_action",
+        "regoMethod": "json_action.is_write(generic.payload)"
+      },
+      "create": {
+        "description": "Checks if the action field in the JSON payload indicates a create operation.",
+        "regoPackage": "json.action as json_action",
+        "regoMethod": "json_action.is_create(generic.payload)"
+      },
+      "delete": {
+        "description": "Checks if the action field in the JSON payload indicates a delete operation.",
+        "regoPackage": "json.action as json_action",
+        "regoMethod": "json_action.is_delete(generic.payload)"
+      },
+      "use": {
+        "description": "Checks if the action field in the JSON payload indicates any usage operation.",
+        "regoPackage": "json.action as json_action",
+        "regoMethod": "json_action.is_use(generic.payload)"
+      }
     }
   },
   "operator": {
@@ -289,6 +316,23 @@
         "regoPackage": "gaiax.leftOperand as gaia_x_lo",
         "regoMethod": "gaia_x_lo.getClaim(helper.verifiable_credential,%s)"
       }
+    },
+    "json": {
+      "payloadValue": {
+        "description": "Extracts a value from the JSON payload at a given dot-notation path (e.g., $.my.field).",
+        "regoPackage": "json.leftOperand as json_lo",
+        "regoMethod": "json_lo.payload_value(generic.payload, %s)"
+      },
+      "subjectValue": {
+        "description": "Extracts a value from the subject/identity object at a given dot-notation path.",
+        "regoPackage": "json.leftOperand as json_lo",
+        "regoMethod": "json_lo.subject_value(generic.subject, %s)"
+      },
+      "payloadType": {
+        "description": "Returns the type field from the JSON payload.",
+        "regoPackage": "json.leftOperand as json_lo",
+        "regoMethod": "json_lo.payload_type(generic.payload)"
+      }
     }
   },
   "assignee": {
@@ -305,6 +349,18 @@
         "regoPackage": "vc.assignee as vc_assignee",
         "regoMethod": "vc_assignee.is_any"
       }
+    },
+    "json": {
+      "assignee": {
+        "description": "Checks if the subject in the JSON payload matches the given ID.",
+        "regoPackage": "odrl.assignee as odrl_assignee",
+        "regoMethod": "odrl_assignee.is_user(generic.subject,%s)"
+      },
+      "any": {
+        "description": "Allows access for any requesting user in a JSON evaluation context.",
+        "regoPackage": "vc.assignee as vc_assignee",
+        "regoMethod": "vc_assignee.is_any"
+      }
     }
   },
   "target": {
@@ -318,6 +374,23 @@
         "description": "Checks that the request target is equal to the given id.",
         "regoPackage": "odrl.target as odrl_target",
         "regoMethod": "odrl_target.is_target(helper.target,%s)"
+      }
+    },
+    "json": {
+      "uid": {
+        "description": "Checks that the target field in the JSON payload is equal to the given id.",
+        "regoPackage": "odrl.target as odrl_target",
+        "regoMethod": "odrl_target.is_target(generic.target,%s)"
+      },
+      "target": {
+        "description": "Checks that the target field in the JSON payload is equal to the given id.",
+        "regoPackage": "odrl.target as odrl_target",
+        "regoMethod": "odrl_target.is_target(generic.target,%s)"
+      },
+      "payloadTarget": {
+        "description": "Checks that a target extracted from a dot-notation path in the JSON payload is equal to the given id.",
+        "regoPackage": "odrl.target as odrl_target",
+        "regoMethod": "odrl_target.is_target(generic.get_value(%s),%s)"
       }
     }
   },
