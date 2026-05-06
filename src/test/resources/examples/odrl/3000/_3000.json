@@ -70,6 +70,10 @@
     "xsd": {
       "@id": "http://www.w3.org/2001/XMLSchema#",
       "@prefix": true
+    },
+    "json": {
+      "@id": "https://odrl-pap.io/json#",
+      "@prefix": true
     }
   }
 }

@@ -69,7 +69,11 @@ public class BundleResource implements DefaultApi {
                     && !file.equals(GENERIC_UTILS_FILE)) {
                 continue;
             }
-            addRegoMethodFromResource(file);
+            try {
+                addRegoMethodFromResource(file);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to load file: " + file, e);
+            }
         }
         if (pathsConfiguration.rego().isPresent() && pathsConfiguration.rego().get().exists()) {
             for (String file : getFiles(Paths.get(pathsConfiguration.rego().get().getAbsolutePath()))) {
