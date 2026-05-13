@@ -109,6 +109,7 @@ public class ValidationResource implements UiApi {
                     compactedJson, new TypeReference<Map<String, Object>>() {});
             MappingResult mappingResult = odrlMapper.mapOdrl(policyAsMap);
             if (mappingResult.isFailed()) {
+                log.debug("The failed policy is: {}", validationRequest.getPolicy());
                 throw new IllegalArgumentException(
                         String.format("Was not able to map the policy. Reason: %s", mappingResult.getFailureReasons()));
             }
