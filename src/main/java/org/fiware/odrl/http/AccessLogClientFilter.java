@@ -26,7 +26,7 @@ public class AccessLogClientFilter implements ClientRequestFilter, ClientRespons
         if (status >= 400) {
             log.warn("{} {} {} - {}ms", requestContext.getMethod(), requestContext.getUri(), status, duration);
         } else {
-            log.info("{} {} {} - {}ms", requestContext.getMethod(), requestContext.getUri(), status, duration);
+            log.debug("{} {} {} - {}ms", requestContext.getMethod(), requestContext.getUri(), status, duration);
         }
     }
 }
