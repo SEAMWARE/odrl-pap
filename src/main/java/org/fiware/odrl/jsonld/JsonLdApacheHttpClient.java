@@ -6,7 +6,9 @@ import com.apicatalog.jsonld.http.HttpClient;
 import com.apicatalog.jsonld.http.HttpResponse;
 import org.apache.http.Header;
 import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,9 +29,9 @@ public class JsonLdApacheHttpClient implements HttpClient {
     private static final String CONTENT_TYPE_HEADER = "content-type";
     private static final String LOCATION_HEADER = "location";
 
-    private final org.apache.http.client.HttpClient httpClient;
+    private final CloseableHttpClient httpClient;
 
-    public JsonLdApacheHttpClient(org.apache.http.client.HttpClient httpClient) {
+    public JsonLdApacheHttpClient(CloseableHttpClient httpClient) {
         this.httpClient = httpClient;
     }
 
@@ -40,10 +42,8 @@ public class JsonLdApacheHttpClient implements HttpClient {
         httpGet.addHeader(ACCEPT_HEADER, requestProfile);
 
         try {
-            // do not insert a try-with, since the document-loader handles that already. Would lead to stream-already closed exception else.
-            org.apache.http.HttpResponse httpResponse = httpClient
-                    .execute(httpGet);
-            return new JsonLdHttpResponse()
+            CloseableHttpResponse httpResponse = httpClient.execute(httpGet);
+            return new JsonLdHttpResponse(httpResponse)
                     .setStatusCode(httpResponse.getStatusLine().getStatusCode())
                     .setBody(httpResponse.getEntity().getContent())
                     .setContentType(Optional.ofNullable(httpResponse.getFirstHeader(CONTENT_TYPE_HEADER)).map(Header::getValue))
@@ -61,13 +61,18 @@ public class JsonLdApacheHttpClient implements HttpClient {
         }
     }
 
-    private class JsonLdHttpResponse implements HttpResponse {
+    private static class JsonLdHttpResponse implements HttpResponse {
 
+        private final CloseableHttpResponse apacheResponse;
         private int statusCode;
         private InputStream body;
         private Collection<String> links;
         private Optional<String> contentType;
         private Optional<String> location;
+
+        JsonLdHttpResponse(CloseableHttpResponse apacheResponse) {
+            this.apacheResponse = apacheResponse;
+        }
 
         public JsonLdHttpResponse setStatusCode(int statusCode) {
             this.statusCode = statusCode;
@@ -121,6 +126,7 @@ public class JsonLdApacheHttpClient implements HttpClient {
 
         @Override
         public void close() throws IOException {
+            apacheResponse.close();
         }
 
     }

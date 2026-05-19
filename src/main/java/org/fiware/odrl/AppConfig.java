@@ -7,6 +7,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Produces;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.fiware.odrl.jsonld.CompactionContext;
@@ -100,11 +101,21 @@ public class AppConfig {
         return new RightOperandMapper(objectMapper, mappingConfiguration);
     }
 
+    @Inject
+    private HttpClientConfiguration httpClientConfiguration;
+
     @Produces
     @ApplicationScoped
     public CloseableHttpClient httpClient() {
+        int timeout = httpClientConfiguration.timeoutMs();
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(timeout)
+                .setSocketTimeout(timeout)
+                .setConnectionRequestTimeout(timeout)
+                .build();
         return HttpClients.custom()
-                .disableRedirectHandling() // optional
+                .disableRedirectHandling()
+                .setDefaultRequestConfig(requestConfig)
                 .build();
     }
 }
