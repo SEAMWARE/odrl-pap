@@ -3,12 +3,14 @@ package org.fiware.odrl.jsonld;
 import com.apicatalog.jsonld.JsonLdError;
 import com.apicatalog.jsonld.document.Document;
 import com.apicatalog.jsonld.document.JsonDocument;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 public class LocalContextRepository implements ContextRepository {
 
     // Keys are normalized: no scheme, no trailing slash
@@ -26,6 +28,7 @@ public class LocalContextRepository implements ContextRepository {
         if (stream == null) {
             return Optional.empty();
         }
+        log.debug("Serving JSON-LD context from local classpath for: {}", url);
         return Optional.of(JsonDocument.of(stream));
     }
 

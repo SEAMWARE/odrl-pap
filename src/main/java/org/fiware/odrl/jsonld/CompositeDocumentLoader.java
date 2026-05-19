@@ -1,6 +1,7 @@
 package org.fiware.odrl.jsonld;
 
 import com.apicatalog.jsonld.JsonLdError;
+import com.apicatalog.jsonld.JsonLdErrorCode;
 import com.apicatalog.jsonld.document.Document;
 import com.apicatalog.jsonld.loader.DocumentLoader;
 import com.apicatalog.jsonld.loader.DocumentLoaderOptions;
@@ -12,11 +13,9 @@ import java.util.Optional;
 public class CompositeDocumentLoader implements DocumentLoader {
 
     private final List<ContextRepository> repositories;
-    private final DocumentLoader httpFallback;
 
-    public CompositeDocumentLoader(List<ContextRepository> repositories, DocumentLoader httpFallback) {
+    public CompositeDocumentLoader(List<ContextRepository> repositories) {
         this.repositories = repositories;
-        this.httpFallback = httpFallback;
     }
 
     @Override
@@ -27,6 +26,6 @@ public class CompositeDocumentLoader implements DocumentLoader {
                 return doc.get();
             }
         }
-        return httpFallback.loadDocument(url, options);
+        throw new JsonLdError(JsonLdErrorCode.LOADING_DOCUMENT_FAILED, url.toString());
     }
 }
