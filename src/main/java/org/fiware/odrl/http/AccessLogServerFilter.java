@@ -13,6 +13,7 @@ import jakarta.ws.rs.ext.Provider;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.URI;
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +28,9 @@ public class AccessLogServerFilter implements ContainerRequestFilter, ContainerR
     AccessLogServerConfiguration config;
 
     @Inject
+    Clock clock;
+
+    @Inject
     RoutingContext routingContext;
 
     @Override
@@ -34,7 +38,7 @@ public class AccessLogServerFilter implements ContainerRequestFilter, ContainerR
         if (config.excludePaths().map(paths -> paths.stream().anyMatch(requestContext.getUriInfo().getPath()::startsWith)).orElse(false)) {
             return;
         }
-        requestContext.setProperty(START_TIME, System.currentTimeMillis());
+        requestContext.setProperty(START_TIME, clock.millis());
     }
 
     @Override
@@ -42,7 +46,7 @@ public class AccessLogServerFilter implements ContainerRequestFilter, ContainerR
         Long start = (Long) requestContext.getProperty(START_TIME);
         if (start == null) return;
 
-        long duration = System.currentTimeMillis() - start;
+        long duration = clock.millis() - start;
         String method = requestContext.getMethod();
         URI requestUri = requestContext.getUriInfo().getRequestUri();
         String query = requestUri.getQuery();

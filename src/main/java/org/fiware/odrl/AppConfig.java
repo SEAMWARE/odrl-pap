@@ -31,6 +31,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Clock;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -154,5 +155,11 @@ public class AppConfig {
                 .disableRedirectHandling()
                 .setDefaultRequestConfig(requestConfig)
                 .build();
+    }
+
+    @Produces
+    @ApplicationScoped
+    public Clock clock() {
+        return Clock.systemUTC();
     }
 }
