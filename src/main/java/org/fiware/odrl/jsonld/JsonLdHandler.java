@@ -9,13 +9,13 @@ import com.apicatalog.jsonld.loader.SchemeRouter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.apicatalog.jsonld.loader.DocumentLoader;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonReader;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.http.impl.client.CloseableHttpClient;
 
 import java.io.InputStream;
 import java.util.List;
@@ -50,7 +50,7 @@ public class JsonLdHandler {
     private static final Pattern JSON_NAMESPACE_PATTERN = Pattern.compile("\"json:");
 
     @Inject
-    private CloseableHttpClient httpClient;
+    private DocumentLoader documentLoader;
 
     @Inject
     private CompactionContext compactionContext;
@@ -69,13 +69,7 @@ public class JsonLdHandler {
      * @throws JsonLdError if expansion or compaction fails
      */
     public String handleJsonLd(InputStream jsonLdInput) throws JsonLdError {
-        HttpLoader httpLoader = new HttpLoader(new JsonLdApacheHttpClient(httpClient));
-        SchemeRouter schemeRouter = new SchemeRouter()
-                .set("https", httpLoader)
-                .set("http", httpLoader)
-                .set("file", httpLoader);
-
-        JsonLdOptions jsonLdOptions = new JsonLdOptions(schemeRouter);
+        JsonLdOptions jsonLdOptions = new JsonLdOptions(documentLoader);
         JsonReader jsonReader = Json.createReader(jsonLdInput);
 
         JsonObject originalJson = jsonReader.readObject();

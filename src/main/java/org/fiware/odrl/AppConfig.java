@@ -2,6 +2,9 @@ package org.fiware.odrl;
 
 import com.apicatalog.jsonld.JsonLdError;
 import com.apicatalog.jsonld.document.JsonDocument;
+import com.apicatalog.jsonld.loader.DocumentLoader;
+import com.apicatalog.jsonld.loader.HttpLoader;
+import com.apicatalog.jsonld.loader.SchemeRouter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -11,12 +14,16 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.fiware.odrl.jsonld.CompactionContext;
+import org.fiware.odrl.jsonld.CompositeDocumentLoader;
+import org.fiware.odrl.jsonld.JsonLdApacheHttpClient;
+import org.fiware.odrl.jsonld.LocalContextRepository;
 import org.fiware.odrl.mapping.*;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 /**
  * @author <a href="https://github.com/wistefan">Stefan Wiedemann</a>
@@ -103,6 +110,17 @@ public class AppConfig {
 
     @Inject
     private HttpClientConfiguration httpClientConfiguration;
+
+    @Produces
+    @ApplicationScoped
+    public DocumentLoader documentLoader(CloseableHttpClient httpClient) {
+        HttpLoader httpLoader = new HttpLoader(new JsonLdApacheHttpClient(httpClient));
+        SchemeRouter schemeRouter = new SchemeRouter()
+                .set("https", httpLoader)
+                .set("http", httpLoader)
+                .set("file", httpLoader);
+        return new CompositeDocumentLoader(List.of(new LocalContextRepository()), schemeRouter);
+    }
 
     @Produces
     @ApplicationScoped
