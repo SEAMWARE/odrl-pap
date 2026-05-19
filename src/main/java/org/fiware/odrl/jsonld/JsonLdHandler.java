@@ -4,8 +4,7 @@ import com.apicatalog.jsonld.JsonLdError;
 import com.apicatalog.jsonld.JsonLdOptions;
 import com.apicatalog.jsonld.document.Document;
 import com.apicatalog.jsonld.document.JsonDocument;
-import com.apicatalog.jsonld.loader.HttpLoader;
-import com.apicatalog.jsonld.loader.SchemeRouter;
+import com.apicatalog.jsonld.loader.DocumentLoader;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.json.Json;
@@ -13,7 +12,6 @@ import jakarta.json.JsonObject;
 import jakarta.json.JsonReader;
 import jakarta.ws.rs.ext.Provider;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.http.impl.client.CloseableHttpClient;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -24,19 +22,13 @@ import java.nio.charset.StandardCharsets;
 public class JsonLdHandler {
 
     @Inject
-    private CloseableHttpClient httpClient;
+    private DocumentLoader documentLoader;
 
     @Inject
     private CompactionContext compactionContext;
 
     public String handleJsonLd(InputStream jsonLdInput) throws JsonLdError {
-        HttpLoader httpLoader = new HttpLoader(new JsonLdApacheHttpClient(httpClient));
-        SchemeRouter schemeRouter = new SchemeRouter()
-                .set("https", httpLoader)
-                .set("http", httpLoader)
-                .set("file", httpLoader);
-
-        JsonLdOptions jsonLdOptions = new JsonLdOptions(schemeRouter);
+        JsonLdOptions jsonLdOptions = new JsonLdOptions(documentLoader);
         JsonReader jsonReader = Json.createReader(jsonLdInput);
 
         JsonObject originalJson = jsonReader.readObject();
