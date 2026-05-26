@@ -7,6 +7,9 @@ import org.openapi.quarkus.odrl_yaml.model.ServiceCreate;
         targets = {
                 ServiceCreate.class
         },
+        classNames = {
+                "com.github.benmanes.caffeine.cache.SSLSMSW"
+        },
         registerFullHierarchy = true
 )
 public class ModelReflectionConfig {
