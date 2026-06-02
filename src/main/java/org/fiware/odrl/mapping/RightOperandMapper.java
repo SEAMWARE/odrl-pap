@@ -104,16 +104,61 @@ public class RightOperandMapper extends TypeMapper {
 		if (!theRightOperandMap.containsKey(OdrlConstants.VALUE_KEY)) {
 			return Optional.empty();
 		}
-		if (theRightOperandMap.containsKey(OdrlConstants.TYPE_KEY) && theRightOperandMap.get(TYPE_KEY).equals(DATE_TYPE)) {
-			String dateString = (String) theRightOperandMap.get(VALUE_KEY);
-			try {
-				Date parsedDate = DATE_FORMAT.parse(dateString);
-				return Optional.of(parsedDate.getTime());
-			} catch (ParseException e) {
-				throw new MappingException(String.format("The date %s is not valid", dateString), e);
+		if (theRightOperandMap.containsKey(OdrlConstants.TYPE_KEY)) {
+			String xsdType = (String) theRightOperandMap.get(TYPE_KEY);
+			if (xsdType.equals(DATE_TYPE)) {
+				String dateString = (String) theRightOperandMap.get(VALUE_KEY);
+				try {
+					Date parsedDate = DATE_FORMAT.parse(dateString);
+					return Optional.of(parsedDate.getTime());
+				} catch (ParseException e) {
+					throw new MappingException(String.format("The date %s is not valid", dateString), e);
+				}
+			}
+			if (OdrlConstants.INTEGER_TYPES.contains(xsdType)) {
+				return Optional.of(parseIntegerValue(theRightOperandMap.get(VALUE_KEY)));
+			}
+			if (OdrlConstants.DECIMAL_TYPES.contains(xsdType)) {
+				return Optional.of(parseDecimalValue(theRightOperandMap.get(VALUE_KEY)));
 			}
 		}
 		return Optional.ofNullable(theRightOperandMap.get(OdrlConstants.VALUE_KEY));
+	}
+
+	/**
+	 * Parses a value from a JSON-LD {@code @value} field as a Long.
+	 * Handles both String representations and numeric JSON values.
+	 */
+	private Long parseIntegerValue(Object value) throws MappingException {
+		if (value instanceof Number number) {
+			return number.longValue();
+		}
+		if (value instanceof String stringValue) {
+			try {
+				return Long.parseLong(stringValue);
+			} catch (NumberFormatException e) {
+				throw new MappingException(String.format("The integer value %s is not valid", stringValue), e);
+			}
+		}
+		throw new MappingException(String.format("Cannot parse %s as an integer", value));
+	}
+
+	/**
+	 * Parses a value from a JSON-LD {@code @value} field as a Double.
+	 * Handles both String representations and numeric JSON values.
+	 */
+	private Double parseDecimalValue(Object value) throws MappingException {
+		if (value instanceof Number number) {
+			return number.doubleValue();
+		}
+		if (value instanceof String stringValue) {
+			try {
+				return Double.parseDouble(stringValue);
+			} catch (NumberFormatException e) {
+				throw new MappingException(String.format("The decimal value %s is not valid", stringValue), e);
+			}
+		}
+		throw new MappingException(String.format("Cannot parse %s as a decimal", value));
 	}
 
 }
