@@ -98,8 +98,11 @@ public class RightOperandMapper extends TypeMapper {
             }
         }
 
-        if (rightOperandObject instanceof List<?> valueList) {
-            return Optional.of(valueList);
+        if (rightOperandObject instanceof List<?>
+                || rightOperandObject instanceof Integer
+                || rightOperandObject instanceof Boolean
+                || rightOperandObject instanceof Double) {
+            return Optional.of(rightOperandObject);
         }
 
         Map<String, Object> theRightOperandMap = convertToMap(rightOperandObject);
