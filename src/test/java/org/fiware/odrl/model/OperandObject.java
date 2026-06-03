@@ -14,5 +14,11 @@ public class OperandObject {
 	private Object value;
 	@JsonProperty("@id")
 	private String id;
+	@JsonProperty("@type")
+	private String type;
+
+	public OperandObject(Object value, String id) {
+		this(value, id, null);
+	}
 
 }

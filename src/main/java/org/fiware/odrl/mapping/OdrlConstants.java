@@ -1,6 +1,7 @@
 package org.fiware.odrl.mapping;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * @author <a href="https://github.com/wistefan">Stefan Wiedemann</a>
@@ -16,6 +17,21 @@ public class OdrlConstants {
 
     public static final String STRING_TYPE = "xsd:string";
     public static final String DATE_TYPE = "xsd:date";
+
+    /**
+     * XSD types that represent integer values and should be parsed as Long.
+     */
+    public static final Set<String> INTEGER_TYPES = Set.of(
+            "xsd:integer", "xsd:long", "xsd:int", "xsd:short", "xsd:byte",
+            "xsd:nonNegativeInteger", "xsd:positiveInteger",
+            "xsd:nonPositiveInteger", "xsd:negativeInteger",
+            "xsd:unsignedLong", "xsd:unsignedInt", "xsd:unsignedShort", "xsd:unsignedByte"
+    );
+
+    /**
+     * XSD types that represent floating-point values and should be parsed as Double.
+     */
+    public static final Set<String> DECIMAL_TYPES = Set.of("xsd:decimal", "xsd:float", "xsd:double");
     public static final String TYPE_POLICY = "odrl:Policy";
     public static final String TYPE_PERMISSION = "odrl:Permission";
     public static final String TYPE_PARTY = "odrl:Party";

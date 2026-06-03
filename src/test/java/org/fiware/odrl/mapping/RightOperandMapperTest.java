@@ -86,7 +86,21 @@ public class RightOperandMapperTest {
 				Arguments.of("my:operand", new OperandObject("theValue", null),
 						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.RIGHT_OPERAND, "my", Map.of("operand", new RegoMethod("my", "operand"))), Optional.of("theValue")),
 				Arguments.of("my:operand", new OperandObject(new TestContent("test", true), null),
-						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.RIGHT_OPERAND, "my", Map.of("operand", new RegoMethod("my", "operand"))), Optional.of(Map.of("testString", "test", "test", true)))
+						ConstraintMapperTest.getMappingConfiguration(OdrlAttribute.RIGHT_OPERAND, "my", Map.of("operand", new RegoMethod("my", "operand"))), Optional.of(Map.of("testString", "test", "test", true))),
+				// xsd:integer with string @value should be parsed to Long
+				Arguments.of("odrl:rightOperand", new OperandObject("6", null, "xsd:integer"), new MappingConfiguration(), Optional.of(6L)),
+				// xsd:integer with numeric @value should be parsed to Long
+				Arguments.of("odrl:rightOperand", new OperandObject(4, null, "xsd:integer"), new MappingConfiguration(), Optional.of(4L)),
+				// xsd:decimal with string @value should be parsed to Double
+				Arguments.of("odrl:rightOperand", new OperandObject("17", null, "xsd:decimal"), new MappingConfiguration(), Optional.of(17.0)),
+				// xsd:decimal with numeric @value should be parsed to Double
+				Arguments.of("odrl:rightOperand", new OperandObject(3.14, null, "xsd:decimal"), new MappingConfiguration(), Optional.of(3.14)),
+				// xsd:double with string @value should be parsed to Double
+				Arguments.of("odrl:rightOperand", new OperandObject("2.5", null, "xsd:double"), new MappingConfiguration(), Optional.of(2.5)),
+				// xsd:long with string @value should be parsed to Long
+				Arguments.of("odrl:rightOperand", new OperandObject("100", null, "xsd:long"), new MappingConfiguration(), Optional.of(100L)),
+				// xsd:nonNegativeInteger with string @value should be parsed to Long
+				Arguments.of("odrl:rightOperand", new OperandObject("0", null, "xsd:nonNegativeInteger"), new MappingConfiguration(), Optional.of(0L))
 		);
 	}
 
