@@ -44,19 +44,29 @@ import java.util.*;
 @Slf4j
 public class ValidationResource implements UiApi {
 
-    /** Key used to wrap the request object inside the OPA input structure. */
+    /**
+     * Key used to wrap the request object inside the OPA input structure.
+     */
     private static final String REQUEST_KEY = "request";
 
-    /** Key used to wrap the top-level input object sent to OPA. */
+    /**
+     * Key used to wrap the top-level input object sent to OPA.
+     */
     private static final String INPUT_KEY = "input";
 
-    /** Key for the payload field inside the generic JSON request structure. */
+    /**
+     * Key for the payload field inside the generic JSON request structure.
+     */
     private static final String PAYLOAD_KEY = "payload";
 
-    /** Key for the subject field inside the generic JSON request structure. */
+    /**
+     * Key for the subject field inside the generic JSON request structure.
+     */
     private static final String SUBJECT_KEY = "subject";
 
-    /** OPA data API path suffix for the is_allowed rule. */
+    /**
+     * OPA data API path suffix for the is_allowed rule.
+     */
     private static final String IS_ALLOWED_PATH_TEMPLATE = "%s/is_allowed";
 
     @RestClient
@@ -99,14 +109,20 @@ public class ValidationResource implements UiApi {
         }
         String tempId = PolicyRepository.generatePolicyId();
         try {
+            log.info("Validation request: " + objectMapper.writeValueAsString(validationRequest));
+            log.info("Incoming policy: " + objectMapper.writeValueAsString(validationRequest.getPolicy()));
+
             String compactedJson = jsonLdHandler.handleJsonLd(
-                    new ByteArrayInputStream(objectMapper.writeValueAsBytes(validationRequest.getPolicy())));
+                    new ByteArrayInputStream(objectMapper.writeValueAsBytes(validationRequest.getPolicy())),
+                    validationRequest.getAdditionalContexts());
+            log.info("Compacted policy: " + compactedJson);
 
             EvaluationContext evaluationContext = jsonLdHandler.detectEvaluationContext(compactedJson);
             log.info("Detected evaluation context: {}", evaluationContext);
 
             Map<String, Object> policyAsMap = objectMapper.readValue(
-                    compactedJson, new TypeReference<Map<String, Object>>() {});
+                    compactedJson, new TypeReference<Map<String, Object>>() {
+                    });
             MappingResult mappingResult = odrlMapper.mapOdrl(policyAsMap);
             if (mappingResult.isFailed()) {
                 log.debug("The failed policy is: {}", validationRequest.getPolicy());
@@ -158,7 +174,7 @@ public class ValidationResource implements UiApi {
      * @throws IllegalArgumentException if the required input field is missing
      */
     private Map<String, Object> buildOpaInput(EvaluationContext evaluationContext,
-                                               ValidationRequest validationRequest) {
+                                              ValidationRequest validationRequest) {
         Map<String, Object> requestContent;
 
         if (evaluationContext == EvaluationContext.JSON) {
@@ -183,7 +199,8 @@ public class ValidationResource implements UiApi {
                                 + "validation request. Please supply a 'testRequest' object with method, host, path, etc.");
             }
             requestContent = objectMapper.convertValue(validationRequest.getTestRequest(),
-                    new TypeReference<Map<String, Object>>() {});
+                    new TypeReference<Map<String, Object>>() {
+                    });
         }
 
         Map<String, Object> request = new HashMap<>();
