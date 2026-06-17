@@ -57,9 +57,9 @@ public class AccessLogServerFilter implements ContainerRequestFilter, ContainerR
         String forwardedFor = requestContext.getHeaderString("X-Forwarded-For");
 
         if (forwardedFor != null) {
-            log.info("{} [{}] - {} - {} {} {} - {}ms", forwardedFor, remoteIp, protocol, method, uri, status, duration);
+            log.debug("{} [{}] - {} - {} {} {} - {}ms", forwardedFor, remoteIp, protocol, method, uri, status, duration);
         } else {
-            log.info("{} - {} - {} {} {} - {}ms", remoteIp, protocol, method, uri, status, duration);
+            log.debug("{} - {} - {} {} {} - {}ms", remoteIp, protocol, method, uri, status, duration);
         }
     }
 

@@ -1,6 +1,7 @@
 package org.fiware.odrl.mapping;
 
 import io.quarkus.qute.ImmutableList;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,6 +14,7 @@ import java.util.StringJoiner;
 /**
  * @author <a href="https://github.com/wistefan">Stefan Wiedemann</a>
  */
+@RegisterForReflection
 public class MappingResult {
 
 
@@ -29,9 +31,25 @@ public class MappingResult {
     @Setter
     private String uid;
 
+    /**
+     * Default import alias for the generic JSON evaluation utils package
+     * ({@code utils.generic}). Always included so that policies using
+     * {@code json:*} namespace mappings can reference {@code generic.payload},
+     * {@code generic.subject}, etc. The generic helper is always bundled
+     * alongside the gateway-specific helper.
+     */
+    private static final String GENERIC_UTILS_IMPORT = "import data.utils.generic as generic";
+
+    /** Default import alias for the PEP-specific gateway utils package. */
+    private static final String HELPER_UTILS_IMPORT = "import data.utils.helper as helper";
+
+    /** Rego v1 import required by all generated policies. */
+    private static final String REGO_V1_IMPORT = "import rego.v1";
+
     public MappingResult() {
-        imports.add("import rego.v1");
-        imports.add("import data.utils.helper as helper");
+        imports.add(REGO_V1_IMPORT);
+        imports.add(HELPER_UTILS_IMPORT);
+        imports.add(GENERIC_UTILS_IMPORT);
     }
 
     public MappingResult addFailure(String reason, String... parameters) {

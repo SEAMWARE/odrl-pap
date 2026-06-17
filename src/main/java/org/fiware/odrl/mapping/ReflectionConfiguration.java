@@ -5,12 +5,13 @@ import org.openapi.quarkus.odrl_yaml.model.Policy;
 import org.openapi.quarkus.odrl_yaml.model.PolicyPath;
 import org.openapi.quarkus.odrl_yaml.model.Service;
 import org.openapi.quarkus.odrl_yaml.model.ServiceListInner;
+import org.openapi.quarkus.odrl_yaml.model.ValidationResponse;
 
 /**
  * Register the output objects for reflection
  *
  * @author <a href="https://github.com/wistefan">Stefan Wiedemann</a>
  */
-@RegisterForReflection(targets = {Policy.class, Service.class, ServiceListInner.class, PolicyPath.class})
+@RegisterForReflection(targets = {Policy.class, Service.class, ServiceListInner.class, PolicyPath.class, ValidationResponse.class})
 public class ReflectionConfiguration {
 }

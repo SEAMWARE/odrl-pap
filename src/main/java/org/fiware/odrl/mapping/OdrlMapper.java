@@ -16,7 +16,6 @@ import java.util.Optional;
 import java.util.StringJoiner;
 
 import static org.fiware.odrl.mapping.OdrlConstants.ACTION_KEY;
-import static org.fiware.odrl.mapping.OdrlConstants.ASSIGNEE_KEY;
 import static org.fiware.odrl.mapping.OdrlConstants.ASSIGNER_KEY;
 import static org.fiware.odrl.mapping.OdrlConstants.GRAPH_KEY;
 import static org.fiware.odrl.mapping.OdrlConstants.ID_KEY;
@@ -24,7 +23,6 @@ import static org.fiware.odrl.mapping.OdrlConstants.ODRL_UID_KEY;
 import static org.fiware.odrl.mapping.OdrlConstants.PERMISSION_KEY;
 import static org.fiware.odrl.mapping.OdrlConstants.REFINEMENT_KEY;
 import static org.fiware.odrl.mapping.OdrlConstants.SUPPORTED_POLICY_TYPES;
-import static org.fiware.odrl.mapping.OdrlConstants.TARGET_KEY;
 import static org.fiware.odrl.mapping.OdrlConstants.TYPE_ASSET;
 import static org.fiware.odrl.mapping.OdrlConstants.TYPE_ASSET_COLLECTION;
 import static org.fiware.odrl.mapping.OdrlConstants.TYPE_KEY;
@@ -140,13 +138,24 @@ public class OdrlMapper {
     }
 
     /**
+     * Finds the first key present in the given map that matches a configured key for the attribute.
+     */
+    private Optional<String> findAttributeKey(Map<String, Object> map, OdrlAttribute attribute) {
+        return mappingConfiguration.getKeys(attribute).stream()
+                .filter(map::containsKey)
+                .findFirst();
+    }
+
+    /**
      * In certain cases(f.e. policies in the edc) certain elements(e.g. target, assigner, assignee) are created at the top-level of the policy and
      * then be relevant for all sub-elements(f.e. permissions). Therefor we store them for later use.
      */
     private void fillTopLevel(Map<String, Object> thePolicy) {
         Optional.ofNullable(thePolicy.get(ASSIGNER_KEY)).ifPresent(topLevelElements::setAssigner);
-        Optional.ofNullable(thePolicy.get(ASSIGNEE_KEY)).ifPresent(topLevelElements::setAssignee);
-        Optional.ofNullable(thePolicy.get(TARGET_KEY)).ifPresent(topLevelElements::setTarget);
+        findAttributeKey(thePolicy, OdrlAttribute.ASSIGNEE)
+                .ifPresent(key -> topLevelElements.setAssignee(key, thePolicy.get(key)));
+        findAttributeKey(thePolicy, OdrlAttribute.TARGET)
+                .ifPresent(key -> topLevelElements.setTarget(key, thePolicy.get(key)));
     }
 
     private void verifyObject(Map<String, Object> theObject) throws MappingException {
@@ -174,10 +183,12 @@ public class OdrlMapper {
         if (!thePermission.containsKey(ACTION_KEY)) {
             mappingResult.addFailure("The permission does not contain an action.");
         }
-        if (!thePermission.containsKey(TARGET_KEY) && topLevelElements.getTarget().isEmpty()) {
+        Optional<String> targetKey = findAttributeKey(thePermission, OdrlAttribute.TARGET);
+        if (targetKey.isEmpty() && topLevelElements.getTarget().isEmpty()) {
             mappingResult.addFailure("The permission does not contain a target.");
         }
-        if (!thePermission.containsKey(ASSIGNEE_KEY) && topLevelElements.getAssignee().isEmpty()) {
+        Optional<String> assigneeKey = findAttributeKey(thePermission, OdrlAttribute.ASSIGNEE);
+        if (assigneeKey.isEmpty() && topLevelElements.getAssignee().isEmpty()) {
             mappingResult.addFailure("The permission does not contain an assignee.");
         }
 
@@ -189,8 +200,14 @@ public class OdrlMapper {
         verifyObject(thePermission);
 
         mapAction(thePermission.get(ACTION_KEY));
-        mapAssignee(Optional.ofNullable(thePermission.get(ASSIGNEE_KEY)).orElseGet(() -> topLevelElements.getAssignee().get()));
-        mapTarget(Optional.ofNullable(thePermission.get(TARGET_KEY)).orElseGet(() -> topLevelElements.getTarget().get()));
+
+        String resolvedAssigneeKey = assigneeKey.orElseGet(() -> topLevelElements.getAssigneeKey().orElseThrow());
+        Object assigneeValue = assigneeKey.map(thePermission::get).orElseGet(() -> topLevelElements.getAssignee().orElseThrow());
+        mapAssignee(resolvedAssigneeKey, assigneeValue);
+
+        String resolvedTargetKey = targetKey.orElseGet(() -> topLevelElements.getTargetKey().orElseThrow());
+        Object targetValue = targetKey.map(thePermission::get).orElseGet(() -> topLevelElements.getTarget().orElseThrow());
+        mapTarget(resolvedTargetKey, targetValue);
 
         for (Map.Entry<String, Object> entry : thePermission.entrySet()) {
             boolean isConstraint = constraintMapper.isConstraint(entry.getKey());
@@ -208,8 +225,8 @@ public class OdrlMapper {
     }
 
 
-    private void mapTarget(Object theTarget) throws MappingException {
-        NamespacedValue target = getNamespaced(TARGET_KEY);
+    private void mapTarget(String targetKey, Object theTarget) throws MappingException {
+        NamespacedValue target = getNamespaced(targetKey);
 
         try {
             mapStringTarget(target, getStringOrByKey(theTarget, ID_KEY));
@@ -225,7 +242,7 @@ public class OdrlMapper {
         }
 
         if (type.equals(TYPE_ASSET)) {
-            mapTargetAsset(targetMap);
+            mapTargetAsset(target, targetMap);
         } else if (type.equals(TYPE_ASSET_COLLECTION)) {
             mapRefinementCollection(targetMap);
         } else {
@@ -233,8 +250,8 @@ public class OdrlMapper {
         }
     }
 
-    private void mapAssignee(Object theAssignee) throws MappingException {
-        if (mapStringAssignee(theAssignee)) {
+    private void mapAssignee(String assigneeKey, Object theAssignee) throws MappingException {
+        if (mapStringAssignee(assigneeKey, theAssignee)) {
             return;
         }
 
@@ -246,7 +263,7 @@ public class OdrlMapper {
         }
 
         if (type.equals(TYPE_PARTY)) {
-            mapAssigneeParty(assigneeMap);
+            mapAssigneeParty(assigneeKey, assigneeMap);
         } else if (type.equals(TYPE_PARTY_COLLECTION)) {
             mapRefinementCollection(assigneeMap);
         } else {
@@ -458,7 +475,7 @@ public class OdrlMapper {
         throw new MappingException(String.format("Was not able to extract a valid %s.", theKey));
     }
 
-    private boolean mapStringAssignee(Object theAssignee) throws MappingException {
+    private boolean mapStringAssignee(String assigneeKey, Object theAssignee) throws MappingException {
         boolean result = false;
         var assigneeString = "";
 
@@ -484,7 +501,7 @@ public class OdrlMapper {
                 getFromConfig(OdrlAttribute.ASSIGNEE, getNamespaced(assigneeString));
                 namespacedAssignee = getNamespaced(assigneeString);
             } catch (MappingException mappingException) {
-                namespacedAssignee = getNamespaced(ASSIGNEE_KEY);
+                namespacedAssignee = getNamespaced(assigneeKey);
                 assigneeId = assigneeString;
             }
             RegoMethod regoMethod = getFromConfig(OdrlAttribute.ASSIGNEE, namespacedAssignee);
@@ -502,22 +519,22 @@ public class OdrlMapper {
         mappingResult.addRule(String.format(regoMethod.regoMethod(), String.format(STRING_ESCAPE_TEMPLATE, targetId)));
     }
 
-    private void mapAssigneeParty(Map<String, Object> theParty) throws MappingException {
+    private void mapAssigneeParty(String assigneeKey, Map<String, Object> theParty) throws MappingException {
         verifyObject(theParty);
 
         Optional<Object> optionalUid = Optional.ofNullable(theParty.get(ODRL_UID_KEY));
         if (optionalUid.isPresent() && optionalUid.get() instanceof String uid) {
-            mapStringAssignee(uid);
+            mapStringAssignee(assigneeKey, uid);
         } else {
             mappingResult.addFailure("The party does not contain a valid uid.");
         }
     }
 
-    private void mapTargetAsset(Map<String, Object> theAsset) throws MappingException {
+    private void mapTargetAsset(NamespacedValue target, Map<String, Object> theAsset) throws MappingException {
         verifyObject(theAsset);
         Optional<Object> optionalUid = Optional.ofNullable(theAsset.get(ODRL_UID_KEY));
         if (optionalUid.isPresent() && optionalUid.get() instanceof String uid) {
-            mapStringTarget(getNamespaced(TARGET_KEY), uid);
+            mapStringTarget(target, uid);
         } else {
             mappingResult.addFailure("The asset does not contain a valid uid.");
         }
@@ -558,16 +575,20 @@ public class OdrlMapper {
     }
 
     private class TopLevelElements {
+        private String targetKey;
         private Object target;
+        private String assigneeKey;
         private Object assignee;
         private Object assigner;
 
-        public TopLevelElements setTarget(Object target) {
+        public TopLevelElements setTarget(String key, Object target) {
+            this.targetKey = key;
             this.target = target;
             return this;
         }
 
-        public TopLevelElements setAssignee(Object assignee) {
+        public TopLevelElements setAssignee(String key, Object assignee) {
+            this.assigneeKey = key;
             this.assignee = assignee;
             return this;
         }
@@ -577,8 +598,16 @@ public class OdrlMapper {
             return this;
         }
 
+        public Optional<String> getTargetKey() {
+            return Optional.ofNullable(targetKey);
+        }
+
         public Optional<Object> getTarget() {
             return Optional.ofNullable(target);
+        }
+
+        public Optional<String> getAssigneeKey() {
+            return Optional.ofNullable(assigneeKey);
         }
 
         public Optional<Object> getAssignee() {

@@ -1,0 +1,22 @@
+{
+  "@context": {
+    "odrl": "http://www.w3.org/ns/odrl/2/",
+    "dcp": "https://w3id.org/dspace/2024/1/",
+    "json": "https://odrl-pap.io/json#"
+  },
+  "@id": "urn:example:policy:dcp-membership-7005",
+  "odrl:uid": "urn:example:policy:dcp-membership-7005",
+  "@type": "odrl:Policy",
+  "odrl:permission": {
+    "odrl:target": "urn:example:asset:3",
+    "odrl:assignee": "json:any",
+    "odrl:action": {
+      "@id": "dcp:use"
+    },
+    "odrl:constraint": {
+      "odrl:leftOperand": "dcp:membershipType",
+      "odrl:operator": "odrl:eq",
+      "odrl:rightOperand": "full"
+    }
+  }
+}
