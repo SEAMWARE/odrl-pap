@@ -11,13 +11,13 @@ import org.fiware.odrl.jsonld.JsonLdHandler;
 import org.fiware.odrl.mapping.*;
 import org.fiware.odrl.persistence.PolicyRepository;
 import org.fiware.odrl.rego.DataResponse;
+import org.fiware.odrl.rego.OpaDataApi;
 import org.openapi.quarkus.odrl_yaml.api.UiApi;
 import org.openapi.quarkus.odrl_yaml.model.GenericJsonInput;
 import org.openapi.quarkus.odrl_yaml.model.Mapping;
 import org.openapi.quarkus.odrl_yaml.model.Mappings;
 import org.openapi.quarkus.odrl_yaml.model.ValidationRequest;
 import org.openapi.quarkus.odrl_yaml.model.ValidationResponse;
-import org.openapi.quarkus.opa_yaml.api.DataApiApi;
 import org.openapi.quarkus.opa_yaml.api.PolicyApiApi;
 
 import java.io.ByteArrayInputStream;
@@ -73,7 +73,7 @@ public class ValidationResource implements UiApi {
     public PolicyApiApi opaPolicyApi;
 
     @RestClient
-    private DataApiApi dataApiApi;
+    private OpaDataApi dataApiApi;
 
     @Inject
     private PolicyRepository policyRepository;
@@ -109,17 +109,17 @@ public class ValidationResource implements UiApi {
         }
         String tempId = PolicyRepository.generatePolicyId();
         try {
-            log.info("Validation request: " + objectMapper.writeValueAsString(validationRequest));
-            log.info("Incoming policy: " + objectMapper.writeValueAsString(validationRequest.getPolicy()));
+            log.debug("Validation request: {}", objectMapper.writeValueAsString(validationRequest));
 
             String compactedJson = jsonLdHandler.handleJsonLd(
                     new ByteArrayInputStream(objectMapper.writeValueAsBytes(validationRequest.getPolicy())),
                     validationRequest.getAdditionalContexts());
-            log.info("Compacted policy: " + compactedJson);
-
-            EvaluationContext evaluationContext = jsonLdHandler.detectEvaluationContext(compactedJson);
-            log.info("Detected evaluation context: {}", evaluationContext);
-
+            log.debug("Compacted policy: {}", compactedJson);
+            //default to http
+            EvaluationContext evaluationContext = EvaluationContext.HTTP;
+            if (validationRequest.getJsonInput() != null) {
+                evaluationContext = EvaluationContext.JSON;
+            }
             Map<String, Object> policyAsMap = objectMapper.readValue(
                     compactedJson, new TypeReference<Map<String, Object>>() {
                     });
@@ -137,12 +137,12 @@ public class ValidationResource implements UiApi {
             }
 
             Map<String, Object> opaInput = buildOpaInput(evaluationContext, validationRequest);
-
             Response dataResponse = dataApiApi.getDocumentWithPath(
                     String.format(IS_ALLOWED_PATH_TEMPLATE, tempId), opaInput, true, false, "full", false, false);
             DataResponse dataResponseObject = dataResponse.readEntity(DataResponse.class);
 
             ValidationResponse validationResponse = new ValidationResponse().allow(dataResponseObject.result());
+            log.debug("Validation response: {}", objectMapper.writeValueAsString(validationResponse));
             if (!dataResponseObject.result()) {
                 validationResponse.explanation(dataResponseObject.explanation());
             }

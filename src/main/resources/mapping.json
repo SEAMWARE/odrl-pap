@@ -84,6 +84,18 @@
         "regoPackage": "json.action as json_action",
         "regoMethod": "json_action.is_use(generic.payload)"
       }
+    },
+    "dcp": {
+      "read": {
+        "description": "Allows if the request scope is not a contract negotiation or transfer process.",
+        "regoPackage": "dcp.action as dcp_action",
+        "regoMethod": "dcp_action.is_read(generic.payload)"
+      },
+      "use": {
+        "description": "Allows any request scope unconditionally.",
+        "regoPackage": "dcp.action as dcp_action",
+        "regoMethod": "dcp_action.is_use(generic.payload)"
+      }
     }
   },
   "operator": {
@@ -332,6 +344,23 @@
         "description": "Returns the type field from the JSON payload.",
         "regoPackage": "json.leftOperand as json_lo",
         "regoMethod": "json_lo.payload_type(generic.payload)"
+      }
+    },
+    "dcp": {
+      "membershipType": {
+        "description": "Retrieves the membershipType from a MembershipCredential in the verifiable credentials.",
+        "regoPackage": "dcp.leftOperand as dcp_lo",
+        "regoMethod": "dcp_lo.membership_type(generic.subject)"
+      },
+      "scope": {
+        "description": "Retrieves the scope from the payload.",
+        "regoPackage": "dcp.leftOperand as dcp_lo",
+        "regoMethod": "dcp_lo.scope(generic.request)"
+      },
+      "participant": {
+        "description": "Retrieves the participant from the payload.",
+        "regoPackage": "dcp.leftOperand as dcp_lo",
+        "regoMethod": "dcp_lo.participant(generic.request)"
       }
     }
   },

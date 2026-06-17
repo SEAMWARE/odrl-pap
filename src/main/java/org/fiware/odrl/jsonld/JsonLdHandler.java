@@ -54,12 +54,6 @@ public class JsonLdHandler {
      */
     private static final String JSON_EVALUATION_CONTEXT_VALUE = "json";
 
-    /**
-     * Compiled regex that matches any compacted JSON-LD term prefixed with
-     * {@code "json:"} (e.g., {@code "json:read"}, {@code "json:payloadValue"}).
-     */
-    private static final Pattern JSON_NAMESPACE_PATTERN = Pattern.compile("\"json:");
-
     @Inject
     private DocumentLoader documentLoader;
 
@@ -181,66 +175,6 @@ public class JsonLdHandler {
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Failed to convert additional context to JSON", e);
         }
-    }
-
-    /**
-     * Detects the evaluation context for a compacted ODRL policy. The routing
-     * decision is driven entirely by the policy's own JSON-LD content — the
-     * {@link org.fiware.odrl.Pep} enum is not involved.
-     *
-     * <p>Detection logic (in priority order):
-     * <ol>
-     *   <li>If the policy (or any sub-policy in {@code @graph}) contains an
-     *       explicit {@code pap:evaluationContext} field whose value is
-     *       {@code "json"}, return {@link EvaluationContext#JSON}.</li>
-     *   <li>If the serialised JSON contains any {@code "json:"}-prefixed term
-     *       (action, left operand, etc.), return
-     *       {@link EvaluationContext#JSON}.</li>
-     *   <li>Otherwise, return {@link EvaluationContext#HTTP} (the default).</li>
-     * </ol>
-     *
-     * @param compactedJson the compacted JSON-LD string produced by
-     *                      {@link #handleJsonLd(InputStream)}
-     * @return the detected {@link EvaluationContext}
-     */
-    public EvaluationContext detectEvaluationContext(String compactedJson) {
-        // 1. Check for explicit pap:evaluationContext field
-        try {
-            Map<String, Object> policyMap = objectMapper.readValue(
-                    compactedJson, new TypeReference<Map<String, Object>>() {});
-
-            if (hasJsonEvaluationContext(policyMap)) {
-                log.debug("Detected JSON evaluation context via explicit pap:evaluationContext field");
-                return EvaluationContext.JSON;
-            }
-
-            // Also check inside @graph if present
-            Object graph = policyMap.get("@graph");
-            if (graph instanceof List<?> graphList) {
-                for (Object entry : graphList) {
-                    if (entry instanceof Map<?, ?>) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> graphEntry = (Map<String, Object>) entry;
-                        if (hasJsonEvaluationContext(graphEntry)) {
-                            log.debug("Detected JSON evaluation context via pap:evaluationContext in @graph entry");
-                            return EvaluationContext.JSON;
-                        }
-                    }
-                }
-            }
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to parse compacted JSON for evaluation context detection, falling back to text scan", e);
-        }
-
-        // 2. Fall back to scanning for json: namespace prefixed terms
-        if (JSON_NAMESPACE_PATTERN.matcher(compactedJson).find()) {
-            log.debug("Detected JSON evaluation context via json:-prefixed terms in compacted policy");
-            return EvaluationContext.JSON;
-        }
-
-        // 3. Default to HTTP
-        log.debug("No JSON evaluation context indicators found, defaulting to HTTP");
-        return EvaluationContext.HTTP;
     }
 
     /**

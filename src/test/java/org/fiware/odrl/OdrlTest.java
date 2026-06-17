@@ -338,7 +338,10 @@ public abstract class OdrlTest {
 	public static Stream<Arguments> jsonPolicyPaths() {
 		return Stream.of(
 				Arguments.of("/examples/json/7001/_7001.json"),
-				Arguments.of("/examples/json/7002/_7002.json")
+				Arguments.of("/examples/json/7002/_7002.json"),
+				Arguments.of("/examples/json/7003/_7003.json"),
+				Arguments.of("/examples/json/7004/_7004.json"),
+				Arguments.of("/examples/json/7005/_7005.json")
 		);
 	}
 

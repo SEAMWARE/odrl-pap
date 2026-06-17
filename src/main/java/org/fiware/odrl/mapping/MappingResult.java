@@ -1,6 +1,7 @@
 package org.fiware.odrl.mapping;
 
 import io.quarkus.qute.ImmutableList;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,6 +14,7 @@ import java.util.StringJoiner;
 /**
  * @author <a href="https://github.com/wistefan">Stefan Wiedemann</a>
  */
+@RegisterForReflection
 public class MappingResult {
 
 

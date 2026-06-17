@@ -198,6 +198,56 @@ public class GenericJsonValidationTest {
     }
 
     // -----------------------------------------------------------------------
+    // DCP mapping resolution tests
+    // -----------------------------------------------------------------------
+
+    /**
+     * Verifies that all expected {@code dcp:*} action mappings are present in
+     * {@code mapping.json} and resolve to the correct rego method signatures.
+     */
+    @ParameterizedTest(name = "dcp:{0} action -> {1}")
+    @MethodSource("dcpActionMappings")
+    @DisplayName("DCP action mappings should be present and correct")
+    void testDcpActionMappingResolution(String actionName,
+                                        String expectedRegoMethod) {
+        NamespacedMap actionMap = mappingConfiguration.get(OdrlAttribute.ACTION);
+        assertNotNull(actionMap, "Action mappings should exist");
+        RegoMap dcpActions = actionMap.get("dcp");
+        assertNotNull(dcpActions, "dcp namespace should exist in action mappings");
+        RegoMethod method = dcpActions.get(actionName);
+        assertNotNull(method, String.format("dcp:%s action should be mapped", actionName));
+        assertEquals(expectedRegoMethod, method.regoMethod(),
+                String.format("dcp:%s rego method should match", actionName));
+    }
+
+    /**
+     * Provides test cases for all {@code dcp:*} action mapping entries.
+     */
+    static Stream<Arguments> dcpActionMappings() {
+        return Stream.of(
+                Arguments.of("read", "dcp_action.is_read(generic.payload)"),
+                Arguments.of("use", "dcp_action.is_use(generic.payload)")
+        );
+    }
+
+    /**
+     * Verifies that the {@code dcp:membershipType} left-operand mapping is
+     * present in {@code mapping.json} and resolves to the correct rego method.
+     */
+    @Test
+    @DisplayName("DCP membershipType leftOperand mapping should be present and correct")
+    void testDcpMembershipTypeLeftOperandMappingResolution() {
+        NamespacedMap loMap = mappingConfiguration.get(OdrlAttribute.LEFT_OPERAND);
+        assertNotNull(loMap, "LeftOperand mappings should exist");
+        RegoMap dcpLo = loMap.get("dcp");
+        assertNotNull(dcpLo, "dcp namespace should exist in leftOperand mappings");
+        RegoMethod method = dcpLo.get("membershipType");
+        assertNotNull(method, "dcp:membershipType leftOperand should be mapped");
+        assertEquals("dcp_lo.membership_type(generic.subject)", method.regoMethod(),
+                "dcp:membershipType rego method should match");
+    }
+
+    // -----------------------------------------------------------------------
     // Rego generation tests — OdrlMapper with json: policies
     // -----------------------------------------------------------------------
 
@@ -304,54 +354,92 @@ public class GenericJsonValidationTest {
     }
 
     // -----------------------------------------------------------------------
-    // Evaluation context detection tests
+    // Rego generation tests — OdrlMapper with dcp: policies
     // -----------------------------------------------------------------------
 
     /**
-     * Verifies that the JSON test policy (7001) is correctly detected as
-     * requiring JSON evaluation context, based on its
-     * {@code pap:evaluationContext} field.
+     * Verifies that the mapper generates correct Rego for a {@code dcp:read}
+     * policy. Corresponds to test policy 7003.
      */
     @Test
-    @DisplayName("JSON test policy 7001 should be detected as JSON evaluation context")
-    void testJsonReadPolicyDetectedAsJsonContext() throws Exception {
-        JsonLdHandler handler = createJsonLdHandler();
-        String json = OBJECT_MAPPER.writeValueAsString(createJsonReadPolicy());
+    @DisplayName("OdrlMapper should generate correct rego for dcp:read policy (7003)")
+    void testMapperGeneratesCorrectRegoForDcpReadPolicy() {
+        OdrlMapper mapper = createMapper();
+        Map<String, Object> policy = createDcpReadPolicy();
 
-        EvaluationContext ctx = handler.detectEvaluationContext(json);
-        assertEquals(EvaluationContext.JSON, ctx,
-                "Policy with pap:evaluationContext=json should be JSON context");
+        MappingResult result = mapper.mapOdrl(policy);
+        assertFalse(result.isFailed(),
+                "Mapping should not fail: " + result.getFailureReasons());
+
+        String rego = result.getRego(TEST_PACKAGE_NAME);
+
+        assertTrue(rego.contains("import data.dcp.action as dcp_action"),
+                "Should import dcp action module");
+        assertTrue(rego.contains("dcp_action.is_read(generic.payload)"),
+                "Should have dcp:read action rule referencing generic.payload");
+        assertTrue(rego.contains("import data.utils.generic as generic"),
+                "Should import utils.generic for json evaluation");
+
+        assertEquals("urn:example:policy:dcp-read-7003", result.getUid(),
+                "Policy UID should be captured");
     }
 
     /**
-     * Verifies that the JSON test policy (7002, with constraint) is correctly
-     * detected as requiring JSON evaluation context.
+     * Verifies that the mapper generates correct Rego for a {@code dcp:use}
+     * policy. Corresponds to test policy 7004.
      */
     @Test
-    @DisplayName("JSON test policy 7002 should be detected as JSON evaluation context")
-    void testJsonConstraintPolicyDetectedAsJsonContext() throws Exception {
-        JsonLdHandler handler = createJsonLdHandler();
-        String json = OBJECT_MAPPER.writeValueAsString(createJsonConstraintPolicy());
+    @DisplayName("OdrlMapper should generate correct rego for dcp:use policy (7004)")
+    void testMapperGeneratesCorrectRegoForDcpUsePolicy() {
+        OdrlMapper mapper = createMapper();
+        Map<String, Object> policy = createDcpUsePolicy();
 
-        EvaluationContext ctx = handler.detectEvaluationContext(json);
-        assertEquals(EvaluationContext.JSON, ctx,
-                "Policy with json: namespace terms should be JSON context");
+        MappingResult result = mapper.mapOdrl(policy);
+        assertFalse(result.isFailed(),
+                "Mapping should not fail: " + result.getFailureReasons());
+
+        String rego = result.getRego(TEST_PACKAGE_NAME);
+
+        assertTrue(rego.contains("import data.dcp.action as dcp_action"),
+                "Should import dcp action module");
+        assertTrue(rego.contains("dcp_action.is_use(generic.payload)"),
+                "Should have dcp:use action rule referencing generic.payload");
+
+        assertEquals("urn:example:policy:dcp-use-7004", result.getUid(),
+                "Policy UID should be captured");
     }
 
     /**
-     * Verifies that a standard ODRL HTTP policy is detected as requiring
-     * HTTP evaluation context (backward compatibility).
+     * Verifies that the mapper generates correct Rego for a {@code dcp:use}
+     * policy with a {@code dcp:membershipType} constraint.
+     * Corresponds to test policy 7005.
      */
     @Test
-    @DisplayName("Standard ODRL HTTP policy should be detected as HTTP context")
-    void testHttpPolicyDetectedAsHttpContext() throws Exception {
-        JsonLdHandler handler = createJsonLdHandler();
-        Map<String, Object> httpPolicy = createHttpPolicy();
-        String json = OBJECT_MAPPER.writeValueAsString(httpPolicy);
+    @DisplayName("OdrlMapper should generate correct rego for dcp policy with membershipType constraint (7005)")
+    void testMapperGeneratesCorrectRegoForDcpMembershipTypePolicy() {
+        OdrlMapper mapper = createMapper();
+        Map<String, Object> policy = createDcpMembershipTypePolicy();
 
-        EvaluationContext ctx = handler.detectEvaluationContext(json);
-        assertEquals(EvaluationContext.HTTP, ctx,
-                "Standard ODRL policy without json: namespace should be HTTP context");
+        MappingResult result = mapper.mapOdrl(policy);
+        assertFalse(result.isFailed(),
+                "Mapping should not fail: " + result.getFailureReasons());
+
+        String rego = result.getRego(TEST_PACKAGE_NAME);
+
+        assertTrue(rego.contains("import data.dcp.action as dcp_action"),
+                "Should import dcp action module");
+        assertTrue(rego.contains("import data.dcp.leftOperand as dcp_lo"),
+                "Should import dcp leftOperand module");
+        assertTrue(rego.contains("import data.odrl.operator as odrl_operator"),
+                "Should import odrl operator module");
+        assertTrue(rego.contains("dcp_action.is_use(generic.payload)"),
+                "Should have dcp:use action rule");
+        assertTrue(rego.contains(
+                        "odrl_operator.eq_operator(dcp_lo.membership_type(generic.subject),\"full\")"),
+                "Should have eq constraint checking membershipType == full");
+
+        assertEquals("urn:example:policy:dcp-membership-7005", result.getUid(),
+                "Policy UID should be captured");
     }
 
     // -----------------------------------------------------------------------
@@ -520,6 +608,67 @@ public class GenericJsonValidationTest {
         permission.put("odrl:target", "urn:example:resource:2");
         permission.put("odrl:assignee", "json:any");
         permission.put("odrl:action", Map.of("@id", "json:use"));
+        permission.put("odrl:constraint", constraint);
+
+        policy.put("odrl:permission", permission);
+        return policy;
+    }
+
+    /**
+     * Creates a compacted JSON representation of test policy 7003: a
+     * {@code dcp:read} policy with {@code json:any} assignee.
+     */
+    private static Map<String, Object> createDcpReadPolicy() {
+        Map<String, Object> policy = new LinkedHashMap<>();
+        policy.put("@type", "odrl:Policy");
+        policy.put("odrl:uid", "urn:example:policy:dcp-read-7003");
+
+        Map<String, Object> permission = new LinkedHashMap<>();
+        permission.put("odrl:target", "urn:example:asset:1");
+        permission.put("odrl:assignee", "json:any");
+        permission.put("odrl:action", Map.of("@id", "dcp:read"));
+
+        policy.put("odrl:permission", permission);
+        return policy;
+    }
+
+    /**
+     * Creates a compacted JSON representation of test policy 7004: a
+     * {@code dcp:use} policy with {@code json:any} assignee.
+     */
+    private static Map<String, Object> createDcpUsePolicy() {
+        Map<String, Object> policy = new LinkedHashMap<>();
+        policy.put("@type", "odrl:Policy");
+        policy.put("odrl:uid", "urn:example:policy:dcp-use-7004");
+
+        Map<String, Object> permission = new LinkedHashMap<>();
+        permission.put("odrl:target", "urn:example:asset:2");
+        permission.put("odrl:assignee", "json:any");
+        permission.put("odrl:action", Map.of("@id", "dcp:use"));
+
+        policy.put("odrl:permission", permission);
+        return policy;
+    }
+
+    /**
+     * Creates a compacted JSON representation of test policy 7005: a
+     * {@code dcp:use} policy with a {@code dcp:membershipType == "full"}
+     * constraint.
+     */
+    private static Map<String, Object> createDcpMembershipTypePolicy() {
+        Map<String, Object> policy = new LinkedHashMap<>();
+        policy.put("@type", "odrl:Policy");
+        policy.put("odrl:uid", "urn:example:policy:dcp-membership-7005");
+
+        Map<String, Object> constraint = new LinkedHashMap<>();
+        constraint.put("odrl:leftOperand", "dcp:membershipType");
+        constraint.put("odrl:operator", "odrl:eq");
+        constraint.put("odrl:rightOperand", "full");
+
+        Map<String, Object> permission = new LinkedHashMap<>();
+        permission.put("odrl:target", "urn:example:asset:3");
+        permission.put("odrl:assignee", "json:any");
+        permission.put("odrl:action", Map.of("@id", "dcp:use"));
         permission.put("odrl:constraint", constraint);
 
         policy.put("odrl:permission", permission);

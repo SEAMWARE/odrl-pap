@@ -1,0 +1,17 @@
+{
+  "@context": {
+    "odrl": "http://www.w3.org/ns/odrl/2/",
+    "dcp": "https://w3id.org/dspace/2024/1/",
+    "json": "https://odrl-pap.io/json#"
+  },
+  "@id": "urn:example:policy:dcp-read-7003",
+  "odrl:uid": "urn:example:policy:dcp-read-7003",
+  "@type": "odrl:Policy",
+  "odrl:permission": {
+    "odrl:target": "urn:example:asset:1",
+    "odrl:assignee": "json:any",
+    "odrl:action": {
+      "@id": "dcp:read"
+    }
+  }
+}
