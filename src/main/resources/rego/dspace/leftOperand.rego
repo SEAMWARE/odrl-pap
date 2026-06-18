@@ -1,8 +1,8 @@
-package dcp.leftOperand
+package dspace.leftOperand
 
 import rego.v1
 
-## dcp:membershipType
+## dspace:membershipType
 # retrieves the membershipType from a MembershipCredential in the vc claims
 membership_type(subject) := result if {
 	some vc in subject.claims.vc
@@ -12,10 +12,10 @@ membership_type(subject) := result if {
 	result := cs.membershipType
 }
 
-## dcp:scope
+## dspace:scope
 # retrieves the scope from the payload
 scope(request) := request.payload.scope
 
-## dcp:participant
+## dspace:participant
 # retrieves the participant from the payload
 participant(request) := request.subject.identity

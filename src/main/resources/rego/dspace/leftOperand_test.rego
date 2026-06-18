@@ -1,6 +1,6 @@
-package dcp.leftOperand_test
+package dspace.leftOperand_test
 
-import data.dcp.leftOperand
+import data.dspace.leftOperand
 
 # ---------- membership_type() ----------
 test_membership_type_single_vc if {
