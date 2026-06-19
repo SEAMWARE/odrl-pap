@@ -117,6 +117,16 @@
 | leftOperand | tmf:lifecycleStatus | life_cycle_status(entity) | return the lifeCycleStatus of a given entity |
 | leftOperand | tmf:resource | resource_type(http_part) | retrieves the type of the resource from the path |
 
+## dspace
+
+| ODRL Class | ODRL Key | Rego-Method | Description |
+| --- | --- | --- | --- |
+| action | dspace:read | default | allows if the request scope is not a contract negotiation or transfer process |
+| action | dspace:use | is_use(_) | allows any request scope unconditionally |
+| leftOperand | dspace:membershipType | membership_type(subject) | retrieves the membershipType from a MembershipCredential in the vc claims |
+| leftOperand | dspace:scope | scope(request) | retrieves the scope from the payload |
+| leftOperand | dspace:participant | participant(request) | retrieves the participant from the payload |
+
 ## vc
 
 | ODRL Class | ODRL Key | Rego-Method | Description |
