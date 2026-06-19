@@ -1,8 +1,8 @@
-package dcp.action
+package dspace.action
 
 import rego.v1
 
-## dcp:read
+## dspace:read
 # allows if the request scope is not a contract negotiation or transfer process
 default is_read(payload) := false
 
@@ -11,6 +11,6 @@ is_read(payload) if {
 	payload.scope != "transfer.process"
 }
 
-## dcp:use
+## dspace:use
 # allows any request scope unconditionally
 is_use(_) := true

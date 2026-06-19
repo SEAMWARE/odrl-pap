@@ -1,6 +1,6 @@
-package dcp.action_test
+package dspace.action_test
 
-import data.dcp.action
+import data.dspace.action
 
 # ---------- is_read() ----------
 # Should return true if the scope is not contract.negotiation or transfer.process

@@ -34,7 +34,7 @@
       "@id": "https://odrl-pap.io/json#",
       "@prefix": true
     },
-    "dcp": {
+    "dspace": {
       "@id": "https://w3id.org/dspace/2024/1/",
       "@prefix": true
     }
