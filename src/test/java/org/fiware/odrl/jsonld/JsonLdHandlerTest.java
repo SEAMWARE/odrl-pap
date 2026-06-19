@@ -174,8 +174,8 @@ public class JsonLdHandlerTest {
         Map<String, Object> mcpOdrlContext = Map.of(
                 "mcp", Map.of("@id", "http://www.w3.org/ns/odrl/2/", "@prefix", true));
 
-        Map<String, Object> dcpOdrlContext = Map.of(
-                "dcp", Map.of("@id", "http://www.w3.org/ns/odrl/2/", "@prefix", true));
+        Map<String, Object> dspaceOdrlContext = Map.of(
+                "dspace", Map.of("@id", "http://www.w3.org/ns/odrl/2/", "@prefix", true));
 
         return Stream.of(
                 Arguments.of(
@@ -184,9 +184,9 @@ public class JsonLdHandlerTest {
                         "mcp",
                         "odrl"),
                 Arguments.of(
-                        "Replace odrl: with dcp:",
-                        List.of(dcpOdrlContext),
-                        "dcp",
+                        "Replace odrl: with dspace:",
+                        List.of(dspaceOdrlContext),
+                        "dspace",
                         "odrl")
         );
     }
