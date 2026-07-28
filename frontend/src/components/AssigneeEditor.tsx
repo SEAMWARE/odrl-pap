@@ -1,30 +1,62 @@
-import { Form, Row, Col, Stack } from 'react-bootstrap';
+/**
+ * Assignee editor component for ODRL policies.
+ *
+ * Supports two modes:
+ * - **Simple Assignee:** A custom identifier or a selection from
+ *   available assignee mappings (via namespace-grouped dropdown).
+ * - **Party Collection:** A typed collection with refinement constraints.
+ *
+ * Includes contextual help text and improved visual separation for
+ * the PartyCollection mode.
+ */
+import { Form, Row, Col, Stack, Card } from 'react-bootstrap';
 import { useState } from 'react';
 import type { Mappings } from '../services/api';
+import { useI18n } from '../i18n';
 import ConstraintBuilder from './ConstraintBuilder';
+import NamespacedDropdown from './NamespacedDropdown';
 
 interface AssigneeEditorProps {
-  assignee: any;
-  setAssignee: (assignee: any) => void;
+  /** Current assignee value (string ID, `{@id}` object, or PartyCollection). */
+  assignee: unknown;
+  /** Callback to update the assignee value. */
+  setAssignee: (assignee: unknown) => void;
+  /** Available mappings for populating dropdowns. */
   mappings: Mappings;
 }
 
+/** Checks whether the assignee is a PartyCollection object. */
+function isPartyCollection(assignee: unknown): boolean {
+  return (
+    typeof assignee === 'object' &&
+    assignee !== null &&
+    (assignee as Record<string, unknown>)['@type'] === 'PartyCollection'
+  );
+}
+
+/**
+ * Assignee editor with namespace-grouped dropdowns, help text,
+ * and improved Party Collection UX.
+ */
 const AssigneeEditor = ({ assignee, setAssignee, mappings }: AssigneeEditorProps) => {
-  const [simpleAssigneeType, setSimpleAssigneeType] = useState('text'); // 'text' or 'dropdown'
+  const { strings } = useI18n();
+  const t = strings.assigneeEditor;
 
-  const isCollection = typeof assignee === 'object' && assignee !== null && assignee['@type'] === 'PartyCollection';
+  const [simpleAssigneeType, setSimpleAssigneeType] = useState<'text' | 'dropdown'>('text');
 
+  const isCollection = isPartyCollection(assignee);
+
+  /** Switches between simple and collection assignee modes. */
   const setType = (type: 'simple' | 'collection') => {
     if (type === 'simple') {
-      setAssignee(''); // Reset to a simple string
-      setSimpleAssigneeType('text'); // Default to text input for simple
+      setAssignee('');
+      setSimpleAssigneeType('text');
     } else {
       setAssignee({ '@type': 'PartyCollection', 'odrl:refinement': [] });
     }
   };
 
-  const anyMappings = mappings as any;
-  const availableAssignees = anyMappings.assignees;
+  const availableAssignees = mappings.assignees ?? [];
 
   return (
     <Stack gap={3}>
@@ -33,14 +65,14 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings }: AssigneeEditorProps
           <Form.Check
             type="radio"
             id="simple-assignee"
-            label="Simple Assignee"
+            label={t.simpleAssignee}
             checked={!isCollection}
             onChange={() => setType('simple')}
           />
           <Form.Check
             type="radio"
             id="collection-assignee"
-            label="Party Collection"
+            label={t.partyCollection}
             checked={isCollection}
             onChange={() => setType('collection')}
           />
@@ -48,66 +80,71 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings }: AssigneeEditorProps
       </Row>
 
       {!isCollection ? (
-        <Stack gap={2} className="p-3 border rounded">
-          <Row>
-            <Col>
-              <Form.Check
-                type="radio"
-                id="simple-assignee-text"
-                label="Custom Assignee"
-                checked={simpleAssigneeType === 'text'}
-                onChange={() => {
-                  setSimpleAssigneeType('text');
-                  setAssignee(''); // Clear value when switching type
-                }}
-              />
-              <Form.Check
-                type="radio"
-                id="simple-assignee-dropdown"
-                label="Select from options"
-                checked={simpleAssigneeType === 'dropdown'}
-                onChange={() => {
-                  setSimpleAssigneeType('dropdown');
-                  setAssignee({ '@id': '' }); // Clear value when switching type
-                }}
-                disabled={!availableAssignees || availableAssignees.length === 0}
-              />
-            </Col>
-          </Row>
-          <Row>
-            <Col>
-              {simpleAssigneeType === 'text' ? (
-                <Form.Control
-                  type="text"
-                  placeholder="Enter Assignee ID"
-                  value={assignee || ''}
-                  onChange={(e) => setAssignee(e.target.value)}
+        <Card body style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
+          <Stack gap={2}>
+            <Row>
+              <Col>
+                <Form.Check
+                  type="radio"
+                  id="simple-assignee-text"
+                  label={t.customAssignee}
+                  checked={simpleAssigneeType === 'text'}
+                  onChange={() => {
+                    setSimpleAssigneeType('text');
+                    setAssignee('');
+                  }}
                 />
-              ) : (
-                <Form.Select
-                  value={assignee?.['@id'] || ''}
-                  onChange={(e) => setAssignee({ '@id': e.target.value })}
-                >
-                  <option>Select an assignee</option>
-                  {availableAssignees?.map((a: any) => (
-                    <option key={a.name} value={a.name}>{a.name} - {a.description}</option>
-                  ))}
-                </Form.Select>
-              )}
-            </Col>
-          </Row>
-        </Stack>
+                <Form.Check
+                  type="radio"
+                  id="simple-assignee-dropdown"
+                  label={t.selectFromOptions}
+                  checked={simpleAssigneeType === 'dropdown'}
+                  onChange={() => {
+                    setSimpleAssigneeType('dropdown');
+                    setAssignee({ '@id': '' });
+                  }}
+                  disabled={availableAssignees.length === 0}
+                />
+              </Col>
+            </Row>
+            <Row>
+              <Col>
+                {simpleAssigneeType === 'text' ? (
+                  <Form.Control
+                    type="text"
+                    placeholder={t.enterAssigneeId}
+                    value={(assignee as string) || ''}
+                    onChange={(e) => setAssignee(e.target.value)}
+                    aria-label={t.customAssignee}
+                  />
+                ) : (
+                  <NamespacedDropdown
+                    items={availableAssignees}
+                    value={(assignee as Record<string, string>)?.['@id'] || ''}
+                    onChange={(val) => setAssignee({ '@id': val })}
+                    placeholder={t.selectAssignee}
+                    ariaLabel={t.selectAssignee}
+                  />
+                )}
+              </Col>
+            </Row>
+          </Stack>
+        </Card>
       ) : (
-        <Stack gap={3} className="p-3 border rounded">
-          <h5>Party Collection</h5>
-          <hr/>
-          <h6>Refinements</h6>
-          <ConstraintBuilder
-            parent={assignee}
-            setParent={setAssignee}
-            mappings={mappings}
-          />
-        </Stack>
+        <Card style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
+          <Card.Header>
+            <strong>{t.partyCollection}</strong>
+          </Card.Header>
+          <Card.Body>
+            <h6>{t.refinementsTitle}</h6>
+            <div className="text-muted small mb-3">{t.refinementsHelp}</div>
+            <ConstraintBuilder
+              parent={assignee as Record<string, unknown>}
+              setParent={setAssignee as (v: Record<string, unknown>) => void}
+              mappings={mappings}
+            />
+          </Card.Body>
+        </Card>
       )}
     </Stack>
   );

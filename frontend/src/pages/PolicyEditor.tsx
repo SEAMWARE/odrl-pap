@@ -1,33 +1,49 @@
+/**
+ * Policy editor page.
+ *
+ * Provides tabs for visual policy building ("Policy Builder") and
+ * raw ODRL JSON editing, plus a validation modal for testing policies.
+ */
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Form, Button, Tabs, Tab, Modal, Alert } from 'react-bootstrap';
 import { PapService } from '../api/services/PapService';
 import { UiService } from '../api/services/UiService';
-import type { OdrlPolicyJson, Policy, TestRequest, ValidationResponse } from '../services/api';
-import Baukasten from '../components/Baukasten';
+import type { OdrlPolicyJson, Policy, ValidationResponse } from '../services/api';
+import { TestRequest } from '../api/models/TestRequest';
+import PolicyBuilder from '../components/PolicyBuilder';
 import ValidationEditor from '../components/ValidationEditor';
+import { useI18n } from '../i18n';
 
+/** Template for a new, empty ODRL policy. */
 const NEW_POLICY_TEMPLATE = {
   '@context': 'http://www.w3.org/ns/odrl/2/',
   '@type': 'odrl:Policy',
   'odrl:permission': {},
 };
 
+/** Default test request values for the validation modal. */
 const DEFAULT_TEST_REQUEST: TestRequest = {
-    method: 'GET',
-    host: 'example.com',
-    path: '/',
-    headers: {
-        'content-type': 'application/json'
-    },
-    body: {}
-}
+  method: TestRequest.method.GET,
+  host: 'example.com',
+  path: '/',
+  headers: {
+    'content-type': 'application/json',
+  },
+  body: {},
+};
 
+/**
+ * Page component for creating and editing ODRL policies.
+ */
 const PolicyEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { strings } = useI18n();
+  const t = strings.policyEditor;
+
   const [policy, setPolicy] = useState<OdrlPolicyJson>({});
-  const [key, setKey] = useState('baukasten');
+  const [activeTab, setActiveTab] = useState('builder');
 
   // Validation state
   const [showValidation, setShowValidation] = useState(false);
@@ -41,7 +57,6 @@ const PolicyEditor = () => {
         .then((p: Policy) => setPolicy(JSON.parse(p.odrl!)))
         .catch(console.error);
     } else {
-      // Create a new policy with a generated UID
       const newPolicy = {
         ...NEW_POLICY_TEMPLATE,
         'odrl:uid': crypto.randomUUID(),
@@ -50,6 +65,7 @@ const PolicyEditor = () => {
     }
   }, [id]);
 
+  /** Saves the policy (create or update). */
   const handleSave = () => {
     const requestBody = policy;
     if (id) {
@@ -63,40 +79,44 @@ const PolicyEditor = () => {
     }
   };
 
+  /** Runs the policy validation against the test request. */
   const handleValidate = () => {
     try {
-      // The body from the textarea is a string, try to parse it.
-      const body = typeof testRequest.body === 'string' ? JSON.parse(testRequest.body) : testRequest.body;
+      const body =
+        typeof testRequest.body === 'string'
+          ? JSON.parse(testRequest.body)
+          : testRequest.body;
       const finalTestRequest = { ...testRequest, body };
 
       const requestBody = { policy, testRequest: finalTestRequest };
       UiService.validatePolicy(requestBody)
         .then(setValidationResult)
-        .catch(err => setValidationError(err.message));
-    } catch (e: any) {
+        .catch((err: Error) => setValidationError(err.message));
+    } catch {
       setValidationError('Invalid JSON in body');
     }
   };
 
+  /** Closes the validation modal and resets results. */
   const handleCloseValidation = () => {
     setShowValidation(false);
     setValidationResult(null);
     setValidationError('');
-  }
+  };
 
   return (
     <>
-      <h1>{id ? 'Edit Policy' : 'New Policy'}</h1>
+      <h1>{id ? t.editTitle : t.newTitle}</h1>
       <Tabs
         id="policy-editor-tabs"
-        activeKey={key}
-        onSelect={(k) => setKey(k!)}
+        activeKey={activeTab}
+        onSelect={(k) => setActiveTab(k!)}
         className="mb-3"
       >
-        <Tab eventKey="baukasten" title="Baukasten">
-          <Baukasten policy={policy} setPolicy={setPolicy} />
+        <Tab eventKey="builder" title={t.tabBuilder}>
+          <PolicyBuilder policy={policy} setPolicy={setPolicy} />
         </Tab>
-        <Tab eventKey="odrl" title="Raw ODRL">
+        <Tab eventKey="odrl" title={t.tabRawOdrl}>
           <Form.Control
             as="textarea"
             rows={20}
@@ -106,14 +126,20 @@ const PolicyEditor = () => {
         </Tab>
       </Tabs>
       <hr />
-      <Button variant="primary" onClick={handleSave}>Save</Button>
-      <Button variant="secondary" className="ms-2" onClick={() => navigate('/')}>Cancel</Button>
-      <Button variant="info" className="ms-2" onClick={() => setShowValidation(true)}>Validate</Button>
+      <Button variant="primary" onClick={handleSave}>
+        {strings.common.save}
+      </Button>
+      <Button variant="secondary" className="ms-2" onClick={() => navigate('/')}>
+        {strings.common.cancel}
+      </Button>
+      <Button variant="info" className="ms-2" onClick={() => setShowValidation(true)}>
+        {t.validate}
+      </Button>
 
       {/* Validation Modal */}
       <Modal show={showValidation} onHide={handleCloseValidation} size="lg">
         <Modal.Header closeButton>
-          <Modal.Title>Validate Policy</Modal.Title>
+          <Modal.Title>{strings.validationEditor.title}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <ValidationEditor testRequest={testRequest} setTestRequest={setTestRequest} />
@@ -124,12 +150,18 @@ const PolicyEditor = () => {
             </Alert>
           )}
           {validationError && (
-            <Alert variant="danger" className="mt-3">{validationError}</Alert>
+            <Alert variant="danger" className="mt-3">
+              {validationError}
+            </Alert>
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseValidation}>Close</Button>
-          <Button variant="primary" onClick={handleValidate}>Run Validation</Button>
+          <Button variant="secondary" onClick={handleCloseValidation}>
+            {strings.common.close}
+          </Button>
+          <Button variant="primary" onClick={handleValidate}>
+            {strings.validationEditor.runValidation}
+          </Button>
         </Modal.Footer>
       </Modal>
     </>
