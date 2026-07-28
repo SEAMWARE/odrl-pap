@@ -3,17 +3,29 @@
  *
  * Provides tabs for visual policy building ("Policy Builder") and
  * raw ODRL JSON editing, plus a validation modal for testing policies.
+ * Supports two validation modes: HTTP Request and JSON Payload.
+ * Test request data persists in session storage across modal open/close.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Form, Button, Tabs, Tab, Modal, Alert } from 'react-bootstrap';
 import { PapService } from '../api/services/PapService';
 import { UiService } from '../api/services/UiService';
 import type { OdrlPolicyJson, Policy, ValidationResponse } from '../services/api';
 import { TestRequest } from '../api/models/TestRequest';
+import type { GenericJsonInput } from '../api/models/GenericJsonInput';
+import type { ValidationMode } from '../components/ValidationEditor';
 import PolicyBuilder from '../components/PolicyBuilder';
 import ValidationEditor from '../components/ValidationEditor';
+import ValidationResult from '../components/ValidationResult';
 import { useI18n } from '../i18n';
+
+/** Session storage key for persisting the last HTTP test request. */
+const SESSION_KEY_TEST_REQUEST = 'odrl-pap-test-request';
+/** Session storage key for persisting the last JSON input. */
+const SESSION_KEY_JSON_INPUT = 'odrl-pap-json-input';
+/** Session storage key for persisting the last validation mode. */
+const SESSION_KEY_VALIDATION_MODE = 'odrl-pap-validation-mode';
 
 /** Template for a new, empty ODRL policy. */
 const NEW_POLICY_TEMPLATE = {
@@ -33,6 +45,62 @@ const DEFAULT_TEST_REQUEST: TestRequest = {
   body: {},
 };
 
+/** Default JSON input for the JSON payload validation mode. */
+const DEFAULT_JSON_INPUT: GenericJsonInput = {
+  payload: {},
+};
+
+/**
+ * Loads persisted validation state from session storage, or returns defaults.
+ *
+ * @returns An object containing testRequest, jsonInput, and validation mode.
+ */
+const loadPersistedState = (): {
+  testRequest: TestRequest;
+  jsonInput: GenericJsonInput;
+  mode: ValidationMode;
+} => {
+  let testRequest = DEFAULT_TEST_REQUEST;
+  let jsonInput = DEFAULT_JSON_INPUT;
+  let mode: ValidationMode = 'httpRequest';
+
+  try {
+    const stored = sessionStorage.getItem(SESSION_KEY_TEST_REQUEST);
+    if (stored) testRequest = JSON.parse(stored);
+  } catch { /* use default */ }
+
+  try {
+    const stored = sessionStorage.getItem(SESSION_KEY_JSON_INPUT);
+    if (stored) jsonInput = JSON.parse(stored);
+  } catch { /* use default */ }
+
+  try {
+    const stored = sessionStorage.getItem(SESSION_KEY_VALIDATION_MODE);
+    if (stored === 'httpRequest' || stored === 'jsonPayload') mode = stored;
+  } catch { /* use default */ }
+
+  return { testRequest, jsonInput, mode };
+};
+
+/**
+ * Persists validation state to session storage for recovery.
+ *
+ * @param testRequest - The current HTTP test request state.
+ * @param jsonInput - The current JSON input state.
+ * @param mode - The current validation mode.
+ */
+const persistState = (
+  testRequest: TestRequest,
+  jsonInput: GenericJsonInput,
+  mode: ValidationMode,
+): void => {
+  try {
+    sessionStorage.setItem(SESSION_KEY_TEST_REQUEST, JSON.stringify(testRequest));
+    sessionStorage.setItem(SESSION_KEY_JSON_INPUT, JSON.stringify(jsonInput));
+    sessionStorage.setItem(SESSION_KEY_VALIDATION_MODE, mode);
+  } catch { /* session storage may be unavailable */ }
+};
+
 /**
  * Page component for creating and editing ODRL policies.
  */
@@ -45,11 +113,15 @@ const PolicyEditor = () => {
   const [policy, setPolicy] = useState<OdrlPolicyJson>({});
   const [activeTab, setActiveTab] = useState('builder');
 
-  // Validation state
+  // Validation state — initialized from session storage
   const [showValidation, setShowValidation] = useState(false);
-  const [testRequest, setTestRequest] = useState<TestRequest>(DEFAULT_TEST_REQUEST);
+  const persisted = loadPersistedState();
+  const [testRequest, setTestRequest] = useState<TestRequest>(persisted.testRequest);
+  const [jsonInput, setJsonInput] = useState<GenericJsonInput>(persisted.jsonInput);
+  const [validationMode, setValidationMode] = useState<ValidationMode>(persisted.mode);
   const [validationResult, setValidationResult] = useState<ValidationResponse | null>(null);
   const [validationError, setValidationError] = useState('');
+  const [isValidating, setIsValidating] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -65,6 +137,11 @@ const PolicyEditor = () => {
     }
   }, [id]);
 
+  // Persist validation state on change
+  useEffect(() => {
+    persistState(testRequest, jsonInput, validationMode);
+  }, [testRequest, jsonInput, validationMode]);
+
   /** Saves the policy (create or update). */
   const handleSave = () => {
     const requestBody = policy;
@@ -79,25 +156,46 @@ const PolicyEditor = () => {
     }
   };
 
-  /** Runs the policy validation against the test request. */
-  const handleValidate = () => {
-    try {
-      const body =
-        typeof testRequest.body === 'string'
-          ? JSON.parse(testRequest.body)
-          : testRequest.body;
-      const finalTestRequest = { ...testRequest, body };
+  /** Runs the policy validation against the test request or JSON input. */
+  const handleValidate = useCallback(() => {
+    setIsValidating(true);
+    setValidationError('');
+    setValidationResult(null);
 
-      const requestBody = { policy, testRequest: finalTestRequest };
-      UiService.validatePolicy(requestBody)
-        .then(setValidationResult)
-        .catch((err: Error) => setValidationError(err.message));
+    try {
+      if (validationMode === 'httpRequest') {
+        const body =
+          typeof testRequest.body === 'string'
+            ? JSON.parse(testRequest.body)
+            : testRequest.body;
+        const finalTestRequest = { ...testRequest, body };
+        const requestBody = { policy, testRequest: finalTestRequest };
+
+        UiService.validatePolicy(requestBody)
+          .then(setValidationResult)
+          .catch((err: Error) => setValidationError(err.message))
+          .finally(() => setIsValidating(false));
+      } else {
+        const requestBody = { policy, jsonInput };
+
+        UiService.validatePolicy(requestBody)
+          .then(setValidationResult)
+          .catch((err: Error) => setValidationError(err.message))
+          .finally(() => setIsValidating(false));
+      }
     } catch {
-      setValidationError('Invalid JSON in body');
+      setValidationError(strings.validationEditor.invalidJson);
+      setIsValidating(false);
     }
+  }, [validationMode, testRequest, jsonInput, policy, strings]);
+
+  /** Resets the validation result to allow re-testing without closing modal. */
+  const handleTestAgain = () => {
+    setValidationResult(null);
+    setValidationError('');
   };
 
-  /** Closes the validation modal and resets results. */
+  /** Closes the validation modal (preserves test data via session storage). */
   const handleCloseValidation = () => {
     setShowValidation(false);
     setValidationResult(null);
@@ -137,18 +235,31 @@ const PolicyEditor = () => {
       </Button>
 
       {/* Validation Modal */}
-      <Modal show={showValidation} onHide={handleCloseValidation} size="lg">
+      <Modal
+        show={showValidation}
+        onHide={handleCloseValidation}
+        size="xl"
+        fullscreen="lg-down"
+        data-testid="validation-modal"
+      >
         <Modal.Header closeButton>
           <Modal.Title>{strings.validationEditor.title}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <ValidationEditor testRequest={testRequest} setTestRequest={setTestRequest} />
-          {validationResult && (
-            <Alert variant={validationResult.allow ? 'success' : 'danger'} className="mt-3">
-              <Alert.Heading>Validation Result</Alert.Heading>
-              <pre>{JSON.stringify(validationResult, null, 2)}</pre>
-            </Alert>
+          {/* Show editor when no result; show result when available */}
+          {!validationResult ? (
+            <ValidationEditor
+              testRequest={testRequest}
+              setTestRequest={setTestRequest}
+              jsonInput={jsonInput}
+              setJsonInput={setJsonInput}
+              mode={validationMode}
+              setMode={setValidationMode}
+            />
+          ) : (
+            <ValidationResult result={validationResult} policy={policy} />
           )}
+
           {validationError && (
             <Alert variant="danger" className="mt-3">
               {validationError}
@@ -159,9 +270,19 @@ const PolicyEditor = () => {
           <Button variant="secondary" onClick={handleCloseValidation}>
             {strings.common.close}
           </Button>
-          <Button variant="primary" onClick={handleValidate}>
-            {strings.validationEditor.runValidation}
-          </Button>
+          {validationResult ? (
+            <Button variant="outline-primary" onClick={handleTestAgain}>
+              {strings.validationEditor.testAgain}
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              onClick={handleValidate}
+              disabled={isValidating}
+            >
+              {isValidating ? strings.common.loading : strings.validationEditor.runValidation}
+            </Button>
+          )}
         </Modal.Footer>
       </Modal>
     </>
