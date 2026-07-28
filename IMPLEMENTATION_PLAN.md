@@ -34,7 +34,7 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
 **Goal:** Transform the policy builder into an intuitive experience for non-technical users. Group dropdown items by namespace (e.g., "odrl", "dome-op", "tmf") with human-readable labels and descriptions. Add contextual help, form validation, and loading/error states throughout.
 
 **Files to modify:**
-- `frontend/src/components/Baukasten.tsx` → **Rename to `PolicyBuilder.tsx`** — Major UX overhaul:
+- `frontend/src/components/Baukasten.tsx` → **Rename to `PolicyBuilder.tsx`** (eliminate German naming) — Major UX overhaul:
   - Group action dropdown items by namespace prefix (split on `:` — e.g., `odrl:read` becomes group "ODRL", item "read")
   - Show `description` from each `Mapping` as subtitle/tooltip in dropdown items
   - Add a guided step indicator or section numbering (1. Target, 2. Assignee, 3. Action, 4. Constraints) so users understand the flow
@@ -119,7 +119,7 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
 - Language can be changed at runtime by providing a different locale to `I18nProvider`
 - Custom themes can be applied via `ThemeProvider` — colors, fonts, and spacing are fully customizable
 - CSS custom properties are used for all themeable values, enabling external style overrides
-- Unit tests for `NamespacedDropdown`, `useMappings` hook, `useI18n` hook, and `PolicyBuilder` (renamed from Baukasten)
+- Unit tests for `NamespacedDropdown`, `useMappings` hook, `useI18n` hook, and `PolicyBuilder`
 
 ---
 
@@ -272,7 +272,7 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
   - Returns: `isTemplateMode`, `isFieldLocked(path)`, `isFieldEditable(path)`, `getFieldMeta(path)`
   - When no template is provided, all fields are editable (current behavior)
 
-- Modify `frontend/src/components/PolicyBuilder.tsx` (renamed from Baukasten) — Add template awareness:
+- Modify `frontend/src/components/PolicyBuilder.tsx` — Add template awareness:
   - Accept optional `template?: PolicyTemplate` prop
   - When template is set, pre-fill form from `template.skeleton`
   - Disable/lock fields listed in `template.lockedFields` (visual lock icon + disabled state)
