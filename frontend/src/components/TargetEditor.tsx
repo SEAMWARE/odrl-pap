@@ -1,30 +1,74 @@
-import { Form, Row, Col, Stack } from 'react-bootstrap';
+/**
+ * Target editor component for ODRL policies.
+ *
+ * Supports two modes:
+ * - **Simple Target:** A custom URL or a selection from available target mappings
+ *   (via namespace-grouped dropdown).
+ * - **Asset Collection:** A typed collection with refinement constraints.
+ *
+ * Includes contextual help text, input validation for URLs, and
+ * improved visual separation for the AssetCollection mode.
+ */
+import { Form, Row, Col, Stack, Card } from 'react-bootstrap';
 import { useState } from 'react';
 import type { Mappings } from '../services/api';
+import { useI18n } from '../i18n';
 import ConstraintBuilder from './ConstraintBuilder';
+import NamespacedDropdown from './NamespacedDropdown';
 
 interface TargetEditorProps {
-  target: any;
-  setTarget: (target: any) => void;
+  /** Current target value (string URL, `{@id}` object, or AssetCollection). */
+  target: unknown;
+  /** Callback to update the target value. */
+  setTarget: (target: unknown) => void;
+  /** Available mappings for populating dropdowns. */
   mappings: Mappings;
 }
 
+/** Checks whether the target is an AssetCollection object. */
+function isAssetCollection(target: unknown): boolean {
+  return (
+    typeof target === 'object' &&
+    target !== null &&
+    (target as Record<string, unknown>)['@type'] === 'AssetCollection'
+  );
+}
+
+/**
+ * Target editor with namespace-grouped dropdowns, help text,
+ * and URL validation for custom targets.
+ */
 const TargetEditor = ({ target, setTarget, mappings }: TargetEditorProps) => {
-  const [simpleTargetType, setSimpleTargetType] = useState('text'); // 'text' or 'dropdown'
+  const { strings } = useI18n();
+  const t = strings.targetEditor;
 
-  const isCollection = typeof target === 'object' && target !== null && target['@type'] === 'AssetCollection';
+  const [simpleTargetType, setSimpleTargetType] = useState<'text' | 'dropdown'>('text');
+  const [urlError, setUrlError] = useState('');
 
+  const isCollection = isAssetCollection(target);
+
+  /** Switches between simple and collection target modes. */
   const setType = (type: 'simple' | 'collection') => {
+    setUrlError('');
     if (type === 'simple') {
-      setTarget(''); // Reset to a simple string
-      setSimpleTargetType('text'); // Default to text input for simple
+      setTarget('');
+      setSimpleTargetType('text');
     } else {
       setTarget({ '@type': 'AssetCollection', 'odrl:refinement': [] });
     }
   };
 
-  const anyMappings = mappings as any;
-  const availableTargets = anyMappings.targets;
+  const availableTargets = mappings.targets ?? [];
+
+  /** Validates and sets a custom target URL. */
+  const handleUrlChange = (value: string) => {
+    setTarget(value);
+    if (value && !value.match(/^https?:\/\/.+/i) && value.length > 0) {
+      setUrlError(t.invalidUrl);
+    } else {
+      setUrlError('');
+    }
+  };
 
   return (
     <Stack gap={3}>
@@ -33,14 +77,14 @@ const TargetEditor = ({ target, setTarget, mappings }: TargetEditorProps) => {
           <Form.Check
             type="radio"
             id="simple-target"
-            label="Simple Target"
+            label={t.simpleTarget}
             checked={!isCollection}
             onChange={() => setType('simple')}
           />
           <Form.Check
             type="radio"
             id="collection-target"
-            label="Asset Collection"
+            label={t.assetCollection}
             checked={isCollection}
             onChange={() => setType('collection')}
           />
@@ -48,66 +92,79 @@ const TargetEditor = ({ target, setTarget, mappings }: TargetEditorProps) => {
       </Row>
 
       {!isCollection ? (
-        <Stack gap={2} className="p-3 border rounded">
-          <Row>
-            <Col>
-              <Form.Check
-                type="radio"
-                id="simple-target-text"
-                label="Custom Target"
-                checked={simpleTargetType === 'text'}
-                onChange={() => {
-                  setSimpleTargetType('text');
-                  setTarget(''); // Clear value when switching type
-                }}
-              />
-              <Form.Check
-                type="radio"
-                id="simple-target-dropdown"
-                label="Select from options"
-                checked={simpleTargetType === 'dropdown'}
-                onChange={() => {
-                  setSimpleTargetType('dropdown');
-                  setTarget({ '@id': '' }); // Clear value when switching type
-                }}
-                disabled={!availableTargets || availableTargets.length === 0}
-              />
-            </Col>
-          </Row>
-          <Row>
-            <Col>
-              {simpleTargetType === 'text' ? (
-                <Form.Control
-                  type="text"
-                  placeholder="Enter Target URL"
-                  value={target || ''}
-                  onChange={(e) => setTarget(e.target.value)}
+        <Card body style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
+          <Stack gap={2}>
+            <Row>
+              <Col>
+                <Form.Check
+                  type="radio"
+                  id="simple-target-text"
+                  label={t.customTarget}
+                  checked={simpleTargetType === 'text'}
+                  onChange={() => {
+                    setSimpleTargetType('text');
+                    setTarget('');
+                    setUrlError('');
+                  }}
                 />
-              ) : (
-                <Form.Select
-                  value={target?.['@id'] || ''}
-                  onChange={(e) => setTarget({ '@id': e.target.value })}
-                >
-                  <option>Select a target</option>
-                  {availableTargets?.map((t: any) => (
-                    <option key={t.name} value={t.name}>{t.name} - {t.description}</option>
-                  ))}
-                </Form.Select>
-              )}
-            </Col>
-          </Row>
-        </Stack>
+                <Form.Check
+                  type="radio"
+                  id="simple-target-dropdown"
+                  label={t.selectFromOptions}
+                  checked={simpleTargetType === 'dropdown'}
+                  onChange={() => {
+                    setSimpleTargetType('dropdown');
+                    setTarget({ '@id': '' });
+                    setUrlError('');
+                  }}
+                  disabled={availableTargets.length === 0}
+                />
+              </Col>
+            </Row>
+            <Row>
+              <Col>
+                {simpleTargetType === 'text' ? (
+                  <Form.Group>
+                    <Form.Control
+                      type="text"
+                      placeholder={t.enterTargetUrl}
+                      value={(target as string) || ''}
+                      onChange={(e) => handleUrlChange(e.target.value)}
+                      isInvalid={!!urlError}
+                      aria-label={t.customTarget}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      {urlError}
+                    </Form.Control.Feedback>
+                  </Form.Group>
+                ) : (
+                  <NamespacedDropdown
+                    items={availableTargets}
+                    value={(target as Record<string, string>)?.['@id'] || ''}
+                    onChange={(val) => setTarget({ '@id': val })}
+                    placeholder={t.selectTarget}
+                    ariaLabel={t.selectTarget}
+                  />
+                )}
+              </Col>
+            </Row>
+          </Stack>
+        </Card>
       ) : (
-        <Stack gap={3} className="p-3 border rounded">
-          <h5>Asset Collection</h5>
-          <hr/>
-          <h6>Refinements</h6>
-          <ConstraintBuilder
-            parent={target}
-            setParent={setTarget}
-            mappings={mappings}
-          />
-        </Stack>
+        <Card style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
+          <Card.Header>
+            <strong>{t.assetCollection}</strong>
+          </Card.Header>
+          <Card.Body>
+            <h6>{t.refinementsTitle}</h6>
+            <div className="text-muted small mb-3">{t.refinementsHelp}</div>
+            <ConstraintBuilder
+              parent={target as Record<string, unknown>}
+              setParent={setTarget as (v: Record<string, unknown>) => void}
+              mappings={mappings}
+            />
+          </Card.Body>
+        </Card>
       )}
     </Stack>
   );
