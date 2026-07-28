@@ -34,7 +34,7 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
 **Goal:** Transform the policy builder into an intuitive experience for non-technical users. Group dropdown items by namespace (e.g., "odrl", "dome-op", "tmf") with human-readable labels and descriptions. Add contextual help, form validation, and loading/error states throughout.
 
 **Files to modify:**
-- `frontend/src/components/Baukasten.tsx` — Major UX overhaul:
+- `frontend/src/components/Baukasten.tsx` → **Rename to `PolicyBuilder.tsx`** — Major UX overhaul:
   - Group action dropdown items by namespace prefix (split on `:` — e.g., `odrl:read` becomes group "ODRL", item "read")
   - Show `description` from each `Mapping` as subtitle/tooltip in dropdown items
   - Add a guided step indicator or section numbering (1. Target, 2. Assignee, 3. Action, 4. Constraints) so users understand the flow
@@ -77,7 +77,35 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
   - Caches mappings in memory (fetched once, shared across components)
   - Provides loading/error states
   - Returns typed mappings data
-  - Used by Baukasten, TargetEditor, AssigneeEditor, ConstraintBuilder
+  - Used by PolicyBuilder, TargetEditor, AssigneeEditor, ConstraintBuilder
+
+- Create `frontend/src/i18n/index.ts` — Localization infrastructure:
+  - Define an `I18nStrings` interface covering all user-facing text (labels, tooltips, help text, error messages, placeholders)
+  - Provide a default English translation (`en.ts`) as the built-in locale
+  - Export a `useI18n()` hook that reads the current locale from an `I18nContext` React context
+  - Support switching locale at runtime via context provider (e.g., `<I18nProvider locale="de" strings={germanStrings}>`)
+  - Allow partial overrides: consumers pass only the keys they want to change, the rest falls back to English defaults
+
+- Create `frontend/src/i18n/en.ts` — Default English translation file:
+  - All UI strings organized by component/section (policyBuilder, constraintBuilder, validationEditor, etc.)
+  - Includes labels, placeholders, help text, error messages, button text
+
+- Create `frontend/src/i18n/I18nContext.tsx` — React context provider for localization:
+  - `I18nProvider` component accepts `locale` and optional `strings` override
+  - Deep-merges user-provided strings with English defaults
+  - Exposes `t(key)` function and `locale` string via context
+
+- Create `frontend/src/theme/ThemeContext.tsx` — Style customization infrastructure:
+  - Define a `ThemeConfig` interface with CSS custom properties (colors, fonts, spacing, border-radius, etc.)
+  - Provide a default theme matching the current Bootstrap-based look
+  - `ThemeProvider` component injects CSS custom properties onto the root element
+  - Support runtime theme switching (light/dark built-in, plus fully custom themes)
+  - Components use CSS custom properties (e.g., `var(--odrl-primary-color)`) instead of hardcoded values
+
+- Create `frontend/src/theme/defaultTheme.ts` — Default theme definition:
+  - Colors, typography, spacing, border-radius, shadows
+  - Light and dark mode presets
+  - Maps to CSS custom properties applied at the container root
 
 **Acceptance criteria:**
 - All dropdowns group items by namespace with visible group headers
@@ -87,7 +115,11 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
 - Error states with retry shown on fetch failure
 - Form sections are numbered and clearly labeled
 - `NamespacedDropdown` is reusable and used consistently across all editors
-- Unit tests for `NamespacedDropdown` and `useMappings` hook
+- All user-facing strings are sourced from the i18n system (no hardcoded UI text in components)
+- Language can be changed at runtime by providing a different locale to `I18nProvider`
+- Custom themes can be applied via `ThemeProvider` — colors, fonts, and spacing are fully customizable
+- CSS custom properties are used for all themeable values, enabling external style overrides
+- Unit tests for `NamespacedDropdown`, `useMappings` hook, `useI18n` hook, and `PolicyBuilder` (renamed from Baukasten)
 
 ---
 
@@ -145,7 +177,7 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
 **Files to create/modify:**
 - Create `frontend/src/web-component/OdrlPolicyEditorElement.ts` — Custom Element definition:
   - Extends `HTMLElement`, registers as `<odrl-policy-editor>`
-  - Observed attributes: `api-base-url`, `auth-token`, `mode` (create/edit), `policy-id`, `theme` (light/dark)
+  - Observed attributes: `api-base-url`, `auth-token`, `mode` (create/edit), `policy-id`, `theme` (light/dark), `locale` (language code, e.g., "en", "de")
   - Creates a Shadow DOM root and mounts the React app inside it
   - Injects Bootstrap CSS into shadow root for style isolation
   - Attribute change callbacks update React context/props
@@ -158,11 +190,12 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
     - `policy-updated` — detail: `{ policy: OdrlPolicyJson, id: string }`
     - `policy-validated` — detail: `{ result: ValidationResponse }`
     - `editor-cancelled` — detail: `{}`
-  - Uses the same Baukasten, ConstraintBuilder, ValidationEditor components
+  - Uses the same PolicyBuilder, ConstraintBuilder, ValidationEditor components
 
 - Create `frontend/src/web-component/EmbeddedContext.tsx` — React Context provider:
-  - Provides: `apiBaseUrl`, `authToken`, `mode`, `policyId`, `onEvent` callback
+  - Provides: `apiBaseUrl`, `authToken`, `mode`, `policyId`, `locale`, `theme`, `i18nStrings`, `onEvent` callback
   - Components read config from this context instead of env vars / localStorage when in embedded mode
+  - Wraps children in `I18nProvider` and `ThemeProvider` so embedded consumers can customize language and styling
 
 - Modify `frontend/src/services/api.ts` — Make API configuration injectable:
   - Accept base URL and auth token from EmbeddedContext when present
@@ -183,15 +216,19 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
   - Add `files` array for npm publishing
 
 - Create `frontend/examples/embed-example.html` — Standalone HTML demo showing:
-  - `<odrl-policy-editor api-base-url="http://localhost:8080"></odrl-policy-editor>`
+  - `<odrl-policy-editor api-base-url="http://localhost:8080" locale="en" theme="light"></odrl-policy-editor>`
   - Event listeners logging policy-created, policy-validated events
-  - Demonstrates attribute configuration
+  - Demonstrates attribute configuration including locale and theme switching
+  - Shows how to pass custom i18n strings and theme via JS properties
 
 **Acceptance criteria:**
 - `<odrl-policy-editor>` custom element renders a fully functional policy editor
 - Changing `api-base-url` attribute reconfigures the API client
 - Setting `auth-token` attribute injects the bearer token into API calls
 - Setting `policy-id` and `mode="edit"` loads an existing policy for editing
+- Setting `locale` attribute changes the UI language (e.g., `locale="de"` switches to German if translations are provided)
+- Setting `theme` attribute switches between light/dark modes; custom theme objects can be passed via JS property
+- Custom i18n strings can be passed via JS property for full translation override
 - Custom Events fire correctly on policy create/update/validate/cancel
 - Shadow DOM isolates styles — no CSS leaks in or out
 - `npm run build:component` produces a single JS file that can be loaded via `<script>`
@@ -235,7 +272,7 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
   - Returns: `isTemplateMode`, `isFieldLocked(path)`, `isFieldEditable(path)`, `getFieldMeta(path)`
   - When no template is provided, all fields are editable (current behavior)
 
-- Modify `frontend/src/components/Baukasten.tsx` — Add template awareness:
+- Modify `frontend/src/components/PolicyBuilder.tsx` (renamed from Baukasten) — Add template awareness:
   - Accept optional `template?: PolicyTemplate` prop
   - When template is set, pre-fill form from `template.skeleton`
   - Disable/lock fields listed in `template.lockedFields` (visual lock icon + disabled state)
@@ -248,18 +285,18 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
 
 - Modify `frontend/src/web-component/OdrlPolicyEditorElement.ts` — Add `template` attribute/property:
   - Accepts serialized JSON template via property (not attribute, since it's complex data)
-  - Passes template to EmbeddedApp → Baukasten
+  - Passes template to EmbeddedApp → PolicyBuilder
 
 - Create `frontend/src/types/index.ts` — Barrel export for all type definitions
 
 **Acceptance criteria:**
 - `PolicyTemplate` and `TemplateField` types are defined and exported
 - `useTemplateMode` hook works correctly: returns unlocked when no template, locked fields when template provided
-- Baukasten renders normally when no template is passed (no regression)
+- PolicyBuilder renders normally when no template is passed (no regression)
 - When a template is passed, skeleton data pre-fills the form and locked fields are visually disabled
 - Web Component accepts a `template` property (JS property, not HTML attribute)
 - Unit tests for `useTemplateMode` hook
-- Unit tests verifying Baukasten renders correctly with and without a template
+- Unit tests verifying PolicyBuilder renders correctly with and without a template
 - No actual template data/catalog is created — only the extensibility hooks
 
 ---
@@ -269,7 +306,7 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
 **Goal:** Ensure production readiness with comprehensive tests, polished UI, accessibility basics, and a clean build pipeline. Verify the entire frontend works end-to-end in both standalone and embedded modes.
 
 **Files to create/modify:**
-- Create `frontend/src/test/components/Baukasten.test.tsx` — Unit tests:
+- Create `frontend/src/test/components/PolicyBuilder.test.tsx` — Unit tests:
   - Renders loading state while mappings load
   - Renders error state on mappings fetch failure
   - Populates action dropdown from mappings data
@@ -346,6 +383,18 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
 - Modify `frontend/eslint.config.js` — Add accessibility linting:
   - Add `eslint-plugin-jsx-a11y` for accessibility checks
 
+- Create `frontend/src/test/i18n/useI18n.test.ts` — Localization tests:
+  - Default locale returns English strings
+  - Switching locale returns translated strings
+  - Partial override merges with defaults
+  - Missing keys fall back to English
+
+- Create `frontend/src/test/theme/ThemeContext.test.tsx` — Theme tests:
+  - Default theme applies CSS custom properties
+  - Custom theme overrides specific properties
+  - Light/dark mode switching works
+  - Theme changes propagate to all components
+
 **Acceptance criteria:**
 - All unit tests pass (`npm run test`)
 - Test coverage is >=70% for components and hooks
@@ -356,3 +405,6 @@ Create a polished, user-friendly frontend for the ODRL PAP that enables non-tech
 - No accessibility warnings from jsx-a11y ESLint plugin
 - All form controls are keyboard-navigable
 - Loading and error states work throughout the app
+- Localization system works end-to-end: UI language can be switched at runtime
+- Theme customization works: colors, fonts, and spacing respond to theme changes
+- No hardcoded user-facing strings remain in components (all sourced from i18n)
