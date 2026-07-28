@@ -103,3 +103,49 @@ src/test/
 - `src/main/java/org/fiware/odrl/mapping/OdrlMapper.java` - ODRL-to-Rego mapper
 - `src/main/resources/rego/utils/apisix.rego` - APISIX helper (reference for new helpers)
 - `src/main/resources/rego/http/leftOperand.rego` - Has `body_value()` with JSONPath-like walk
+
+## Frontend (React SPA)
+- **Stack:** React 19, TypeScript 5.8, Vite 7, Bootstrap 5, React-Bootstrap
+- **Location:** `frontend/`
+- **API Client:** Auto-generated from `api/odrl.yaml` via `openapi-typescript-codegen` (`npm run generate-api`)
+- **Services:** `PapService` (policy CRUD), `UiService` (GET /mappings, POST /validate)
+- **Entry:** `frontend/src/main.tsx` → `App.tsx` (React Router v7)
+
+### Frontend Structure
+```
+frontend/src/
+  api/              # Auto-generated OpenAPI client (models, services, core)
+  components/
+    Baukasten.tsx       # Main visual policy builder (dropdowns from /mappings)
+    ConstraintBuilder.tsx # AND/OR/XONE constraint editor with operand dropdowns
+    TargetEditor.tsx    # Simple target or AssetCollection with refinements
+    AssigneeEditor.tsx  # Simple assignee or PartyCollection with refinements
+    ValidationEditor.tsx # HTTP test request builder (method, host, path, headers, body, JWT helper)
+    PolicySummary.tsx   # Read-only policy display + raw JSON toggle
+    Layout.tsx          # Navbar + route outlet
+  pages/
+    PolicyList.tsx      # Policy CRUD table
+    PolicyEditor.tsx    # Tabs: visual builder ("Baukasten") / raw JSON editor + validation modal
+  services/
+    api.ts              # OpenAPI base URL + auth header config
+  theme/
+    theme.css           # CSS custom properties (primary: #0B2B40, secondary: #F07D00)
+```
+
+### Frontend Build & Dev
+```bash
+cd frontend
+npm install
+npm run dev          # Vite dev server (proxies /mappings, /policy, /validate to backend)
+npm run build        # tsc -b && vite build → dist/
+npm run generate-api # Regenerate OpenAPI client from ../api/odrl.yaml
+npm run lint         # ESLint
+```
+
+### Frontend Environment
+- `VITE_API_PROXY_TARGET` — Dev proxy target (default: http://localhost:8080)
+- `VITE_API_BASE_URL` — Production API base URL (default: /api)
+
+### Frontend Docker
+- Multi-stage: Node 18 build → Nginx 1.21 serve (port 80)
+- Static files only; API base URL baked at build time
