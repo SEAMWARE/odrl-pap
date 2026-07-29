@@ -17,7 +17,7 @@ import ConstraintBuilder from './ConstraintBuilder';
 import NamespacedDropdown from './NamespacedDropdown';
 
 interface TargetEditorProps {
-  /** Current target value (string URL, `{@id}` object, or AssetCollection). */
+  /** Current target value (string URL/identifier or AssetCollection object). */
   target: unknown;
   /** Callback to update the target value. */
   setTarget: (target: unknown) => void;
@@ -46,6 +46,8 @@ const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEdi
 
   const [simpleTargetType, setSimpleTargetType] = useState<'text' | 'dropdown'>('text');
   const [urlError, setUrlError] = useState('');
+  /** Tracks the dropdown selection separately from the target value. */
+  const [dropdownSelection, setDropdownSelection] = useState('');
 
   const isCollection = isAssetCollection(target);
 
@@ -119,7 +121,8 @@ const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEdi
                   checked={simpleTargetType === 'dropdown'}
                   onChange={() => {
                     setSimpleTargetType('dropdown');
-                    setTarget({ '@id': '' });
+                    setDropdownSelection('');
+                    setTarget('');
                     setUrlError('');
                   }}
                   disabled={locked || availableTargets.length === 0}
@@ -144,14 +147,27 @@ const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEdi
                     </Form.Control.Feedback>
                   </Form.Group>
                 ) : (
-                  <NamespacedDropdown
-                    items={availableTargets}
-                    value={(target as Record<string, string>)?.['@id'] || ''}
-                    onChange={(val) => setTarget({ '@id': val })}
-                    placeholder={t.selectTarget}
-                    ariaLabel={t.selectTarget}
-                    disabled={locked}
-                  />
+                  <Stack gap={2}>
+                    <NamespacedDropdown
+                      items={availableTargets}
+                      value={dropdownSelection}
+                      onChange={(val) => {
+                        setDropdownSelection(val);
+                        setTarget(val);
+                      }}
+                      placeholder={t.selectTarget}
+                      ariaLabel={t.selectTarget}
+                      disabled={locked}
+                    />
+                    <Form.Control
+                      type="text"
+                      placeholder={t.enterTargetValue}
+                      value={typeof target === 'string' ? target : ''}
+                      onChange={(e) => setTarget(e.target.value)}
+                      aria-label={t.enterTargetValue}
+                      disabled={locked}
+                    />
+                  </Stack>
                 )}
               </Col>
             </Row>

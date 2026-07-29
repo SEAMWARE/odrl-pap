@@ -7,14 +7,15 @@
  *
  * ## Observed attributes
  *
- * | Attribute       | Description                                   | Default    |
- * |-----------------|-----------------------------------------------|------------|
- * | `api-base-url`  | PAP API base URL                              | `""`       |
- * | `auth-token`    | Bearer token for API authentication           | `null`     |
- * | `mode`          | `"create"` or `"edit"`                        | `"create"` |
- * | `policy-id`     | Policy ID to load (when `mode="edit"`)        | `null`     |
- * | `theme`         | `"light"` or `"dark"`                         | `"light"`  |
- * | `locale`        | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
+ * | Attribute        | Description                                   | Default    |
+ * |------------------|-----------------------------------------------|------------|
+ * | `api-base-url`   | PAP API base URL                              | `""`       |
+ * | `auth-token`     | Bearer token for API authentication           | `null`     |
+ * | `mode`           | `"create"` or `"edit"`                        | `"create"` |
+ * | `policy-id`      | Policy ID to load (when `mode="edit"`)        | `null`     |
+ * | `theme`          | `"light"` or `"dark"`                         | `"light"`  |
+ * | `locale`         | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
+ * | `policy-context` | JSON-LD `@context` for new policies (JSON)    | `null`     |
  *
  * ## Custom Events
  *
@@ -30,6 +31,7 @@
  * - `i18nStrings` — partial i18n override object (deep-merged with defaults)
  * - `themeConfig` — partial ThemeConfig override merged on top of the preset
  * - `template` — a {@link PolicyTemplate} object to pre-fill and constrain the editor
+ * - `policyContext` — custom JSON-LD `@context` object/string for new policies
  *
  * @example
  * ```html
@@ -83,7 +85,7 @@ const DEFAULT_LOCALE = 'en';
 export class OdrlPolicyEditorElement extends HTMLElement {
   /** Attributes that trigger re-renders when changed. */
   static get observedAttributes(): string[] {
-    return ['api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale'];
+    return ['api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale', 'policy-context'];
   }
 
   /** React root instance (created on connect, destroyed on disconnect). */
@@ -103,6 +105,9 @@ export class OdrlPolicyEditorElement extends HTMLElement {
 
   /** Policy template set via JS property. */
   private _template: PolicyTemplate | undefined;
+
+  /** Custom JSON-LD `@context` set via JS property. */
+  private _policyContext: Record<string, string> | string | undefined;
 
   /**
    * Sets partial i18n string overrides (JS property, not HTML attribute).
@@ -174,6 +179,34 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     return this._template;
   }
 
+  /**
+   * Sets a custom JSON-LD `@context` for new policies (JS property).
+   *
+   * When set, overrides the built-in default context
+   * (`{ "odrl": "http://www.w3.org/ns/odrl/2/" }`).
+   *
+   * Can also be set via the `policy-context` HTML attribute (as a JSON
+   * string), but the JS property takes precedence.
+   *
+   * @example
+   * ```js
+   * const editor = document.querySelector('odrl-policy-editor');
+   * editor.policyContext = {
+   *   odrl: 'http://www.w3.org/ns/odrl/2/',
+   *   'dome-op': 'https://github.com/DOME-Marketplace/dome-odrl-profile#',
+   * };
+   * ```
+   */
+  set policyContext(value: Record<string, string> | string | undefined) {
+    this._policyContext = value;
+    this.renderReact();
+  }
+
+  /** Returns the current custom policy context, or `undefined` if using the default. */
+  get policyContext(): Record<string, string> | string | undefined {
+    return this._policyContext;
+  }
+
   // ------------------------------------------------------------------
   // Lifecycle
   // ------------------------------------------------------------------
@@ -218,8 +251,32 @@ export class OdrlPolicyEditorElement extends HTMLElement {
   // Internal helpers
   // ------------------------------------------------------------------
 
+  /**
+   * Resolves the policy context from the JS property or the HTML attribute.
+   *
+   * The JS property (`_policyContext`) takes precedence. If not set,
+   * falls back to parsing the `policy-context` HTML attribute as JSON.
+   *
+   * @returns The resolved context, or `undefined` to use the default.
+   */
+  private resolvePolicyContextAttr(): Record<string, string> | string | undefined {
+    if (this._policyContext !== undefined) {
+      return this._policyContext;
+    }
+    const attr = this.getAttribute('policy-context');
+    if (attr) {
+      try {
+        return JSON.parse(attr) as Record<string, string>;
+      } catch {
+        return attr;
+      }
+    }
+    return undefined;
+  }
+
   /** Builds the {@link EmbeddedConfig} from the current attribute values. */
   private buildConfig(): EmbeddedConfig {
+    const policyContext = this.resolvePolicyContextAttr();
     return {
       apiBaseUrl: this.getAttribute('api-base-url') ?? DEFAULT_API_BASE_URL,
       authToken: this.getAttribute('auth-token'),
@@ -228,6 +285,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       locale: this.getAttribute('locale') ?? DEFAULT_LOCALE,
       theme: (this.getAttribute('theme') as EmbeddedThemePreset) ?? DEFAULT_THEME,
       onEvent: this.dispatchComponentEvent.bind(this),
+      ...(policyContext !== undefined && { policyContext }),
     };
   }
 

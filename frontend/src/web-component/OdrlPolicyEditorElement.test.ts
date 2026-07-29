@@ -130,6 +130,7 @@ describe('OdrlPolicyEditorElement', () => {
       'policy-id',
       'theme',
       'locale',
+      'policy-context',
     ]);
   });
 

@@ -11,7 +11,7 @@
  *   properties on its own container (not `document.documentElement`).
  */
 import { useState, useEffect, useCallback, useRef, type RefObject } from 'react';
-import { Form, Button, Tabs, Tab, Alert } from 'react-bootstrap';
+import { Form, Button, Tabs, Tab, Alert, InputGroup, Badge, CloseButton } from 'react-bootstrap';
 import { PapService } from '../api/services/PapService';
 import { UiService } from '../api/services/UiService';
 import type { OdrlPolicyJson, ValidationResponse } from '../services/api';
@@ -31,13 +31,7 @@ import {
   type EmbeddedConfig,
   type EmbeddedThemePreset,
 } from './EmbeddedContext';
-
-/** Template for a new, empty ODRL policy. */
-const NEW_POLICY_TEMPLATE: OdrlPolicyJson = {
-  '@context': 'http://www.w3.org/ns/odrl/2/',
-  '@type': 'odrl:Policy',
-  'odrl:permission': {},
-};
+import { createNewPolicy } from '../constants/policyDefaults';
 
 /** Default test request values for validation. */
 const DEFAULT_TEST_REQUEST: TestRequest = {
@@ -101,7 +95,7 @@ const EmbeddedApp = ({
   containerRef,
   template,
 }: EmbeddedAppProps) => {
-  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent } = config;
+  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext } = config;
 
   // --- API configuration ---
   useEffect(() => {
@@ -118,10 +112,9 @@ const EmbeddedApp = ({
   }, [theme, themeOverrides, containerRef]);
 
   // --- Policy state ---
-  const [policy, setPolicy] = useState<OdrlPolicyJson>(() => ({
-    ...NEW_POLICY_TEMPLATE,
-    'odrl:uid': crypto.randomUUID(),
-  }));
+  const [policy, setPolicy] = useState<OdrlPolicyJson>(
+    () => createNewPolicy(policyContext) as OdrlPolicyJson,
+  );
   const [saveError, setSaveError] = useState('');
 
   // Load existing policy in edit mode
@@ -136,6 +129,18 @@ const EmbeddedApp = ({
   // --- Editor tab state ---
   const [activeTab, setActiveTab] = useState('builder');
 
+  // --- Raw ODRL tab state ---
+  /** Raw JSON text decoupled from the policy state for free-form editing. */
+  const [rawText, setRawText] = useState('');
+  /** JSON parse error message (empty when the text is valid JSON). */
+  const [jsonError, setJsonError] = useState('');
+  /** Tracks previous tab to detect switches. */
+  const prevTabRef = useRef(activeTab);
+  /** Prefix input for a new @context entry. */
+  const [newCtxPrefix, setNewCtxPrefix] = useState('');
+  /** URI input for a new @context entry. */
+  const [newCtxUri, setNewCtxUri] = useState('');
+
   // --- Validation state ---
   const [showValidation, setShowValidation] = useState(false);
   const [testRequest, setTestRequest] = useState<TestRequest>(DEFAULT_TEST_REQUEST);
@@ -148,6 +153,77 @@ const EmbeddedApp = ({
   // --- Internal ref for theme fallback ---
   const internalRef = useRef<HTMLDivElement>(null);
   const effectiveRef = containerRef ?? internalRef;
+
+  // Sync rawText from the current policy when switching TO the raw tab.
+  useEffect(() => {
+    if (activeTab === 'odrl' && prevTabRef.current !== 'odrl') {
+      setRawText(JSON.stringify(policy, null, 2));
+      setJsonError('');
+    }
+    prevTabRef.current = activeTab;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  /**
+   * Handles changes in the raw ODRL textarea.
+   *
+   * Updates rawText immediately so the user can type freely, and syncs
+   * to the policy state only when the JSON is valid.
+   */
+  const handleRawTextChange = useCallback((text: string) => {
+    setRawText(text);
+    try {
+      const parsed = JSON.parse(text) as OdrlPolicyJson;
+      setPolicy(parsed);
+      setJsonError('');
+    } catch (err: unknown) {
+      setJsonError(err instanceof Error ? err.message : 'Invalid JSON');
+    }
+  }, []);
+
+  /**
+   * Adds a new prefix:URI entry to the policy's `@context`.
+   */
+  const handleAddContext = useCallback(() => {
+    if (!newCtxPrefix.trim() || !newCtxUri.trim()) return;
+
+    const currentCtx = (policy as Record<string, unknown>)['@context'];
+    let contextObj: Record<string, string>;
+
+    if (typeof currentCtx === 'object' && currentCtx !== null && !Array.isArray(currentCtx)) {
+      contextObj = { ...(currentCtx as Record<string, string>) };
+    } else if (typeof currentCtx === 'string') {
+      contextObj = { odrl: currentCtx };
+    } else {
+      contextObj = {};
+    }
+
+    contextObj[newCtxPrefix.trim()] = newCtxUri.trim();
+
+    const updatedPolicy = { ...policy, '@context': contextObj } as OdrlPolicyJson;
+    setPolicy(updatedPolicy);
+    setRawText(JSON.stringify(updatedPolicy, null, 2));
+    setJsonError('');
+    setNewCtxPrefix('');
+    setNewCtxUri('');
+  }, [newCtxPrefix, newCtxUri, policy]);
+
+  /**
+   * Removes a prefix entry from the policy's `@context`.
+   *
+   * @param prefix - The context key to remove.
+   */
+  const handleRemoveContext = useCallback((prefix: string) => {
+    const currentCtx = (policy as Record<string, unknown>)['@context'];
+    if (typeof currentCtx === 'object' && currentCtx !== null && !Array.isArray(currentCtx)) {
+      const copy = { ...(currentCtx as Record<string, string>) };
+      delete copy[prefix];
+      const updatedPolicy = { ...policy, '@context': copy } as OdrlPolicyJson;
+      setPolicy(updatedPolicy);
+      setRawText(JSON.stringify(updatedPolicy, null, 2));
+      setJsonError('');
+    }
+  }, [policy]);
 
   /** Saves the policy and emits the appropriate event. */
   const handleSave = useCallback(() => {
@@ -228,18 +304,74 @@ const EmbeddedApp = ({
               <PolicyBuilder policy={policy} setPolicy={setPolicy} template={template} />
             </Tab>
             <Tab eventKey="odrl" title="Raw ODRL">
+              {/* --- Context management --- */}
+              <div className="mb-3 p-3 border rounded" style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
+                <h6 className="mb-2">JSON-LD Context (@context)</h6>
+                {(() => {
+                  const ctx = (policy as Record<string, unknown>)['@context'];
+                  if (typeof ctx === 'object' && ctx !== null && !Array.isArray(ctx)) {
+                    return (
+                      <div className="mb-2 d-flex flex-wrap gap-1">
+                        {Object.entries(ctx as Record<string, string>).map(([prefix, uri]) => (
+                          <Badge
+                            key={prefix}
+                            bg="secondary"
+                            className="d-inline-flex align-items-center gap-1 px-2 py-1"
+                            title={uri}
+                          >
+                            <strong>{prefix}</strong>: {uri}
+                            <CloseButton
+                              variant="white"
+                              style={{ fontSize: '0.5rem' }}
+                              onClick={() => handleRemoveContext(prefix)}
+                              aria-label={`Remove ${prefix}`}
+                            />
+                          </Badge>
+                        ))}
+                      </div>
+                    );
+                  }
+                  if (typeof ctx === 'string') {
+                    return <p className="text-muted small mb-2">{ctx}</p>;
+                  }
+                  return null;
+                })()}
+                <InputGroup size="sm">
+                  <Form.Control
+                    placeholder="e.g., dome-op"
+                    value={newCtxPrefix}
+                    onChange={(e) => setNewCtxPrefix(e.target.value)}
+                    aria-label="Context prefix"
+                  />
+                  <Form.Control
+                    placeholder="e.g., https://example.com/ns/"
+                    value={newCtxUri}
+                    onChange={(e) => setNewCtxUri(e.target.value)}
+                    aria-label="Context namespace URI"
+                  />
+                  <Button
+                    variant="outline-primary"
+                    onClick={handleAddContext}
+                    disabled={!newCtxPrefix.trim() || !newCtxUri.trim()}
+                  >
+                    Add Context
+                  </Button>
+                </InputGroup>
+              </div>
+
+              {/* --- Raw JSON textarea --- */}
               <Form.Control
                 as="textarea"
                 rows={16}
-                value={JSON.stringify(policy, null, 2)}
-                onChange={(e) => {
-                  try {
-                    setPolicy(JSON.parse(e.target.value));
-                  } catch {
-                    /* allow intermediate invalid JSON while typing */
-                  }
-                }}
+                value={rawText}
+                onChange={(e) => handleRawTextChange(e.target.value)}
+                isInvalid={!!jsonError}
+                isValid={!jsonError && rawText.length > 0}
+                className="font-monospace"
               />
+              {jsonError && (
+                <Form.Text className="text-danger">{jsonError}</Form.Text>
+              )}
             </Tab>
           </Tabs>
 

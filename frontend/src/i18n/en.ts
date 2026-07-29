@@ -52,6 +52,7 @@ export const en = {
     refinementsTitle: 'Refinements',
     refinementsHelp: 'Add constraints that narrow down which assets in the collection this policy applies to.',
     invalidUrl: 'Please enter a valid URL',
+    enterTargetValue: 'Enter the target value (e.g., urn:resource:123 or https://example.com/resource)',
   },
 
   assigneeEditor: {
@@ -63,6 +64,7 @@ export const en = {
     selectAssignee: 'Select an assignee',
     refinementsTitle: 'Refinements',
     refinementsHelp: 'Add constraints that define which parties in the collection this policy applies to.',
+    enterAssigneeValue: 'Enter the assignee value (e.g., did:example:org123 or urn:party:456)',
   },
 
   constraintBuilder: {
@@ -177,6 +179,17 @@ export const en = {
     tabBuilder: 'Policy Builder',
     tabRawOdrl: 'Raw ODRL',
     validate: 'Validate',
+    jsonValid: 'Valid JSON',
+    jsonInvalid: 'Invalid JSON',
+    contextTitle: 'JSON-LD Context (@context)',
+    contextPrefix: 'Prefix',
+    contextPrefixPlaceholder: 'e.g., dome-op',
+    contextUri: 'Namespace URI',
+    contextUriPlaceholder: 'e.g., https://example.com/ns/',
+    addContext: 'Add Context',
+    removeContext: 'Remove',
+    applyJson: 'Apply JSON',
+    jsonParseError: 'Fix JSON errors before adding context.',
   },
 
   namespacedDropdown: {
