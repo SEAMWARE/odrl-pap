@@ -2,7 +2,7 @@
 
 ## Overview
 
-Publish the existing ODRL Policy Editor Web Component (`@fiware/odrl-policy-editor`) to the npm public registry via the existing GitHub Actions CI pipeline, add frontend Docker image builds, and provide integration documentation showing how to embed the component in the target applications (FDSC-Dashboard, BAE Logic Proxy). The Web Component, build config, and embedding README are already complete on the `frontend` branch; the remaining work is CI pipeline integration, version management, and target-application-specific integration guides.
+Publish the existing ODRL Policy Editor Web Component (`@seamware/odrl-policy-editor`) to the npm public registry via the existing GitHub Actions CI pipeline, add frontend Docker image builds, and provide integration documentation showing how to embed the component in the target applications (FDSC-Dashboard, BAE Logic Proxy). The Web Component, build config, and embedding README are already complete on the `frontend` branch; the remaining work is CI pipeline integration, version management, and target-application-specific integration guides.
 
 ## Steps
 
@@ -39,7 +39,7 @@ Publish the existing ODRL Policy Editor Web Component (`@fiware/odrl-policy-edit
 **Files to modify:**
 
 - `frontend/package.json` — Add npm publishing metadata:
-  - Add `"publishConfig": { "access": "public" }` so the scoped `@fiware/*` package publishes without requiring `--access public` on every invocation
+  - Add `"publishConfig": { "access": "public" }` so the scoped `@seamware/*` package publishes without requiring `--access public` on every invocation
   - Add `"repository": { "type": "git", "url": "https://github.com/SEAMWARE/odrl-pap.git", "directory": "frontend" }`
   - Add `"license": "Apache-2.0"` (matching the repository license)
   - Add `"homepage": "https://github.com/SEAMWARE/odrl-pap/tree/main/frontend#readme"`
@@ -90,12 +90,12 @@ Publish the existing ODRL Policy Editor Web Component (`@fiware/odrl-policy-edit
   ```yaml
   # Requires NPM_TOKEN secret configured in the repository settings:
   #   Settings → Secrets and variables → Actions → New repository secret
-  # The token must have publish permissions for the @fiware npm scope.
+  # The token must have publish permissions for the @seamware npm scope.
   # Generate at: https://www.npmjs.com → Access Tokens → Generate New Token (Automation)
   ```
 
 **Acceptance criteria:**
-- On push to `main` (release): `@fiware/odrl-policy-editor@<version>` is published to npm with `latest` dist-tag
+- On push to `main` (release): `@seamware/odrl-policy-editor@<version>` is published to npm with `latest` dist-tag
 - On PR events (pre-release): package is published with `<version>-PRE-<PR#>` and `next` dist-tag
 - The npm package version matches the git semver tag exactly
 - The frontend Docker image is pushed to `quay.io/fiware/odrl-pap-frontend:<version>`
@@ -110,26 +110,26 @@ Publish the existing ODRL Policy Editor Web Component (`@fiware/odrl-policy-edit
 
 ### Step 3: Integration Guides & Embedding Documentation
 
-**Goal:** Create concrete, step-by-step integration guides showing how to embed the published `@fiware/odrl-policy-editor` Web Component into the two target applications (FDSC-Dashboard and BAE Logic Proxy) and any generic web application. Update the main README with npm installation instructions and badges.
+**Goal:** Create concrete, step-by-step integration guides showing how to embed the published `@seamware/odrl-policy-editor` Web Component into the two target applications (FDSC-Dashboard and BAE Logic Proxy) and any generic web application. Update the main README with npm installation instructions and badges.
 
 **Files to create/modify:**
 
 - `frontend/README.md` — Update the top of the file:
-  - Replace the `:warning: experimental` notice with an npm version badge: `[![npm](https://img.shields.io/npm/v/@fiware/odrl-policy-editor)](https://www.npmjs.com/package/@fiware/odrl-policy-editor)`
+  - Replace the `:warning: experimental` notice with an npm version badge: `[![npm](https://img.shields.io/npm/v/@seamware/odrl-policy-editor)](https://www.npmjs.com/package/@seamware/odrl-policy-editor)`
   - Add an **Installation** section right after Prerequisites showing:
-    - npm install: `npm install @fiware/odrl-policy-editor`
-    - CDN via unpkg: `<script type="module" src="https://unpkg.com/@fiware/odrl-policy-editor@latest"></script>`
-    - CDN via jsdelivr: `<script type="module" src="https://cdn.jsdelivr.net/npm/@fiware/odrl-policy-editor@latest"></script>`
+    - npm install: `npm install @seamware/odrl-policy-editor`
+    - CDN via unpkg: `<script type="module" src="https://unpkg.com/@seamware/odrl-policy-editor@latest"></script>`
+    - CDN via jsdelivr: `<script type="module" src="https://cdn.jsdelivr.net/npm/@seamware/odrl-policy-editor@latest"></script>`
   - Add a **Quick Integration** section with a minimal 10-line HTML snippet that works copy-paste
   - Add a **Docker** section for the frontend image: `docker pull quay.io/fiware/odrl-pap-frontend:<version>`
   - Add links to the detailed integration guides in `docs/`
 
 - `frontend/docs/integration-fdsc-dashboard.md` — Vue 3 integration guide for [FDSC-Dashboard](https://github.com/SEAMWARE/fdsc-dashboard):
   - The FDSC-Dashboard uses Vue 3 + Vuetify 3 + Vite + TypeScript + Pinia + `oidc-client-ts`
-  - **Install:** `npm install @fiware/odrl-policy-editor`
+  - **Install:** `npm install @seamware/odrl-policy-editor`
   - **Vite config:** Add `vue.template.compilerOptions.isCustomElement` rule for `odrl-policy-editor` in `vite.config.ts` so Vue does not try to resolve it as a Vue component
   - **Vue wrapper component:** Create `OdrlPolicyEditor.vue` (full copy-pasteable `<script setup lang="ts">` + `<template>` example):
-    - Import `'@fiware/odrl-policy-editor'` (side-effect import to register the custom element)
+    - Import `'@seamware/odrl-policy-editor'` (side-effect import to register the custom element)
     - Bind `api-base-url` to the dashboard's BFF proxy URL
     - Bind `auth-token` from the existing `oidc-client-ts` user store (`user.access_token`)
     - Listen for `@policy-created` and `@editor-cancelled` custom events
@@ -141,12 +141,12 @@ Publish the existing ODRL Policy Editor Web Component (`@fiware/odrl-policy-edit
 - `frontend/docs/integration-bae-logic-proxy.md` — Integration guide for [BAE Logic Proxy](https://github.com/FIWARE-TMForum/business-ecosystem-logic-proxy):
   - The BAE Logic Proxy is a Node.js/Express server with an embedded `portal/bae-frontend` web portal
   - **Option A (CDN — no build step):**
-    - Add a `<script type="module" src="https://unpkg.com/@fiware/odrl-policy-editor@latest"></script>` tag to the portal HTML
+    - Add a `<script type="module" src="https://unpkg.com/@seamware/odrl-policy-editor@latest"></script>` tag to the portal HTML
     - Place `<odrl-policy-editor>` in the desired portal page
     - Wire `auth-token` from the existing session/cookie auth mechanism via inline JS
     - Set `api-base-url` to the PAP backend endpoint
   - **Option B (npm bundle):**
-    - `npm install @fiware/odrl-policy-editor`
+    - `npm install @seamware/odrl-policy-editor`
     - Import in the portal's JS entry point
   - **Event handling:** Listen for `policy-created` to integrate with the BAE's product/offering workflow
   - Provide a complete HTML snippet example for each option
@@ -176,6 +176,6 @@ Publish the existing ODRL Policy Editor Web Component (`@fiware/odrl-policy-edit
 - The main `frontend/README.md` has an npm badge, installation commands (npm + CDN), quick-start snippet, and links to detailed guides
 - The `:warning: experimental` notice is replaced with the npm badge
 - Example directories in `frontend/examples/` are self-contained with their own README
-- All documentation references the correct npm package name (`@fiware/odrl-policy-editor`)
+- All documentation references the correct npm package name (`@seamware/odrl-policy-editor`)
 - CDN URLs use both `unpkg.com` and `cdn.jsdelivr.net` alternatives
 - Security (CSP) and performance (lazy-loading, preconnect) considerations are documented

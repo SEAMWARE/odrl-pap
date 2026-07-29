@@ -37,14 +37,14 @@ The simplest integration path — no build tools required.
   <!-- Option 1: unpkg -->
   <script
     type="module"
-    src="https://unpkg.com/@fiware/odrl-policy-editor@latest"
+    src="https://unpkg.com/@seamware/odrl-policy-editor@latest"
   ></script>
 
   <!-- Option 2: jsDelivr -->
   <!--
   <script
     type="module"
-    src="https://cdn.jsdelivr.net/npm/@fiware/odrl-policy-editor@latest"
+    src="https://cdn.jsdelivr.net/npm/@seamware/odrl-policy-editor@latest"
   ></script>
   -->
 </head>
@@ -75,12 +75,12 @@ The simplest integration path — no build tools required.
 ### Via npm (Self-Hosted)
 
 ```bash
-npm install @fiware/odrl-policy-editor
+npm install @seamware/odrl-policy-editor
 ```
 
 ```javascript
 // main.js
-import '@fiware/odrl-policy-editor';
+import '@seamware/odrl-policy-editor';
 ```
 
 Then use `<odrl-policy-editor>` in your HTML as shown above.
@@ -95,7 +95,7 @@ JavaScript properties and listen for Custom Events.
 ### Installation
 
 ```bash
-npm install @fiware/odrl-policy-editor
+npm install @seamware/odrl-policy-editor
 ```
 
 ### Component Wrapper
@@ -105,7 +105,7 @@ npm install @fiware/odrl-policy-editor
 import { useEffect, useRef } from 'react';
 
 // Side-effect import: registers the custom element
-import '@fiware/odrl-policy-editor';
+import '@seamware/odrl-policy-editor';
 
 interface OdrlPolicyEditorProps {
   apiBaseUrl: string;
@@ -218,7 +218,7 @@ Angular requires explicit opt-in for custom elements via
 ### Installation
 
 ```bash
-npm install @fiware/odrl-policy-editor
+npm install @seamware/odrl-policy-editor
 ```
 
 ### Module Configuration
@@ -281,7 +281,7 @@ Import the package in your `main.ts` (before bootstrapping):
 
 ```typescript
 // main.ts
-import '@fiware/odrl-policy-editor';
+import '@seamware/odrl-policy-editor';
 import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
 import { AppModule } from './app/app.module';
 
@@ -300,7 +300,7 @@ the tag:
 ```javascript
 // main.js
 import Vue from 'vue';
-import '@fiware/odrl-policy-editor';
+import '@seamware/odrl-policy-editor';
 
 // Tell Vue 2 to treat <odrl-policy-editor> as a native element
 Vue.config.ignoredElements = ['odrl-policy-editor'];
@@ -372,7 +372,7 @@ export default defineConfig({
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue';
-import '@fiware/odrl-policy-editor';
+import '@seamware/odrl-policy-editor';
 
 const apiBaseUrl = '/api/pap';
 const authToken = ref<string | null>(null);
@@ -409,7 +409,7 @@ is needed.
 ```svelte
 <!-- PolicyEditor.svelte -->
 <script>
-  import '@fiware/odrl-policy-editor';
+  import '@seamware/odrl-policy-editor';
 
   export let apiBaseUrl = '/api/pap';
   export let authToken = null;
@@ -474,7 +474,7 @@ export default function PolicyEditorPage() {
 <script setup>
 // Import only on the client
 if (import.meta.client) {
-  await import('@fiware/odrl-policy-editor');
+  await import('@seamware/odrl-policy-editor');
 }
 </script>
 ```
@@ -491,7 +491,7 @@ if (import.meta.client) {
 
   onMount(async () => {
     if (browser) {
-      await import('@fiware/odrl-policy-editor');
+      await import('@seamware/odrl-policy-editor');
       loaded = true;
     }
   });
@@ -564,7 +564,7 @@ page:
 ```javascript
 // Lazy-load on demand
 async function showEditor() {
-  await import('@fiware/odrl-policy-editor');
+  await import('@seamware/odrl-policy-editor');
   document.getElementById('editor-container').innerHTML =
     '<odrl-policy-editor api-base-url="/api/pap" mode="create"></odrl-policy-editor>';
 }
@@ -626,5 +626,5 @@ via versioned URLs.
 | `editor-cancelled` | `{}` | The user clicked Cancel |
 
 For complete type definitions, see the
-[TypeScript declarations](https://www.npmjs.com/package/@fiware/odrl-policy-editor)
+[TypeScript declarations](https://www.npmjs.com/package/@seamware/odrl-policy-editor)
 included in the npm package.

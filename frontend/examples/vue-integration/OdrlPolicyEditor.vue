@@ -11,7 +11,7 @@
     />
 
   Requirements:
-    npm install @fiware/odrl-policy-editor
+    npm install @seamware/odrl-policy-editor
     Configure isCustomElement in vite.config.ts (see README.md).
 -->
 <script setup lang="ts">
@@ -26,7 +26,7 @@
 import { defineProps, defineEmits, withDefaults } from 'vue';
 
 // Side-effect import: registers the <odrl-policy-editor> custom element
-import '@fiware/odrl-policy-editor';
+import '@seamware/odrl-policy-editor';
 
 interface Props {
   /** PAP API base URL. */

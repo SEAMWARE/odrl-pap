@@ -147,7 +147,7 @@ npm run lint         # ESLint
 - `VITE_API_BASE_URL` — Production API base URL (default: /api)
 
 ### Frontend Web Component (npm Package)
-- **Package:** `@fiware/odrl-policy-editor` (scoped, public)
+- **Package:** `@seamware/odrl-policy-editor` (scoped, public)
 - **Build:** `npm run build:component` → `dist-component/odrl-policy-editor.js` (single self-contained ES module)
 - **Config:** `frontend/vite.component.config.ts` (library build, inlines all CSS/deps)
 - **Entry:** `frontend/src/web-component/index.ts` → registers `<odrl-policy-editor>` custom element

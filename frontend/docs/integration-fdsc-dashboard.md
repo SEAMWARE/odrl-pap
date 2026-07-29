@@ -32,7 +32,7 @@ for authentication.
 
 ```bash
 cd fdsc-dashboard
-npm install @fiware/odrl-policy-editor
+npm install @seamware/odrl-policy-editor
 ```
 
 ---
@@ -81,7 +81,7 @@ import { useTheme } from 'vuetify';
 import { useRouter } from 'vue-router';
 
 // Side-effect import: registers the <odrl-policy-editor> custom element
-import '@fiware/odrl-policy-editor';
+import '@seamware/odrl-policy-editor';
 
 // Import your OIDC user store (adjust the path to match your project)
 import { useAuthStore } from '@/stores/auth';
@@ -304,5 +304,5 @@ calls go through this proxy, avoiding CORS issues entirely.
 |-------|----------|
 | `[Vue warn]: Failed to resolve component: odrl-policy-editor` | Add `isCustomElement` to `vite.config.ts` (see [Step 2](#2-configure-vite)) |
 | API calls return 401 | Verify the OIDC token is being passed correctly; check `accessToken` in Vue DevTools |
-| Editor styles look broken | Ensure you are importing `@fiware/odrl-policy-editor` (the side-effect import registers the custom element and its Shadow DOM styles) |
+| Editor styles look broken | Ensure you are importing `@seamware/odrl-policy-editor` (the side-effect import registers the custom element and its Shadow DOM styles) |
 | Theme colors do not match Vuetify | Check that `applyVuetifyTheme()` runs after the element is mounted; inspect the `themeConfig` property in DevTools |

@@ -51,14 +51,14 @@ portal page where you want the policy editor to appear.
   <!-- Load the Web Component from unpkg CDN -->
   <script
     type="module"
-    src="https://unpkg.com/@fiware/odrl-policy-editor@latest"
+    src="https://unpkg.com/@seamware/odrl-policy-editor@latest"
   ></script>
 
   <!-- Alternative: jsDelivr CDN -->
   <!--
   <script
     type="module"
-    src="https://cdn.jsdelivr.net/npm/@fiware/odrl-policy-editor@latest"
+    src="https://cdn.jsdelivr.net/npm/@seamware/odrl-policy-editor@latest"
   ></script>
   -->
 
@@ -139,7 +139,7 @@ you need it:
 <!-- In the <head> section -->
 <script
   type="module"
-  src="https://unpkg.com/@fiware/odrl-policy-editor@latest"
+  src="https://unpkg.com/@seamware/odrl-policy-editor@latest"
 ></script>
 
 <!-- In the page body, where the editor should render -->
@@ -161,7 +161,7 @@ import it:
 ### 1. Install
 
 ```bash
-npm install @fiware/odrl-policy-editor
+npm install @seamware/odrl-policy-editor
 ```
 
 ### 2. Import in the Portal Entry Point
@@ -170,7 +170,7 @@ npm install @fiware/odrl-policy-editor
 // In your portal's main JavaScript file (e.g., app.js or index.js)
 
 // Side-effect import: registers the <odrl-policy-editor> custom element
-import '@fiware/odrl-policy-editor';
+import '@seamware/odrl-policy-editor';
 ```
 
 The import registers the custom element globally. You can now use

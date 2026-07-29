@@ -1,6 +1,6 @@
 # ODRL PAP Frontend
 
-[![npm](https://img.shields.io/npm/v/@fiware/odrl-policy-editor)](https://www.npmjs.com/package/@fiware/odrl-policy-editor)
+[![npm](https://img.shields.io/npm/v/@seamware/odrl-policy-editor)](https://www.npmjs.com/package/@seamware/odrl-policy-editor)
 
 A React-based frontend for the ODRL Policy Administration Point (PAP). It
 provides a visual, form-driven policy editor that guides users through creating
@@ -59,17 +59,17 @@ The editor can be used in two ways:
 Install the embeddable Web Component via npm:
 
 ```bash
-npm install @fiware/odrl-policy-editor
+npm install @seamware/odrl-policy-editor
 ```
 
 Or load it directly from a CDN — no build step required:
 
 ```html
 <!-- unpkg -->
-<script type="module" src="https://unpkg.com/@fiware/odrl-policy-editor@latest"></script>
+<script type="module" src="https://unpkg.com/@seamware/odrl-policy-editor@latest"></script>
 
 <!-- jsDelivr (alternative) -->
-<script type="module" src="https://cdn.jsdelivr.net/npm/@fiware/odrl-policy-editor@latest"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@seamware/odrl-policy-editor@latest"></script>
 ```
 
 ---
@@ -83,7 +83,7 @@ Drop this snippet into any HTML page to get a working policy editor:
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <script type="module" src="https://unpkg.com/@fiware/odrl-policy-editor@latest"></script>
+  <script type="module" src="https://unpkg.com/@seamware/odrl-policy-editor@latest"></script>
 </head>
 <body>
   <odrl-policy-editor

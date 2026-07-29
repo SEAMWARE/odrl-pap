@@ -1,5 +1,5 @@
 {
-  "name": "@fiware/odrl-policy-editor",
+  "name": "@seamware/odrl-policy-editor",
   "version": "0.1.0",
   "type": "module",
   "description": "ODRL Policy Editor — visual policy builder embeddable as a Web Component",
@@ -28,6 +28,9 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "engines": {
+    "node": ">=20.19"
   },
   "scripts": {
     "dev": "vite",

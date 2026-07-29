@@ -1,5 +1,5 @@
 /**
- * Public TypeScript declarations for `@fiware/odrl-policy-editor`.
+ * Public TypeScript declarations for `@seamware/odrl-policy-editor`.
  *
  * This hand-crafted declaration file is copied into `dist-component/`
  * during the `build:component` script so npm consumers get type-checking
