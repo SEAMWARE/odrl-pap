@@ -183,6 +183,13 @@ export const en = {
     noResults: 'No matching items',
     filterPlaceholder: 'Type to filter...',
   },
+
+  templateMode: {
+    banner: 'Creating policy from template: {name}',
+    bannerDescription: '{description}',
+    lockedFieldTooltip: 'This field is locked by the template and cannot be changed.',
+    lockedBadge: 'Locked',
+  },
 } as const;
 
 /**

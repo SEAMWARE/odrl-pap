@@ -12,6 +12,7 @@ import { I18nProvider } from '../i18n';
 import { clearMappingsCache } from '../hooks/useMappings';
 import { UiService } from '../api/services/UiService';
 import type { Mappings, OdrlPolicyJson } from '../api';
+import type { PolicyTemplate } from '../types';
 
 // Mock UiService so we control the mappings response
 vi.mock('../api/services/UiService', () => ({
@@ -230,5 +231,189 @@ describe('PolicyBuilder', () => {
     await waitFor(() => {
       expect(screen.getByText('Policy Summary')).toBeInTheDocument();
     });
+  });
+
+  it('does not show template banner when no template is provided', async () => {
+    vi.mocked(UiService.getMappings).mockResolvedValue(MOCK_MAPPINGS);
+
+    renderWithProviders(
+      <PolicyBuilder policy={EMPTY_POLICY} setPolicy={() => {}} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Target')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('template-banner')).not.toBeInTheDocument();
+  });
+
+  it('does not show locked badges when no template is provided', async () => {
+    vi.mocked(UiService.getMappings).mockResolvedValue(MOCK_MAPPINGS);
+
+    renderWithProviders(
+      <PolicyBuilder policy={EMPTY_POLICY} setPolicy={() => {}} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Target')).toBeInTheDocument();
+    });
+
+    expect(screen.queryAllByTestId('locked-badge')).toHaveLength(0);
+  });
+});
+
+/** Template fixture for template-mode tests. */
+const TEMPLATE_WITH_LOCKED_ACTION: PolicyTemplate = {
+  id: 'test-locked-action',
+  name: 'Locked Action Template',
+  description: 'A test template with the action field locked',
+  category: 'Testing',
+  skeleton: {
+    '@context': 'http://www.w3.org/ns/odrl/2/',
+    '@type': 'odrl:Policy',
+    'odrl:permission': {
+      'odrl:action': 'odrl:read',
+    },
+  },
+  editableFields: [
+    {
+      path: 'odrl:permission.odrl:target',
+      label: 'Target',
+      description: 'Choose the target resource',
+      type: 'dropdown',
+      required: true,
+    },
+  ],
+  lockedFields: [
+    'odrl:permission.odrl:action',
+    'odrl:permission.odrl:assignee',
+  ],
+};
+
+describe('PolicyBuilder with template', () => {
+  beforeEach(() => {
+    clearMappingsCache();
+    vi.mocked(UiService.getMappings).mockReset();
+  });
+
+  it('shows the template banner with template name', async () => {
+    vi.mocked(UiService.getMappings).mockResolvedValue(MOCK_MAPPINGS);
+
+    renderWithProviders(
+      <PolicyBuilder
+        policy={EMPTY_POLICY}
+        setPolicy={() => {}}
+        template={TEMPLATE_WITH_LOCKED_ACTION}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('template-banner')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/Locked Action Template/),
+    ).toBeInTheDocument();
+  });
+
+  it('shows locked badges on locked sections', async () => {
+    vi.mocked(UiService.getMappings).mockResolvedValue(MOCK_MAPPINGS);
+
+    renderWithProviders(
+      <PolicyBuilder
+        policy={EMPTY_POLICY}
+        setPolicy={() => {}}
+        template={TEMPLATE_WITH_LOCKED_ACTION}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Target')).toBeInTheDocument();
+    });
+
+    const lockedBadges = screen.getAllByTestId('locked-badge');
+    // Action and Assignee are locked
+    expect(lockedBadges.length).toBe(2);
+  });
+
+  it('disables the action dropdown when action is locked', async () => {
+    vi.mocked(UiService.getMappings).mockResolvedValue(MOCK_MAPPINGS);
+
+    renderWithProviders(
+      <PolicyBuilder
+        policy={EMPTY_POLICY}
+        setPolicy={() => {}}
+        template={TEMPLATE_WITH_LOCKED_ACTION}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Action')).toBeInTheDocument();
+    });
+
+    const actionSelect = screen.getByLabelText('Action');
+    expect(actionSelect).toBeDisabled();
+  });
+
+  it('shows the locked field tooltip on the action section', async () => {
+    vi.mocked(UiService.getMappings).mockResolvedValue(MOCK_MAPPINGS);
+
+    renderWithProviders(
+      <PolicyBuilder
+        policy={EMPTY_POLICY}
+        setPolicy={() => {}}
+        template={TEMPLATE_WITH_LOCKED_ACTION}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Action')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('action-locked-hint')).toBeInTheDocument();
+    expect(
+      screen.getByText(/locked by the template/i),
+    ).toBeInTheDocument();
+  });
+
+  it('renders all four step sections even with template', async () => {
+    vi.mocked(UiService.getMappings).mockResolvedValue(MOCK_MAPPINGS);
+
+    renderWithProviders(
+      <PolicyBuilder
+        policy={EMPTY_POLICY}
+        setPolicy={() => {}}
+        template={TEMPLATE_WITH_LOCKED_ACTION}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Target')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Assignee')).toBeInTheDocument();
+    expect(screen.getByText('Action')).toBeInTheDocument();
+    expect(screen.getByText('Constraints')).toBeInTheDocument();
+  });
+
+  it('calls setPolicy with skeleton data on mount', async () => {
+    const setPolicy = vi.fn();
+    vi.mocked(UiService.getMappings).mockResolvedValue(MOCK_MAPPINGS);
+
+    renderWithProviders(
+      <PolicyBuilder
+        policy={EMPTY_POLICY}
+        setPolicy={setPolicy}
+        template={TEMPLATE_WITH_LOCKED_ACTION}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(setPolicy).toHaveBeenCalled();
+    });
+
+    // The first call should apply the skeleton
+    const skeletonCall = setPolicy.mock.calls[0][0];
+    expect(skeletonCall['odrl:permission']['odrl:action']).toBe('odrl:read');
   });
 });

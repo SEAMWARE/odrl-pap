@@ -18,6 +18,8 @@ interface ConstraintBuilderProps {
   setParent: (newParent: Record<string, unknown>) => void;
   /** Available mappings for populating dropdowns. */
   mappings: Mappings;
+  /** When `true`, all constraint controls are disabled (set by template mode). */
+  locked?: boolean;
 }
 
 /** Represents a single constraint's data shape. */
@@ -42,7 +44,7 @@ function getRightOperandType(constraint: ConstraintData): 'named' | 'literal' {
  * Interactive constraint builder with namespace-grouped dropdowns and
  * clear logical-grouping indicators.
  */
-const ConstraintBuilder = ({ parent, setParent, mappings }: ConstraintBuilderProps) => {
+const ConstraintBuilder = ({ parent, setParent, mappings, locked = false }: ConstraintBuilderProps) => {
   const { strings } = useI18n();
   const t = strings.constraintBuilder;
 
@@ -147,6 +149,7 @@ const ConstraintBuilder = ({ parent, setParent, mappings }: ConstraintBuilderPro
                     value={logicalType}
                     onChange={(e) => setLogicalType(e.target.value)}
                     aria-label={t.groupingLabel}
+                    disabled={locked}
                   >
                     <option value="and">{t.groupingAnd}</option>
                     <option value="or">{t.groupingOr}</option>
@@ -182,6 +185,7 @@ const ConstraintBuilder = ({ parent, setParent, mappings }: ConstraintBuilderPro
               size="sm"
               onClick={() => removeConstraint(index)}
               aria-label={`${t.removeConstraint} ${index + 1}`}
+              disabled={locked}
             >
               {t.removeConstraint}
             </Button>
@@ -199,6 +203,7 @@ const ConstraintBuilder = ({ parent, setParent, mappings }: ConstraintBuilderPro
                   }
                   placeholder={t.selectLeftOperand}
                   ariaLabel={`${t.selectLeftOperand} ${index + 1}`}
+                  disabled={locked}
                 />
               </Col>
 
@@ -213,6 +218,7 @@ const ConstraintBuilder = ({ parent, setParent, mappings }: ConstraintBuilderPro
                   }
                   placeholder={t.selectOperator}
                   ariaLabel={`${t.selectOperator} ${index + 1}`}
+                  disabled={locked}
                 />
               </Col>
 
@@ -227,6 +233,7 @@ const ConstraintBuilder = ({ parent, setParent, mappings }: ConstraintBuilderPro
                         handleRightOperandTypeChange(index, e.target.value as 'named' | 'literal')
                       }
                       aria-label={`Right operand type for constraint ${index + 1}`}
+                      disabled={locked}
                     >
                       <option value="named">{t.rightOperandNamed}</option>
                       <option value="literal">{t.rightOperandLiteral}</option>
@@ -242,6 +249,7 @@ const ConstraintBuilder = ({ parent, setParent, mappings }: ConstraintBuilderPro
                         }
                         placeholder={t.selectRightOperand}
                         ariaLabel={`${t.selectRightOperand} ${index + 1}`}
+                        disabled={locked}
                       />
                     ) : (
                       <Stack direction="horizontal" gap={2}>
@@ -256,6 +264,7 @@ const ConstraintBuilder = ({ parent, setParent, mappings }: ConstraintBuilderPro
                             })
                           }
                           aria-label={`${t.valuePlaceholder} for constraint ${index + 1}`}
+                          disabled={locked}
                         />
                         <Form.Control
                           type="text"
@@ -268,6 +277,7 @@ const ConstraintBuilder = ({ parent, setParent, mappings }: ConstraintBuilderPro
                             })
                           }
                           aria-label={`${t.typePlaceholder} for constraint ${index + 1}`}
+                          disabled={locked}
                         />
                       </Stack>
                     )}
@@ -281,7 +291,7 @@ const ConstraintBuilder = ({ parent, setParent, mappings }: ConstraintBuilderPro
 
       {/* Add constraint button */}
       <div>
-        <Button variant="success" onClick={addConstraint}>
+        <Button variant="success" onClick={addConstraint} disabled={locked}>
           + {t.addConstraint}
         </Button>
       </div>

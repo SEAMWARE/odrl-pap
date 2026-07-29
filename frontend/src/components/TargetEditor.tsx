@@ -23,6 +23,8 @@ interface TargetEditorProps {
   setTarget: (target: unknown) => void;
   /** Available mappings for populating dropdowns. */
   mappings: Mappings;
+  /** When `true`, all controls are disabled (set by template mode). */
+  locked?: boolean;
 }
 
 /** Checks whether the target is an AssetCollection object. */
@@ -38,7 +40,7 @@ function isAssetCollection(target: unknown): boolean {
  * Target editor with namespace-grouped dropdowns, help text,
  * and URL validation for custom targets.
  */
-const TargetEditor = ({ target, setTarget, mappings }: TargetEditorProps) => {
+const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEditorProps) => {
   const { strings } = useI18n();
   const t = strings.targetEditor;
 
@@ -80,6 +82,7 @@ const TargetEditor = ({ target, setTarget, mappings }: TargetEditorProps) => {
             label={t.simpleTarget}
             checked={!isCollection}
             onChange={() => setType('simple')}
+            disabled={locked}
           />
           <Form.Check
             type="radio"
@@ -87,6 +90,7 @@ const TargetEditor = ({ target, setTarget, mappings }: TargetEditorProps) => {
             label={t.assetCollection}
             checked={isCollection}
             onChange={() => setType('collection')}
+            disabled={locked}
           />
         </Col>
       </Row>
@@ -106,6 +110,7 @@ const TargetEditor = ({ target, setTarget, mappings }: TargetEditorProps) => {
                     setTarget('');
                     setUrlError('');
                   }}
+                  disabled={locked}
                 />
                 <Form.Check
                   type="radio"
@@ -117,7 +122,7 @@ const TargetEditor = ({ target, setTarget, mappings }: TargetEditorProps) => {
                     setTarget({ '@id': '' });
                     setUrlError('');
                   }}
-                  disabled={availableTargets.length === 0}
+                  disabled={locked || availableTargets.length === 0}
                 />
               </Col>
             </Row>
@@ -132,6 +137,7 @@ const TargetEditor = ({ target, setTarget, mappings }: TargetEditorProps) => {
                       onChange={(e) => handleUrlChange(e.target.value)}
                       isInvalid={!!urlError}
                       aria-label={t.customTarget}
+                      disabled={locked}
                     />
                     <Form.Control.Feedback type="invalid">
                       {urlError}
@@ -144,6 +150,7 @@ const TargetEditor = ({ target, setTarget, mappings }: TargetEditorProps) => {
                     onChange={(val) => setTarget({ '@id': val })}
                     placeholder={t.selectTarget}
                     ariaLabel={t.selectTarget}
+                    disabled={locked}
                   />
                 )}
               </Col>
