@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<!--
+  Standalone HTML demo for the <odrl-policy-editor> Web Component.
+
+  Shows how to embed the policy editor in any HTML page, configure it
+  via attributes and JS properties, and listen for Custom Events.
+
+  To run this demo:
+    1. cd frontend
+    2. npm run build:component
+    3. Serve this directory (e.g., npx serve .)
+    4. Open http://localhost:3000/examples/embed-example.html
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ODRL Policy Editor — Embedded Demo</title>
+  <style>
+    /* Host-page styles to demonstrate Shadow DOM isolation */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #fafafa;
+      color: #222;
+    }
+    h1 { color: #0B2B40; }
+    .controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .controls label { font-weight: 600; }
+    .controls select, .controls input {
+      padding: 0.4rem 0.6rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #event-log {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 1rem;
+      max-height: 300px;
+      overflow-y: auto;
+      background: #fff;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.85rem;
+      margin-top: 1.5rem;
+    }
+    #event-log .entry {
+      border-bottom: 1px solid #eee;
+      padding: 0.4rem 0;
+    }
+    #event-log .entry:last-child { border-bottom: none; }
+    .event-type { color: #0B2B40; font-weight: bold; }
+    .event-time { color: #999; margin-right: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>ODRL Policy Editor — Embedded Demo</h1>
+  <p>
+    This page demonstrates the <code>&lt;odrl-policy-editor&gt;</code> Web
+    Component embedded in a plain HTML page. The editor is fully isolated
+    inside a Shadow DOM — host-page styles do not leak in.
+  </p>
+
+  <!-- Controls to change attributes at runtime -->
+  <div class="controls">
+    <div>
+      <label for="theme-select">Theme:</label>
+      <select id="theme-select">
+        <option value="light" selected>Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </div>
+    <div>
+      <label for="locale-select">Locale:</label>
+      <select id="locale-select">
+        <option value="en" selected>English</option>
+        <option value="de">Deutsch (demo)</option>
+      </select>
+    </div>
+    <div>
+      <label for="api-url-input">API Base URL:</label>
+      <input
+        id="api-url-input"
+        type="text"
+        value="http://localhost:8080"
+        size="30"
+      />
+    </div>
+    <div>
+      <button id="apply-btn">Apply</button>
+    </div>
+  </div>
+
+  <!-- The Web Component -->
+  <odrl-policy-editor
+    api-base-url="http://localhost:8080"
+    locale="en"
+    theme="light"
+  ></odrl-policy-editor>
+
+  <!-- Event log -->
+  <h2>Event Log</h2>
+  <div id="event-log">
+    <em>Custom Events from the editor will appear here...</em>
+  </div>
+
+  <!-- Load the Web Component bundle -->
+  <script type="module" src="../dist-component/odrl-policy-editor.js"></script>
+
+  <script>
+    const editor = document.querySelector('odrl-policy-editor');
+    const eventLog = document.getElementById('event-log');
+
+    // --- Listen for all custom events ---
+    ['policy-created', 'policy-updated', 'policy-validated', 'editor-cancelled'].forEach(
+      (eventName) => {
+        editor.addEventListener(eventName, (e) => {
+          logEvent(eventName, e.detail);
+        });
+      }
+    );
+
+    /** Appends an entry to the event log panel. */
+    function logEvent(type, detail) {
+      // Clear the placeholder on first event
+      if (eventLog.querySelector('em')) {
+        eventLog.innerHTML = '';
+      }
+      const entry = document.createElement('div');
+      entry.className = 'entry';
+      const time = new Date().toLocaleTimeString();
+      entry.innerHTML = `
+        <span class="event-time">${time}</span>
+        <span class="event-type">${type}</span>
+        <pre style="margin:0.25rem 0 0;white-space:pre-wrap">${JSON.stringify(detail, null, 2)}</pre>
+      `;
+      eventLog.prepend(entry);
+    }
+
+    // --- Controls: update attributes on Apply ---
+    document.getElementById('apply-btn').addEventListener('click', () => {
+      const theme = document.getElementById('theme-select').value;
+      const locale = document.getElementById('locale-select').value;
+      const apiUrl = document.getElementById('api-url-input').value;
+
+      editor.setAttribute('theme', theme);
+      editor.setAttribute('locale', locale);
+      editor.setAttribute('api-base-url', apiUrl);
+    });
+
+    // --- Demo: set i18n strings via JS property ---
+    // This shows how a host page can pass custom translations
+    document.getElementById('locale-select').addEventListener('change', (e) => {
+      if (e.target.value === 'de') {
+        editor.i18nStrings = {
+          policyBuilder: {
+            title: 'Richtlinien-Editor',
+            stepTarget: 'Ziel',
+            stepTargetHelp: 'Definieren Sie, auf welche Ressource diese Richtlinie anwendbar ist.',
+            stepAssignee: 'Berechtigter',
+            stepAssigneeHelp: 'Geben Sie an, wem die Berechtigung erteilt oder verweigert wird.',
+            stepAction: 'Aktion',
+            stepActionHelp: 'Wählen Sie die erlaubte oder verbotene Operation.',
+            stepConstraints: 'Einschränkungen',
+            stepConstraintsHelp: 'Fügen Sie Bedingungen hinzu, die erfüllt sein müssen.',
+          },
+          common: {
+            save: 'Speichern',
+            cancel: 'Abbrechen',
+            loading: 'Wird geladen...',
+          },
+        };
+      } else {
+        editor.i18nStrings = undefined; // Reset to English defaults
+      }
+    });
+
+    // --- Demo: set custom theme via JS property ---
+    document.getElementById('theme-select').addEventListener('change', (e) => {
+      if (e.target.value === 'dark') {
+        editor.themeConfig = {
+          'odrl-primary-color': '#1a4a6b',
+          'odrl-bg-color': '#1a1a2e',
+          'odrl-text-color': '#e0e0e0',
+        };
+      } else {
+        editor.themeConfig = undefined; // Reset to defaults
+      }
+    });
+  </script>
+</body>
+</html>
