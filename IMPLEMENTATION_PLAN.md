@@ -1,410 +1,181 @@
-# Implementation Plan: Easy definition of ODRL Policies by end users
+# Implementation Plan: Publish ODRL-PAP Frontend
 
 ## Overview
 
-Create a polished, user-friendly frontend for the ODRL PAP that enables non-technical end users to build ODRL policies through guided dropdowns and form elements, test them against the validation endpoint, and that can be embedded as a Web Component into external applications (BAE-Marketplace, FDSC-Dashboard). The existing React 19 + TypeScript frontend in `frontend/` provides a solid foundation (~70% functional) and will be enhanced rather than replaced.
+Publish the existing ODRL Policy Editor Web Component (`@fiware/odrl-policy-editor`) to the npm public registry via the existing GitHub Actions CI pipeline, add frontend Docker image builds, and provide integration documentation showing how to embed the component in the target applications (FDSC-Dashboard, BAE Logic Proxy). The Web Component, build config, and embedding README are already complete on the `frontend` branch; the remaining work is CI pipeline integration, version management, and target-application-specific integration guides.
 
 ## Steps
 
-### Step 1: Project Foundation - Testing Infrastructure & Build Configuration
+### Step 1: Frontend CI — Lint, Test, and Build Validation
 
-**Goal:** Establish the testing and build infrastructure needed for all subsequent steps. Add Vitest + React Testing Library, configure Vite for dual output (standalone app + library/Web Component), and set up runtime environment variable injection for the Docker image.
-
-**Files to create/modify:**
-- `frontend/package.json` — Add devDependencies: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `jsdom`, `msw` (Mock Service Worker for API mocking)
-- `frontend/vite.config.ts` — Add `test` configuration block for Vitest (jsdom environment); add conditional library-mode build config (used in Step 4)
-- `frontend/vitest.config.ts` — Vitest configuration if separate config is cleaner (jsdom env, setup files, coverage thresholds)
-- `frontend/src/test/setup.ts` — Test setup file (import `@testing-library/jest-dom`, MSW server setup/teardown)
-- `frontend/src/test/mocks/handlers.ts` — MSW request handlers for `/mappings` and `/validate` endpoints with realistic mock data
-- `frontend/src/test/mocks/server.ts` — MSW server instance
-- `frontend/Dockerfile` — Add runtime env var injection via `envsubst` on an `env-config.js` template so `VITE_API_BASE_URL` can be set at container start without rebuilding
-- `frontend/public/env-config.js` — Runtime config template: `window.__ENV__ = { API_BASE_URL: "${VITE_API_BASE_URL}" }`
-- `frontend/src/services/api.ts` — Read base URL from `window.__ENV__?.API_BASE_URL` at runtime, falling back to `import.meta.env.VITE_API_BASE_URL`
-
-**Acceptance criteria:**
-- `npm run test` runs Vitest and passes (with at least one placeholder test)
-- `npm run build` produces a working `dist/` bundle
-- Docker image serves the app and respects `VITE_API_BASE_URL` set at `docker run` time
-- MSW handlers return realistic mock data matching the `Mappings` and `ValidationResponse` schemas from `api/odrl.yaml`
-
----
-
-### Step 2: Policy Builder UX - Namespace-Grouped Dropdowns & User Guidance
-
-**Goal:** Transform the policy builder into an intuitive experience for non-technical users. Group dropdown items by namespace (e.g., "odrl", "dome-op", "tmf") with human-readable labels and descriptions. Add contextual help, form validation, and loading/error states throughout.
+**Goal:** Add frontend lint, test, and build validation jobs to the existing GitHub Actions workflows so that every push validates the frontend code. This establishes the quality gate that must pass before npm publishing can be added in Step 2.
 
 **Files to modify:**
-- `frontend/src/components/Baukasten.tsx` → **Rename to `PolicyBuilder.tsx`** (eliminate German naming) — Major UX overhaul:
-  - Group action dropdown items by namespace prefix (split on `:` — e.g., `odrl:read` becomes group "ODRL", item "read")
-  - Show `description` from each `Mapping` as subtitle/tooltip in dropdown items
-  - Add a guided step indicator or section numbering (1. Target, 2. Assignee, 3. Action, 4. Constraints) so users understand the flow
-  - Add contextual help text explaining what each section does in plain language
-  - Add loading spinner while mappings are being fetched
-  - Add error alert if mappings fetch fails with retry button
-  - Improve overall layout: make the form the primary focus, summary as collapsible sidebar
 
-- `frontend/src/components/TargetEditor.tsx` — Enhance:
-  - Group target dropdown items by namespace
-  - Add placeholder text and help tooltips explaining "target" in plain language
-  - Add input validation (URL format for custom targets)
-  - Improve AssetCollection UX with better visual separation
-
-- `frontend/src/components/AssigneeEditor.tsx` — Enhance:
-  - Group assignee dropdown items by namespace
-  - Add placeholder text and help tooltips
-  - Improve PartyCollection UX
-
-- `frontend/src/components/ConstraintBuilder.tsx` — Enhance:
-  - Group left operand and operator dropdowns by namespace
-  - Show descriptions in dropdown items
-  - Add visual indicator explaining what AND/OR/XONE means in plain language (e.g., "ALL must match" / "ANY can match" / "Exactly ONE must match")
-  - Add visual card/panel styling to each constraint for clearer separation
-  - Better right operand type toggle with clearer labels ("Named value (URI)" vs "Literal value")
-
-- `frontend/src/components/PolicySummary.tsx` — Enhance:
-  - Improve readability with better formatting
-  - Add copy-to-clipboard for the raw JSON view
-  - Show human-readable summaries (e.g., "Allow READ on target X when assignee is Y")
-
-- Create `frontend/src/components/NamespacedDropdown.tsx` — Reusable dropdown component:
-  - Accepts `items: Mapping[]` and groups by namespace prefix
-  - Renders `<optgroup>` or Bootstrap equivalent for each namespace
-  - Shows `description` as secondary text
-  - Supports search/filter for large lists
-  - Handles empty state gracefully
-
-- Create `frontend/src/hooks/useMappings.ts` — Extract mappings fetch into a reusable React hook:
-  - Caches mappings in memory (fetched once, shared across components)
-  - Provides loading/error states
-  - Returns typed mappings data
-  - Used by PolicyBuilder, TargetEditor, AssigneeEditor, ConstraintBuilder
-
-- Create `frontend/src/i18n/index.ts` — Localization infrastructure:
-  - Define an `I18nStrings` interface covering all user-facing text (labels, tooltips, help text, error messages, placeholders)
-  - Provide a default English translation (`en.ts`) as the built-in locale
-  - Export a `useI18n()` hook that reads the current locale from an `I18nContext` React context
-  - Support switching locale at runtime via context provider (e.g., `<I18nProvider locale="de" strings={germanStrings}>`)
-  - Allow partial overrides: consumers pass only the keys they want to change, the rest falls back to English defaults
-
-- Create `frontend/src/i18n/en.ts` — Default English translation file:
-  - All UI strings organized by component/section (policyBuilder, constraintBuilder, validationEditor, etc.)
-  - Includes labels, placeholders, help text, error messages, button text
-
-- Create `frontend/src/i18n/I18nContext.tsx` — React context provider for localization:
-  - `I18nProvider` component accepts `locale` and optional `strings` override
-  - Deep-merges user-provided strings with English defaults
-  - Exposes `t(key)` function and `locale` string via context
-
-- Create `frontend/src/theme/ThemeContext.tsx` — Style customization infrastructure:
-  - Define a `ThemeConfig` interface with CSS custom properties (colors, fonts, spacing, border-radius, etc.)
-  - Provide a default theme matching the current Bootstrap-based look
-  - `ThemeProvider` component injects CSS custom properties onto the root element
-  - Support runtime theme switching (light/dark built-in, plus fully custom themes)
-  - Components use CSS custom properties (e.g., `var(--odrl-primary-color)`) instead of hardcoded values
-
-- Create `frontend/src/theme/defaultTheme.ts` — Default theme definition:
-  - Colors, typography, spacing, border-radius, shadows
-  - Light and dark mode presets
-  - Maps to CSS custom properties applied at the container root
+- `.github/workflows/test.yaml` — Add a new `frontend-test` job alongside the existing `test` and `opa-test` jobs:
+  - Checkout the repository (`actions/checkout@v6` — matching existing usage)
+  - Set up Node.js 18 with npm cache (`actions/setup-node@v4`, `cache: npm`, `cache-dependency-path: frontend/package-lock.json`)
+  - Run `npm ci` in `frontend/` (reproducible installs for CI)
+  - Run `npm run lint` (ESLint with jsx-a11y plugin)
+  - Run `npm run test:ci` (Vitest in verbose non-watch mode)
+  - Run `npm run build` (standalone SPA build — validates TypeScript compilation and Vite bundling)
+  - Run `npm run build:component` (Web Component library build — validates the artifact that will be published to npm)
+  - The job runs in parallel with the existing Java `test` and `opa-test` jobs (no `needs` dependency between them)
+  - Use `working-directory: frontend` on each step to keep the workflow clean
 
 **Acceptance criteria:**
-- All dropdowns group items by namespace with visible group headers
-- Each dropdown item shows its description
-- Contextual help text is present on every form section
-- Loading states shown while data is being fetched
-- Error states with retry shown on fetch failure
-- Form sections are numbered and clearly labeled
-- `NamespacedDropdown` is reusable and used consistently across all editors
-- All user-facing strings are sourced from the i18n system (no hardcoded UI text in components)
-- Language can be changed at runtime by providing a different locale to `I18nProvider`
-- Custom themes can be applied via `ThemeProvider` — colors, fonts, and spacing are fully customizable
-- CSS custom properties are used for all themeable values, enabling external style overrides
-- Unit tests for `NamespacedDropdown`, `useMappings` hook, `useI18n` hook, and `PolicyBuilder`
+- Every push triggers frontend lint, test, and both builds
+- The `frontend-test` job fails if lint, tests, or either build fails
+- Existing Java `test` and `opa-test` jobs are completely unaffected
+- The workflow uses `npm ci` (not `npm install`) for reproducible CI builds
+- Node.js dependency caching reduces install time on repeat runs
 
 ---
 
-### Step 3: Validation & Testing UI Enhancement
+### Step 2: npm Publishing Pipeline & Version Management
 
-**Goal:** Improve the policy validation/testing experience so users can easily test their policies against sample requests. Add support for the `GenericJsonInput` validation mode (JSON payload evaluation), improve result display, and add pre-populated example payloads.
+**Goal:** Add npm package publishing to the existing release and pre-release workflows so the Web Component is automatically published to the npm registry when a new version is tagged. Synchronize the package version with the semver tag generated by the existing `generate-version` job. Additionally, build and push the frontend Docker image to quay.io.
 
 **Files to modify:**
-- `frontend/src/components/ValidationEditor.tsx` — Major enhancement:
-  - Add a mode toggle: "HTTP Request" (existing TestRequest) vs "JSON Payload" (GenericJsonInput)
-  - **HTTP Request mode** (existing, enhanced):
-    - Add protocol field (currently hardcoded; make explicit)
-    - Better header management: add/remove custom headers (not just Content-Type and Authorization)
-    - Improve JWT helper UX: add field descriptions, show decoded JWT preview
-    - Add "Example" button that pre-fills a realistic sample HTTP request
-  - **JSON Payload mode** (new):
-    - `payload` JSON textarea with syntax highlighting or at least validation
-    - Optional `subject` JSON textarea for identity/credential context
-    - Add "Example" button with sample JSON payload
-  - Shared:
-    - Add a "Copy as cURL" button for the HTTP request mode
-    - Better JSON syntax validation with clear error messages before submission
 
-- `frontend/src/pages/PolicyEditor.tsx` — Enhance validation modal:
-  - Larger modal for better readability
-  - Show validation result prominently: green checkmark for allow, red X for deny
-  - Display `explanation` array as a readable list with icons
-  - Add "Test Again" button to modify and re-run without closing modal
-  - Show the policy that was validated (collapsible)
-  - Persist last test request in session storage so users don't lose their test data
+- `frontend/package.json` — Add npm publishing metadata:
+  - Add `"publishConfig": { "access": "public" }` so the scoped `@fiware/*` package publishes without requiring `--access public` on every invocation
+  - Add `"repository": { "type": "git", "url": "https://github.com/SEAMWARE/odrl-pap.git", "directory": "frontend" }`
+  - Add `"license": "Apache-2.0"` (matching the repository license)
+  - Add `"homepage": "https://github.com/SEAMWARE/odrl-pap/tree/main/frontend#readme"`
+  - Add `"bugs": { "url": "https://github.com/SEAMWARE/odrl-pap/issues" }`
+  - Add a type declaration file to `files` array: `["dist-component/odrl-policy-editor.js", "dist-component/odrl-policy-editor.d.ts"]`
+  - Add `"types": "dist-component/odrl-policy-editor.d.ts"` for TypeScript consumers
+  - Keep `version` at `0.1.0` — CI will override it at publish time via `npm version`
 
-- `frontend/src/api/models/GenericJsonInput.ts` — Verify this model exists in generated API client; if not, regenerate client from the latest `api/odrl.yaml`
+- `frontend/dist-component/odrl-policy-editor.d.ts` — This file is NOT committed; it is generated as part of the build. Instead, create `frontend/src/web-component/types.d.ts` — A handcrafted TypeScript declaration file re-exporting the public API types for npm consumers. This will be copied into `dist-component/` during the `build:component` script. The types include:
+  - `OdrlPolicyEditorElement` class definition with observed attributes and JS properties
+  - `TAG_NAME` constant
+  - `EmbeddedConfig`, `EmbeddedEventMap`, `EditorMode`, `EmbeddedThemePreset`, `OnEventCallback` type exports
+  - `HTMLElementTagNameMap` augmentation so `document.querySelector('odrl-policy-editor')` returns the correct type
 
-- Create `frontend/src/components/ValidationResult.tsx` — Extract result display into its own component:
-  - Visual allow/deny indicator (icon + color)
-  - Expandable explanation list
-  - Raw response toggle for advanced users
+- `frontend/package.json` — Update the `build:component` script to also copy the type declaration:
+  - Change from: `"build:component": "vite build --config vite.component.config.ts"`
+  - Change to: `"build:component": "vite build --config vite.component.config.ts && cp src/web-component/types.d.ts dist-component/odrl-policy-editor.d.ts"`
 
-**Acceptance criteria:**
-- Users can toggle between HTTP Request and JSON Payload validation modes
-- JSON Payload mode sends `{ policy, jsonInput: { payload, subject } }` to POST /validate
-- HTTP Request mode continues to work as before
-- Pre-filled example buttons work for both modes
-- Validation results display clearly with visual allow/deny indicator
-- Test request data persists across modal open/close within a session
-- Unit tests for `ValidationResult` component
-- Unit tests for mode toggle behavior
+- `.github/workflows/release.yaml` — Add two new jobs:
+  1. **`publish-npm`** job (needs: `generate-version`):
+     - Checkout the repository
+     - Set up Node.js 18 with `registry-url: https://registry.npmjs.org`
+     - `npm ci` in `frontend/`
+     - Run lint and tests as a safety gate: `npm run lint && npm run test:ci`
+     - Set version: `npm version ${{ needs.generate-version.outputs.version }} --no-git-tag-version` in `frontend/`
+     - Build: `npm run build:component`
+     - Publish: `npm publish` with env `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`
+     - Runs in parallel with `build-arm` and `build-amd` (all depend only on `generate-version`)
+  2. **`build-frontend-image`** job (needs: `generate-version`):
+     - Checkout the repository
+     - Log into quay.io using existing `QUAY_USERNAME` / `QUAY_PASSWORD` secrets
+     - Build: `docker build -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap-frontend:${{ needs.generate-version.outputs.version }} frontend/`
+     - Push: `docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap-frontend:${{ needs.generate-version.outputs.version }}`
+     - Runs in parallel with backend image builds
+  - Update the `git-release` job `needs` array to include `publish-npm` and `build-frontend-image` so the GitHub release is only created after all artifacts are published
 
----
+- `.github/workflows/pre-release.yaml` — Add two new jobs:
+  1. **`publish-npm-prerelease`** job (needs: `generate-version`):
+     - Same Node.js setup as the release job
+     - Set pre-release version (e.g., `1.2.3-PRE-42`)
+     - Build the component
+     - Publish with `--tag next` so pre-releases don't become the default `latest` dist-tag
+     - Runs in parallel with backend image builds
+  2. **`build-frontend-image`** job (needs: `generate-version`):
+     - Build and push the frontend Docker image with the pre-release version tag
 
-### Step 4: Embeddable Web Component Wrapper
-
-**Goal:** Make the policy builder embeddable in external applications (BAE-Marketplace, FDSC-Dashboard) as a standard Web Component (`<odrl-policy-editor>`). This uses the Custom Elements API — no framework required by the host application. The component communicates via HTML attributes and Custom Events.
-
-**Files to create/modify:**
-- Create `frontend/src/web-component/OdrlPolicyEditorElement.ts` — Custom Element definition:
-  - Extends `HTMLElement`, registers as `<odrl-policy-editor>`
-  - Observed attributes: `api-base-url`, `auth-token`, `mode` (create/edit), `policy-id`, `theme` (light/dark), `locale` (language code, e.g., "en", "de")
-  - Creates a Shadow DOM root and mounts the React app inside it
-  - Injects Bootstrap CSS into shadow root for style isolation
-  - Attribute change callbacks update React context/props
-
-- Create `frontend/src/web-component/EmbeddedApp.tsx` — Stripped-down React root for embedded mode:
-  - No router (single-page policy editor only, no list view)
-  - Receives config via React Context from the Web Component wrapper
-  - Emits Custom Events via a callback bridge:
-    - `policy-created` — detail: `{ policy: OdrlPolicyJson, id: string }`
-    - `policy-updated` — detail: `{ policy: OdrlPolicyJson, id: string }`
-    - `policy-validated` — detail: `{ result: ValidationResponse }`
-    - `editor-cancelled` — detail: `{}`
-  - Uses the same PolicyBuilder, ConstraintBuilder, ValidationEditor components
-
-- Create `frontend/src/web-component/EmbeddedContext.tsx` — React Context provider:
-  - Provides: `apiBaseUrl`, `authToken`, `mode`, `policyId`, `locale`, `theme`, `i18nStrings`, `onEvent` callback
-  - Components read config from this context instead of env vars / localStorage when in embedded mode
-  - Wraps children in `I18nProvider` and `ThemeProvider` so embedded consumers can customize language and styling
-
-- Modify `frontend/src/services/api.ts` — Make API configuration injectable:
-  - Accept base URL and auth token from EmbeddedContext when present
-  - Fall back to env var / localStorage in standalone mode
-
-- Create `frontend/src/web-component/index.ts` — Entry point for Web Component build:
-  - Registers the custom element
-  - Exports for direct ES module import
-
-- Modify `frontend/vite.config.ts` — Add a library build target:
-  - New npm script `build:component` that builds only the Web Component entry point
-  - Output: `dist/odrl-policy-editor.js` (single bundled file with CSS inlined)
-  - Standard `build` continues to produce the standalone app
-
-- Modify `frontend/package.json`:
-  - Add `build:component` script
-  - Add `main`, `module`, `exports` fields pointing to the Web Component bundle
-  - Add `files` array for npm publishing
-
-- Create `frontend/examples/embed-example.html` — Standalone HTML demo showing:
-  - `<odrl-policy-editor api-base-url="http://localhost:8080" locale="en" theme="light"></odrl-policy-editor>`
-  - Event listeners logging policy-created, policy-validated events
-  - Demonstrates attribute configuration including locale and theme switching
-  - Shows how to pass custom i18n strings and theme via JS properties
-
-**Acceptance criteria:**
-- `<odrl-policy-editor>` custom element renders a fully functional policy editor
-- Changing `api-base-url` attribute reconfigures the API client
-- Setting `auth-token` attribute injects the bearer token into API calls
-- Setting `policy-id` and `mode="edit"` loads an existing policy for editing
-- Setting `locale` attribute changes the UI language (e.g., `locale="de"` switches to German if translations are provided)
-- Setting `theme` attribute switches between light/dark modes; custom theme objects can be passed via JS property
-- Custom i18n strings can be passed via JS property for full translation override
-- Custom Events fire correctly on policy create/update/validate/cancel
-- Shadow DOM isolates styles — no CSS leaks in or out
-- `npm run build:component` produces a single JS file that can be loaded via `<script>`
-- The standalone app (`npm run build`) is not affected by these changes
-- `examples/embed-example.html` loads and renders correctly in a browser
-- Unit tests for the Web Component lifecycle (mount, attribute changes, event dispatch)
-
----
-
-### Step 5: Template Extensibility Architecture
-
-**Goal:** Design and implement the hooks and interfaces needed for future policy template support, without implementing actual templates. The architecture should make it straightforward for a future iteration to add pre-defined templates that users fill out.
-
-**Files to create/modify:**
-- Create `frontend/src/types/PolicyTemplate.ts` — Template type definitions:
-  ```typescript
-  interface PolicyTemplate {
-    id: string;
-    name: string;
-    description: string;
-    category: string;
-    /** Pre-filled ODRL policy structure with placeholder markers */
-    skeleton: Record<string, unknown>;
-    /** Which fields the user must fill in */
-    editableFields: TemplateField[];
-    /** Which fields are locked and cannot be changed */
-    lockedFields: string[];
-  }
-  
-  interface TemplateField {
-    path: string;           // JSON path in the skeleton (e.g., "odrl:permission.odrl:target")
-    label: string;          // Human-readable label
-    description: string;    // Help text
-    type: 'dropdown' | 'text' | 'constraint';
-    required: boolean;
-  }
+- Add a comment block at the top of the `publish-npm` job documenting the required `NPM_TOKEN` repository secret:
+  ```yaml
+  # Requires NPM_TOKEN secret configured in the repository settings:
+  #   Settings → Secrets and variables → Actions → New repository secret
+  # The token must have publish permissions for the @fiware npm scope.
+  # Generate at: https://www.npmjs.com → Access Tokens → Generate New Token (Automation)
   ```
 
-- Create `frontend/src/hooks/useTemplateMode.ts` — Hook for template-aware editing:
-  - Accepts optional `PolicyTemplate`
-  - Returns: `isTemplateMode`, `isFieldLocked(path)`, `isFieldEditable(path)`, `getFieldMeta(path)`
-  - When no template is provided, all fields are editable (current behavior)
-
-- Modify `frontend/src/components/PolicyBuilder.tsx` — Add template awareness:
-  - Accept optional `template?: PolicyTemplate` prop
-  - When template is set, pre-fill form from `template.skeleton`
-  - Disable/lock fields listed in `template.lockedFields` (visual lock icon + disabled state)
-  - Show `TemplateField.description` as help text for editable fields
-  - Add a visual banner at the top: "Creating policy from template: {name}"
-
-- Modify `frontend/src/components/TargetEditor.tsx` — Accept `locked?: boolean` prop to disable editing
-- Modify `frontend/src/components/AssigneeEditor.tsx` — Accept `locked?: boolean` prop
-- Modify `frontend/src/components/ConstraintBuilder.tsx` — Accept `lockedFields?: string[]` prop to selectively lock individual constraints
-
-- Modify `frontend/src/web-component/OdrlPolicyEditorElement.ts` — Add `template` attribute/property:
-  - Accepts serialized JSON template via property (not attribute, since it's complex data)
-  - Passes template to EmbeddedApp → PolicyBuilder
-
-- Create `frontend/src/types/index.ts` — Barrel export for all type definitions
-
 **Acceptance criteria:**
-- `PolicyTemplate` and `TemplateField` types are defined and exported
-- `useTemplateMode` hook works correctly: returns unlocked when no template, locked fields when template provided
-- PolicyBuilder renders normally when no template is passed (no regression)
-- When a template is passed, skeleton data pre-fills the form and locked fields are visually disabled
-- Web Component accepts a `template` property (JS property, not HTML attribute)
-- Unit tests for `useTemplateMode` hook
-- Unit tests verifying PolicyBuilder renders correctly with and without a template
-- No actual template data/catalog is created — only the extensibility hooks
+- On push to `main` (release): `@fiware/odrl-policy-editor@<version>` is published to npm with `latest` dist-tag
+- On PR events (pre-release): package is published with `<version>-PRE-<PR#>` and `next` dist-tag
+- The npm package version matches the git semver tag exactly
+- The frontend Docker image is pushed to `quay.io/fiware/odrl-pap-frontend:<version>`
+- The npm package includes only `dist-component/odrl-policy-editor.js` and `dist-component/odrl-policy-editor.d.ts` (no source code, no `node_modules`)
+- `publishConfig.access` is set to `"public"`
+- TypeScript consumers get type-checking when importing the package
+- Lint and tests run before publishing as a safety gate
+- The GitHub release is only created after all artifacts (backend images, frontend image, npm package) succeed
+- Required secrets are documented in workflow comments
 
 ---
 
-### Step 6: Comprehensive Testing & Production Polish
+### Step 3: Integration Guides & Embedding Documentation
 
-**Goal:** Ensure production readiness with comprehensive tests, polished UI, accessibility basics, and a clean build pipeline. Verify the entire frontend works end-to-end in both standalone and embedded modes.
+**Goal:** Create concrete, step-by-step integration guides showing how to embed the published `@fiware/odrl-policy-editor` Web Component into the two target applications (FDSC-Dashboard and BAE Logic Proxy) and any generic web application. Update the main README with npm installation instructions and badges.
 
 **Files to create/modify:**
-- Create `frontend/src/test/components/PolicyBuilder.test.tsx` — Unit tests:
-  - Renders loading state while mappings load
-  - Renders error state on mappings fetch failure
-  - Populates action dropdown from mappings data
-  - Groups dropdown items by namespace
-  - Assembles correct ODRL JSON structure on form submission
-  - Template mode: pre-fills and locks fields
 
-- Create `frontend/src/test/components/ConstraintBuilder.test.tsx` — Unit tests:
-  - Add/remove constraints
-  - Toggle AND/OR/XONE logic
-  - Select left operand, operator, right operand
-  - Toggle named vs literal right operand
-  - Outputs correct ODRL constraint JSON
+- `frontend/README.md` — Update the top of the file:
+  - Replace the `:warning: experimental` notice with an npm version badge: `[![npm](https://img.shields.io/npm/v/@fiware/odrl-policy-editor)](https://www.npmjs.com/package/@fiware/odrl-policy-editor)`
+  - Add an **Installation** section right after Prerequisites showing:
+    - npm install: `npm install @fiware/odrl-policy-editor`
+    - CDN via unpkg: `<script type="module" src="https://unpkg.com/@fiware/odrl-policy-editor@latest"></script>`
+    - CDN via jsdelivr: `<script type="module" src="https://cdn.jsdelivr.net/npm/@fiware/odrl-policy-editor@latest"></script>`
+  - Add a **Quick Integration** section with a minimal 10-line HTML snippet that works copy-paste
+  - Add a **Docker** section for the frontend image: `docker pull quay.io/fiware/odrl-pap-frontend:<version>`
+  - Add links to the detailed integration guides in `docs/`
 
-- Create `frontend/src/test/components/ValidationEditor.test.tsx` — Unit tests:
-  - HTTP Request mode fields
-  - JSON Payload mode fields
-  - Mode toggle
-  - JWT helper generates valid unsigned JWT
-  - Example button pre-fills form
+- `frontend/docs/integration-fdsc-dashboard.md` — Vue 3 integration guide for [FDSC-Dashboard](https://github.com/SEAMWARE/fdsc-dashboard):
+  - The FDSC-Dashboard uses Vue 3 + Vuetify 3 + Vite + TypeScript + Pinia + `oidc-client-ts`
+  - **Install:** `npm install @fiware/odrl-policy-editor`
+  - **Vite config:** Add `vue.template.compilerOptions.isCustomElement` rule for `odrl-policy-editor` in `vite.config.ts` so Vue does not try to resolve it as a Vue component
+  - **Vue wrapper component:** Create `OdrlPolicyEditor.vue` (full copy-pasteable `<script setup lang="ts">` + `<template>` example):
+    - Import `'@fiware/odrl-policy-editor'` (side-effect import to register the custom element)
+    - Bind `api-base-url` to the dashboard's BFF proxy URL
+    - Bind `auth-token` from the existing `oidc-client-ts` user store (`user.access_token`)
+    - Listen for `@policy-created` and `@editor-cancelled` custom events
+    - Pass `locale` from Vue I18n's current locale
+    - Show how to bridge Vuetify theme colors to `themeConfig` property using `ref()` and `onMounted()`
+  - **Route registration:** Add a route in the dashboard's Vue Router config
+  - **Navigation:** Add a sidebar/nav item linking to the policy editor page
 
-- Create `frontend/src/test/components/ValidationResult.test.tsx` — Unit tests:
-  - Allow result renders green indicator
-  - Deny result renders red indicator
-  - Explanation list renders correctly
+- `frontend/docs/integration-bae-logic-proxy.md` — Integration guide for [BAE Logic Proxy](https://github.com/FIWARE-TMForum/business-ecosystem-logic-proxy):
+  - The BAE Logic Proxy is a Node.js/Express server with an embedded `portal/bae-frontend` web portal
+  - **Option A (CDN — no build step):**
+    - Add a `<script type="module" src="https://unpkg.com/@fiware/odrl-policy-editor@latest"></script>` tag to the portal HTML
+    - Place `<odrl-policy-editor>` in the desired portal page
+    - Wire `auth-token` from the existing session/cookie auth mechanism via inline JS
+    - Set `api-base-url` to the PAP backend endpoint
+  - **Option B (npm bundle):**
+    - `npm install @fiware/odrl-policy-editor`
+    - Import in the portal's JS entry point
+  - **Event handling:** Listen for `policy-created` to integrate with the BAE's product/offering workflow
+  - Provide a complete HTML snippet example for each option
 
-- Create `frontend/src/test/components/NamespacedDropdown.test.tsx` — Unit tests:
-  - Groups items by namespace prefix
-  - Renders descriptions
-  - Filter/search works
-  - Handles empty items array
+- `frontend/docs/integration-generic.md` — Generic integration guide for any web application:
+  - **Vanilla HTML/JS** — `<script type="module">` + `<odrl-policy-editor>` (simplest path)
+  - **React** — Import the package as a side effect; use the custom element in JSX with `ref` for property access
+  - **Angular** — Add `CUSTOM_ELEMENTS_SCHEMA` to the NgModule; use the element in templates
+  - **Vue 2** — Configure `Vue.config.ignoredElements = ['odrl-policy-editor']`
+  - **Vue 3** — `compilerOptions.isCustomElement` (same as FDSC guide, but standalone)
+  - **Server-side rendering (SSR)** — Note that the custom element requires a browser DOM; use dynamic imports or `<ClientOnly>` wrappers in SSR frameworks (Next.js, Nuxt, SvelteKit)
+  - **Security:** CSP `script-src` must allow the CDN domain or `'self'` if self-hosted; note CORS requirements for `api-base-url`
+  - **Performance:** Lazy-load with `import()`, add `<link rel="preconnect">` to the API host
 
-- Create `frontend/src/test/hooks/useMappings.test.ts` — Hook tests:
-  - Returns loading state initially
-  - Returns data after fetch
-  - Returns error on failure
-  - Caches data across multiple hook instances
+- `frontend/examples/vue-integration/` — Minimal Vue 3 example:
+  - `OdrlPolicyEditor.vue` — Vue 3 wrapper component (copy-pasteable)
+  - `README.md` — 5-line setup instructions
 
-- Create `frontend/src/test/hooks/useTemplateMode.test.ts` — Hook tests:
-  - No template: all fields unlocked
-  - With template: correct fields locked/unlocked
-
-- Create `frontend/src/test/pages/PolicyList.test.tsx` — Page tests:
-  - Renders policy table
-  - Delete button removes policy
-  - New policy button navigates
-
-- Create `frontend/src/test/pages/PolicyEditor.test.tsx` — Page tests:
-  - Create mode: empty form
-  - Edit mode: loads existing policy
-  - Save submits correct data
-  - Validation modal opens and displays results
-
-- Create `frontend/src/test/web-component/OdrlPolicyEditorElement.test.ts` — Web Component tests:
-  - Custom element registers
-  - Renders shadow DOM content
-  - Attribute changes propagate
-  - Custom events fire
-
-- Modify `frontend/src/components/*.tsx` — Accessibility improvements:
-  - Add `aria-label` and `aria-describedby` to all form controls
-  - Ensure keyboard navigation works in dropdowns
-  - Add `role` attributes where needed
-  - Ensure color contrast meets WCAG AA
-
-- Modify `frontend/Dockerfile` — Final production polish:
-  - Add nginx.conf with proper SPA fallback (try_files), gzip, cache headers
-  - Health check endpoint
-
-- Modify `frontend/package.json` — Add scripts:
-  - `test:coverage` — Run tests with coverage report
-  - `test:ci` — Run tests in CI mode (no watch)
-
-- Modify `frontend/eslint.config.js` — Add accessibility linting:
-  - Add `eslint-plugin-jsx-a11y` for accessibility checks
-
-- Create `frontend/src/test/i18n/useI18n.test.ts` — Localization tests:
-  - Default locale returns English strings
-  - Switching locale returns translated strings
-  - Partial override merges with defaults
-  - Missing keys fall back to English
-
-- Create `frontend/src/test/theme/ThemeContext.test.tsx` — Theme tests:
-  - Default theme applies CSS custom properties
-  - Custom theme overrides specific properties
-  - Light/dark mode switching works
-  - Theme changes propagate to all components
+- `frontend/examples/vanilla-integration/` — Minimal vanilla HTML/JS example:
+  - `index.html` — Standalone page loading from CDN with event listeners and a simple config panel
+  - `README.md` — 5-line setup instructions
 
 **Acceptance criteria:**
-- All unit tests pass (`npm run test`)
-- Test coverage is >=70% for components and hooks
-- ESLint passes with no errors (`npm run lint`)
-- Production build succeeds (`npm run build`)
-- Web Component build succeeds (`npm run build:component`)
-- Docker image builds and serves correctly
-- No accessibility warnings from jsx-a11y ESLint plugin
-- All form controls are keyboard-navigable
-- Loading and error states work throughout the app
-- Localization system works end-to-end: UI language can be switched at runtime
-- Theme customization works: colors, fonts, and spacing respond to theme changes
-- No hardcoded user-facing strings remain in components (all sourced from i18n)
+- `frontend/docs/integration-fdsc-dashboard.md` provides a complete, copy-pasteable integration for the FDSC-Dashboard (Vue 3 + Vuetify + oidc-client-ts)
+- `frontend/docs/integration-bae-logic-proxy.md` provides a complete integration for the BAE Logic Proxy (both CDN and npm approaches)
+- `frontend/docs/integration-generic.md` covers vanilla JS, React, Angular, Vue 2, Vue 3, and SSR considerations
+- The main `frontend/README.md` has an npm badge, installation commands (npm + CDN), quick-start snippet, and links to detailed guides
+- The `:warning: experimental` notice is replaced with the npm badge
+- Example directories in `frontend/examples/` are self-contained with their own README
+- All documentation references the correct npm package name (`@fiware/odrl-policy-editor`)
+- CDN URLs use both `unpkg.com` and `cdn.jsdelivr.net` alternatives
+- Security (CSP) and performance (lazy-loading, preconnect) considerations are documented

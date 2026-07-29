@@ -146,6 +146,28 @@ npm run lint         # ESLint
 - `VITE_API_PROXY_TARGET` — Dev proxy target (default: http://localhost:8080)
 - `VITE_API_BASE_URL` — Production API base URL (default: /api)
 
+### Frontend Web Component (npm Package)
+- **Package:** `@fiware/odrl-policy-editor` (scoped, public)
+- **Build:** `npm run build:component` → `dist-component/odrl-policy-editor.js` (single self-contained ES module)
+- **Config:** `frontend/vite.component.config.ts` (library build, inlines all CSS/deps)
+- **Entry:** `frontend/src/web-component/index.ts` → registers `<odrl-policy-editor>` custom element
+- **Shadow DOM:** Full style isolation; Bootstrap + theme CSS inlined
+- **Attributes:** `api-base-url`, `auth-token`, `mode`, `policy-id`, `theme`, `locale`, `policy-context`
+- **JS Properties:** `i18nStrings`, `themeConfig`, `template`, `policyContext`
+- **Events:** `policy-created`, `policy-updated`, `policy-validated`, `editor-cancelled`
+
 ### Frontend Docker
 - Multi-stage: Node 18 build → Nginx 1.21 serve (port 80)
-- Static files only; API base URL baked at build time
+- Nginx reverse-proxies API paths (`/policy`, `/mappings`, `/validate`) to `PAP_BACKEND_URL`
+- `PAP_BACKEND_URL` injected at container start via `envsubst` (no rebuild needed)
+- Health check at `/healthz`
+
+## CI/CD Workflows (`.github/workflows/`)
+- `test.yaml` — Runs on every push: Java Maven tests + OPA rego tests
+- `it.yaml` — Integration tests (currently partially disabled)
+- `check.yml` — PR check: validates semver label (major/minor/patch)
+- `pre-release.yaml` — On PR events: builds + pushes pre-release Docker images to quay.io
+- `release.yaml` — On push to main: generates semver version, builds multi-arch Docker images, pushes to quay.io, creates GitHub release
+- **Registry:** `quay.io/fiware/odrl-pap` (backend image)
+- **Secrets used:** `QUAY_USERNAME`, `QUAY_PASSWORD`, `GITHUB_TOKEN`
+- **Version generation:** `zwaldowski/semver-release-action` from PR labels
