@@ -52,6 +52,7 @@ export const en = {
     refinementsTitle: 'Refinements',
     refinementsHelp: 'Add constraints that narrow down which assets in the collection this policy applies to.',
     invalidUrl: 'Please enter a valid URL',
+    enterTargetValue: 'Enter the target value (e.g., urn:resource:123 or https://example.com/resource)',
   },
 
   assigneeEditor: {
@@ -63,6 +64,7 @@ export const en = {
     selectAssignee: 'Select an assignee',
     refinementsTitle: 'Refinements',
     refinementsHelp: 'Add constraints that define which parties in the collection this policy applies to.',
+    enterAssigneeValue: 'Enter the assignee value (e.g., did:example:org123 or urn:party:456)',
   },
 
   constraintBuilder: {

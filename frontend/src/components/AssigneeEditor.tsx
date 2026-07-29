@@ -17,7 +17,7 @@ import ConstraintBuilder from './ConstraintBuilder';
 import NamespacedDropdown from './NamespacedDropdown';
 
 interface AssigneeEditorProps {
-  /** Current assignee value (string ID, `{@id}` object, or PartyCollection). */
+  /** Current assignee value (string identifier or PartyCollection object). */
   assignee: unknown;
   /** Callback to update the assignee value. */
   setAssignee: (assignee: unknown) => void;
@@ -45,6 +45,8 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings, locked = false }: Ass
   const t = strings.assigneeEditor;
 
   const [simpleAssigneeType, setSimpleAssigneeType] = useState<'text' | 'dropdown'>('text');
+  /** Tracks the dropdown selection separately from the assignee value. */
+  const [dropdownSelection, setDropdownSelection] = useState('');
 
   const isCollection = isPartyCollection(assignee);
 
@@ -106,7 +108,8 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings, locked = false }: Ass
                   checked={simpleAssigneeType === 'dropdown'}
                   onChange={() => {
                     setSimpleAssigneeType('dropdown');
-                    setAssignee({ '@id': '' });
+                    setDropdownSelection('');
+                    setAssignee('');
                   }}
                   disabled={locked || availableAssignees.length === 0}
                 />
@@ -124,14 +127,27 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings, locked = false }: Ass
                     disabled={locked}
                   />
                 ) : (
-                  <NamespacedDropdown
-                    items={availableAssignees}
-                    value={(assignee as Record<string, string>)?.['@id'] || ''}
-                    onChange={(val) => setAssignee({ '@id': val })}
-                    placeholder={t.selectAssignee}
-                    ariaLabel={t.selectAssignee}
-                    disabled={locked}
-                  />
+                  <Stack gap={2}>
+                    <NamespacedDropdown
+                      items={availableAssignees}
+                      value={dropdownSelection}
+                      onChange={(val) => {
+                        setDropdownSelection(val);
+                        setAssignee(val);
+                      }}
+                      placeholder={t.selectAssignee}
+                      ariaLabel={t.selectAssignee}
+                      disabled={locked}
+                    />
+                    <Form.Control
+                      type="text"
+                      placeholder={t.enterAssigneeValue}
+                      value={typeof assignee === 'string' ? assignee : ''}
+                      onChange={(e) => setAssignee(e.target.value)}
+                      aria-label={t.enterAssigneeValue}
+                      disabled={locked}
+                    />
+                  </Stack>
                 )}
               </Col>
             </Row>
