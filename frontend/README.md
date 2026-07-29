@@ -1,6 +1,6 @@
 # ODRL PAP Frontend
 
-> :warning: This is currently just an experimental frontend, without any proper tests provided. DO NOT use it in production.
+[![npm](https://img.shields.io/npm/v/@fiware/odrl-policy-editor)](https://www.npmjs.com/package/@fiware/odrl-policy-editor)
 
 A React-based frontend for the ODRL Policy Administration Point (PAP). It
 provides a visual, form-driven policy editor that guides users through creating
@@ -19,6 +19,10 @@ The editor can be used in two ways:
 
 ## Table of Contents
 
+- [Installation](#installation)
+- [Quick Integration](#quick-integration)
+- [Docker](#docker)
+- [Integration Guides](#integration-guides)
 - [Prerequisites](#prerequisites)
 - [Quick Start (Development)](#quick-start-development)
 - [Standalone SPA Usage](#standalone-spa-usage)
@@ -47,6 +51,99 @@ The editor can be used in two ways:
   - [API Base URL Resolution](#api-base-url-resolution)
 - [Testing](#testing)
 - [Regenerating the API Client](#regenerating-the-api-client)
+
+---
+
+## Installation
+
+Install the embeddable Web Component via npm:
+
+```bash
+npm install @fiware/odrl-policy-editor
+```
+
+Or load it directly from a CDN — no build step required:
+
+```html
+<!-- unpkg -->
+<script type="module" src="https://unpkg.com/@fiware/odrl-policy-editor@latest"></script>
+
+<!-- jsDelivr (alternative) -->
+<script type="module" src="https://cdn.jsdelivr.net/npm/@fiware/odrl-policy-editor@latest"></script>
+```
+
+---
+
+## Quick Integration
+
+Drop this snippet into any HTML page to get a working policy editor:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <script type="module" src="https://unpkg.com/@fiware/odrl-policy-editor@latest"></script>
+</head>
+<body>
+  <odrl-policy-editor
+    api-base-url="https://your-pap-backend.example.com"
+    mode="create"
+    theme="light"
+    locale="en"
+  ></odrl-policy-editor>
+  <script>
+    document.querySelector('odrl-policy-editor')
+      .addEventListener('policy-created', (e) => console.log('Created:', e.detail.id));
+  </script>
+</body>
+</html>
+```
+
+See [Embedding as a Web Component](#embedding-as-a-web-component) for full
+attribute/property/event documentation.
+
+---
+
+## Docker
+
+A pre-built frontend Docker image is available:
+
+```bash
+docker pull quay.io/fiware/odrl-pap-frontend:<version>
+```
+
+Run the container with the PAP backend URL:
+
+```bash
+docker run -p 8080:80 \
+  -e PAP_BACKEND_URL=http://odrl-pap:8080 \
+  quay.io/fiware/odrl-pap-frontend:<version>
+```
+
+See [Docker Deployment](#docker-deployment) for full configuration details.
+
+---
+
+## Integration Guides
+
+Detailed, step-by-step guides for embedding the Web Component in specific
+platforms:
+
+- **[FDSC-Dashboard (Vue 3 + Vuetify)](docs/integration-fdsc-dashboard.md)** —
+  Vue wrapper component with OIDC auth token and Vuetify theme bridging
+- **[BAE Logic Proxy](docs/integration-bae-logic-proxy.md)** —
+  CDN and npm integration options for the BAE marketplace portal
+- **[Generic Integration](docs/integration-generic.md)** —
+  Vanilla JS, React, Angular, Vue 2/3, Svelte, SSR, security (CSP), and
+  performance optimization
+
+Working examples are available in the [`examples/`](examples/) directory:
+
+| Example | Description |
+|---------|-------------|
+| [`vanilla-integration/`](examples/vanilla-integration/) | Standalone HTML page with CDN loading and a config panel |
+| [`vue-integration/`](examples/vue-integration/) | Copy-pasteable Vue 3 wrapper component |
 
 ---
 
