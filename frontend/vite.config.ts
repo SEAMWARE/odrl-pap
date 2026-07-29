@@ -20,6 +20,10 @@ export default defineConfig(({ mode }) => {
         console.log('proxy error', err);
       });
       proxy.on('proxyReq', (proxyReq: ClientRequest, req: IncomingMessage, _res: ServerResponse) => {
+        // Strip Origin and Referer headers to avoid CORS rejection by the
+        // backend — mirrors the proxy_set_header directives in nginx.conf.
+        proxyReq.removeHeader('origin');
+        proxyReq.removeHeader('referer');
         console.log('\n[proxy] Sending Request to the Target:', req.method, req.url);
         console.log('[proxy] Target:', proxyTarget + proxyReq.path);
       });
