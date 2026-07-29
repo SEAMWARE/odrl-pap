@@ -54,6 +54,14 @@ export interface EmbeddedConfig {
   theme: EmbeddedThemePreset;
   /** Callback to emit Custom Events on the host element. */
   onEvent: OnEventCallback;
+  /**
+   * Custom JSON-LD `@context` for new policies.
+   *
+   * When set, overrides the built-in default context
+   * (`{ "odrl": "http://www.w3.org/ns/odrl/2/" }`).
+   * Accepts an object (namespaced map) or a string (context URI).
+   */
+  policyContext?: Record<string, string> | string | null;
 }
 
 /** Full context value including an `isEmbedded` flag. */

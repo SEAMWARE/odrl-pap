@@ -31,13 +31,7 @@ import {
   type EmbeddedConfig,
   type EmbeddedThemePreset,
 } from './EmbeddedContext';
-
-/** Template for a new, empty ODRL policy. */
-const NEW_POLICY_TEMPLATE: OdrlPolicyJson = {
-  '@context': 'http://www.w3.org/ns/odrl/2/',
-  '@type': 'odrl:Policy',
-  'odrl:permission': {},
-};
+import { createNewPolicy } from '../constants/policyDefaults';
 
 /** Default test request values for validation. */
 const DEFAULT_TEST_REQUEST: TestRequest = {
@@ -101,7 +95,7 @@ const EmbeddedApp = ({
   containerRef,
   template,
 }: EmbeddedAppProps) => {
-  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent } = config;
+  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext } = config;
 
   // --- API configuration ---
   useEffect(() => {
@@ -118,10 +112,9 @@ const EmbeddedApp = ({
   }, [theme, themeOverrides, containerRef]);
 
   // --- Policy state ---
-  const [policy, setPolicy] = useState<OdrlPolicyJson>(() => ({
-    ...NEW_POLICY_TEMPLATE,
-    'odrl:uid': crypto.randomUUID(),
-  }));
+  const [policy, setPolicy] = useState<OdrlPolicyJson>(
+    () => createNewPolicy(policyContext) as OdrlPolicyJson,
+  );
   const [saveError, setSaveError] = useState('');
 
   // Load existing policy in edit mode

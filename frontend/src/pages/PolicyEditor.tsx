@@ -19,6 +19,7 @@ import PolicyBuilder from '../components/PolicyBuilder';
 import ValidationEditor from '../components/ValidationEditor';
 import ValidationResult from '../components/ValidationResult';
 import { useI18n } from '../i18n';
+import { createNewPolicy } from '../constants/policyDefaults';
 
 /** Session storage key for persisting the last HTTP test request. */
 const SESSION_KEY_TEST_REQUEST = 'odrl-pap-test-request';
@@ -26,13 +27,6 @@ const SESSION_KEY_TEST_REQUEST = 'odrl-pap-test-request';
 const SESSION_KEY_JSON_INPUT = 'odrl-pap-json-input';
 /** Session storage key for persisting the last validation mode. */
 const SESSION_KEY_VALIDATION_MODE = 'odrl-pap-validation-mode';
-
-/** Template for a new, empty ODRL policy. */
-const NEW_POLICY_TEMPLATE = {
-  '@context': 'http://www.w3.org/ns/odrl/2/',
-  '@type': 'odrl:Policy',
-  'odrl:permission': {},
-};
 
 /** Default test request values for the validation modal. */
 const DEFAULT_TEST_REQUEST: TestRequest = {
@@ -129,11 +123,7 @@ const PolicyEditor = () => {
         .then((p: Policy) => setPolicy(JSON.parse(p.odrl!)))
         .catch(console.error);
     } else {
-      const newPolicy = {
-        ...NEW_POLICY_TEMPLATE,
-        'odrl:uid': crypto.randomUUID(),
-      };
-      setPolicy(newPolicy);
+      setPolicy(createNewPolicy() as OdrlPolicyJson);
     }
   }, [id]);
 
