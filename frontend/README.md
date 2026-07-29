@@ -115,30 +115,36 @@ configured for SPA routing (all unknown paths serve `index.html`).
 
 ### Docker Deployment
 
-A multi-stage `Dockerfile` is provided:
+A multi-stage `Dockerfile` is provided. The container includes an Nginx reverse
+proxy that forwards API requests to the PAP backend, so the browser never makes
+cross-origin requests (no CORS issues).
 
 ```bash
 # 1. Build the image
 docker build -t odrl-pap-frontend .
 
-# 2. Run the container
+# 2. Run the container — set PAP_BACKEND_URL to the backend's internal address
 docker run -p 8080:80 \
-  -e VITE_API_BASE_URL=https://pap-api.example.com \
+  -e PAP_BACKEND_URL=http://odrl-pap:8080 \
   odrl-pap-frontend
 ```
 
-The frontend is served at `http://localhost:8080`.
+The frontend is served at `http://localhost:8080`. API requests to `/policy`,
+`/mappings`, and `/validate` are transparently proxied to the backend specified
+by `PAP_BACKEND_URL`.
 
 The container uses Nginx with:
 
+- **API reverse proxy** — forwards `/policy`, `/mappings`, `/validate` to the
+  backend, avoiding CORS issues
 - **SPA fallback** — `try_files $uri $uri/ /index.html`
 - **Gzip compression** — enabled for JS, CSS, JSON, SVG
 - **Cache headers** — hashed assets cached for 1 year; `index.html` never cached
 - **Health check** — `GET /healthz` returns `200 OK`
 
-The `VITE_API_BASE_URL` environment variable is injected **at container startup**
-via `envsubst`, so a single image can be reused across environments without
-rebuilding.
+The `PAP_BACKEND_URL` environment variable is injected **at container startup**
+via `envsubst` into the Nginx config, so a single image can be reused across
+environments without rebuilding.
 
 ### Configuration
 
@@ -148,14 +154,17 @@ starting point).
 | Variable               | Purpose                                              | Default                |
 |------------------------|------------------------------------------------------|------------------------|
 | `VITE_API_PROXY_TARGET`| Backend URL used by the Vite dev-server proxy        | `http://localhost:8080` |
-| `VITE_API_BASE_URL`    | Base URL for API calls in the production build       | `/api`                 |
+| `PAP_BACKEND_URL`      | Backend URL for the Nginx reverse proxy (Docker)     | _(required in Docker)_ |
+| `VITE_API_BASE_URL`    | Override API base URL in the browser (rarely needed) | `""` (empty = proxy)   |
 
-- **Development mode** — uses `VITE_API_PROXY_TARGET` to proxy `/mappings`,
-  `/policy`, and `/validate` requests to the backend.
-- **Production / preview mode** — uses `VITE_API_BASE_URL` as the base URL for
-  API requests.
-- **Docker** — `VITE_API_BASE_URL` is injected at runtime via the
-  `env-config.js` mechanism (no rebuild required).
+- **Development mode** — the Vite dev server proxies `/mappings`, `/policy`,
+  and `/validate` to the backend specified by `VITE_API_PROXY_TARGET`.
+- **Docker / Production** — Nginx reverse-proxies API paths to `PAP_BACKEND_URL`.
+  The frontend uses relative paths (empty base URL) so all requests go through
+  the same origin, avoiding CORS issues entirely.
+- **`VITE_API_BASE_URL`** — only needed if the frontend must call a different
+  origin than the Nginx proxy (e.g., an external API gateway). In the normal
+  proxy setup this variable should be left unset.
 
 ### Preview Mode
 
@@ -557,7 +566,13 @@ The API base URL is resolved from multiple sources (highest priority first):
 | 1        | `configureApi(baseUrl, token)` (programmatic) | Web Component mode |
 | 2        | `window.__ENV__.API_BASE_URL` (runtime)    | Docker `envsubst`     |
 | 3        | `import.meta.env.VITE_API_BASE_URL` (build-time) | Static builds    |
-| 4        | Empty string (relative paths)              | Dev proxy / same-origin |
+| 4        | Empty string (relative paths)              | Dev proxy / Nginx reverse proxy |
+
+In the recommended Docker deployment, the base URL resolves to an empty string
+(priority 4). API requests use relative paths (`/policy`, `/mappings`,
+`/validate`) and are proxied by Nginx to the backend configured via
+`PAP_BACKEND_URL`. This avoids CORS issues entirely because the browser sees
+all traffic going to a single origin.
 
 ---
 

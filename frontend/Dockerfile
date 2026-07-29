@@ -11,8 +11,9 @@ RUN npx vite build
 # Stage 2: Serve the static build artifacts with runtime env injection
 FROM nginx:1.21.6-alpine
 
-# Use custom nginx config with SPA fallback, gzip, and cache headers
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy the nginx config as a template — envsubst replaces $PAP_BACKEND_URL
+# at container startup so the same image works in any environment.
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 COPY --from=build /app/dist /usr/share/nginx/html
 
@@ -27,7 +28,10 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget -qO- http://localhost/healthz || exit 1
 
-# At startup, substitute environment variables into env-config.js, then start nginx.
-# Only the explicitly listed variables are substituted to avoid corrupting other
-# dollar-sign references in static assets.
-CMD ["/bin/sh", "-c", "envsubst '$VITE_API_BASE_URL' < /usr/share/nginx/html/env-config.js.template > /usr/share/nginx/html/env-config.js && nginx -g 'daemon off;'"]
+# At startup:
+# 1. Substitute $PAP_BACKEND_URL into the nginx config template
+#    (only this variable is listed so nginx's own $uri/$host/etc. are preserved)
+# 2. Substitute $VITE_API_BASE_URL into env-config.js for the rare case where
+#    the frontend needs to call a different origin than the proxy
+# 3. Start nginx
+CMD ["/bin/sh", "-c", "envsubst '$PAP_BACKEND_URL' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && envsubst '$VITE_API_BASE_URL' < /usr/share/nginx/html/env-config.js.template > /usr/share/nginx/html/env-config.js && nginx -g 'daemon off;'"]
