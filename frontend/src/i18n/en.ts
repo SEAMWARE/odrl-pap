@@ -179,6 +179,17 @@ export const en = {
     tabBuilder: 'Policy Builder',
     tabRawOdrl: 'Raw ODRL',
     validate: 'Validate',
+    jsonValid: 'Valid JSON',
+    jsonInvalid: 'Invalid JSON',
+    contextTitle: 'JSON-LD Context (@context)',
+    contextPrefix: 'Prefix',
+    contextPrefixPlaceholder: 'e.g., dome-op',
+    contextUri: 'Namespace URI',
+    contextUriPlaceholder: 'e.g., https://example.com/ns/',
+    addContext: 'Add Context',
+    removeContext: 'Remove',
+    applyJson: 'Apply JSON',
+    jsonParseError: 'Fix JSON errors before adding context.',
   },
 
   namespacedDropdown: {

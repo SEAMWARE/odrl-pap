@@ -156,6 +156,7 @@ starting point).
 | `VITE_API_PROXY_TARGET`| Backend URL used by the Vite dev-server proxy        | `http://localhost:8080` |
 | `PAP_BACKEND_URL`      | Backend URL for the Nginx reverse proxy (Docker)     | _(required in Docker)_ |
 | `VITE_API_BASE_URL`    | Override API base URL in the browser (rarely needed) | `""` (empty = proxy)   |
+| `VITE_ODRL_CONTEXT`    | Default `@context` for new policies (JSON string)    | `{"odrl":"http://www.w3.org/ns/odrl/2/"}` |
 
 - **Development mode** — the Vite dev server proxies `/mappings`, `/policy`,
   and `/validate` to the backend specified by `VITE_API_PROXY_TARGET`.
@@ -226,6 +227,7 @@ at runtime triggers a re-render automatically.
 | `policy-id`     | Policy ID to load (required when `mode="edit"`) | `null`   |
 | `theme`         | `"light"` or `"dark"`                         | `"light"`  |
 | `locale`        | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
+| `policy-context`| Default `@context` for new policies (JSON string) | `{"odrl":"http://www.w3.org/ns/odrl/2/"}` |
 
 ```javascript
 // Attributes can be changed at runtime
@@ -245,6 +247,7 @@ JavaScript properties on the element:
 | `i18nStrings` | `DeepPartial<I18nStrings>`   | Partial i18n overrides (deep-merged with defaults)   |
 | `themeConfig` | `Partial<ThemeConfig>`       | Partial theme CSS custom property overrides           |
 | `template`    | `PolicyTemplate`             | Pre-fills the form and optionally locks fields        |
+| `policyContext` | `Record<string, string>`   | Default `@context` for new policies (takes precedence over attribute) |
 
 ```javascript
 const editor = document.querySelector('odrl-policy-editor');
@@ -573,6 +576,78 @@ In the recommended Docker deployment, the base URL resolves to an empty string
 `/validate`) and are proxied by Nginx to the backend configured via
 `PAP_BACKEND_URL`. This avoids CORS issues entirely because the browser sees
 all traffic going to a single origin.
+
+---
+
+## Policy Context (`@context`) Configuration
+
+New policies are created with a default JSON-LD `@context`. The PAP backend
+expects the context as a **namespaced object**:
+
+```json
+{
+  "@context": {
+    "odrl": "http://www.w3.org/ns/odrl/2/"
+  }
+}
+```
+
+The default context can be overridden at multiple levels. Resolution order
+(highest priority first):
+
+| Priority | Source                                       | Context                          |
+|----------|----------------------------------------------|----------------------------------|
+| 1        | `policyContext` JS property on the Web Component | Embedded mode (programmatic) |
+| 2        | `policy-context` HTML attribute (JSON string)    | Embedded mode (declarative)  |
+| 3        | `window.__ENV__.ODRL_CONTEXT` (runtime JSON)     | Docker `envsubst`            |
+| 4        | `import.meta.env.VITE_ODRL_CONTEXT` (build-time) | Static builds               |
+| 5        | `{ "odrl": "http://www.w3.org/ns/odrl/2/" }`     | Built-in default             |
+
+### Adding Contexts at Runtime
+
+The **Raw ODRL** tab in the editor includes a context management panel that
+lets users add or remove `@context` entries without editing JSON directly.
+Click **Add Context**, enter a prefix (e.g., `dome-op`) and a namespace URI
+(e.g., `https://dome-marketplace.eu/ns/`), and the entry is added to the
+policy's `@context` object.
+
+### Standalone Mode
+
+Set the `VITE_ODRL_CONTEXT` environment variable (build-time) or
+`window.__ENV__.ODRL_CONTEXT` (runtime injection in Docker):
+
+```bash
+# .env — build-time override
+VITE_ODRL_CONTEXT='{"odrl":"http://www.w3.org/ns/odrl/2/","dome-op":"https://dome-marketplace.eu/ns/"}'
+```
+
+```javascript
+// env-config.js — runtime injection (Docker envsubst)
+window.__ENV__ = {
+  ODRL_CONTEXT: '{"odrl":"http://www.w3.org/ns/odrl/2/","dome-op":"https://dome-marketplace.eu/ns/"}'
+};
+```
+
+### Embedded Mode
+
+Pass the context via the `policy-context` HTML attribute or the
+`policyContext` JavaScript property:
+
+```html
+<!-- HTML attribute (JSON string) -->
+<odrl-policy-editor
+  policy-context='{"odrl":"http://www.w3.org/ns/odrl/2/","dome-op":"https://dome-marketplace.eu/ns/"}'
+></odrl-policy-editor>
+```
+
+```javascript
+// JavaScript property (object — takes precedence over the attribute)
+const editor = document.querySelector('odrl-policy-editor');
+editor.policyContext = {
+  odrl: 'http://www.w3.org/ns/odrl/2/',
+  'dome-op': 'https://dome-marketplace.eu/ns/',
+};
+```
 
 ---
 
