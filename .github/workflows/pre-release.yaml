@@ -138,8 +138,69 @@ jobs:
           
           docker manifest push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap:${{ needs.generate-version.outputs.version }}
 
+  # ---------------------------------------------------------------------------
+  # Frontend: publish npm pre-release package
+  # ---------------------------------------------------------------------------
+  # Requires NPM_TOKEN secret configured in the repository settings.
+  # Pre-releases are published under the "next" dist-tag so they do not
+  # become the default "latest" version for npm consumers.
+  publish-npm-prerelease:
+    needs: [ "generate-version" ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint and test
+        working-directory: frontend
+        run: npm run lint && npm run test:ci
+
+      - name: Set pre-release version
+        working-directory: frontend
+        run: npm version ${{ needs.generate-version.outputs.version }} --no-git-tag-version
+
+      - name: Build Web Component
+        working-directory: frontend
+        run: npm run build:component
+
+      - name: Publish to npm (next tag)
+        working-directory: frontend
+        run: npm publish --tag next
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Frontend: build and push Docker pre-release image
+  # ---------------------------------------------------------------------------
+  build-frontend-image:
+    needs: [ "generate-version" ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Log into quay.io
+        run: docker login -u "${{ secrets.QUAY_USERNAME }}" -p "${{ secrets.QUAY_PASSWORD }}" ${{ env.REGISTRY }}
+
+      - name: Build frontend image
+        run: docker build -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap-frontend:${{ needs.generate-version.outputs.version }} frontend/
+
+      - name: Push frontend image
+        run: docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap-frontend:${{ needs.generate-version.outputs.version }}
+
   git-release:
-    needs: [ "generate-version","multi-arch" ]
+    needs: [ "generate-version", "multi-arch", "publish-npm-prerelease", "build-frontend-image" ]
     runs-on: ubuntu-latest
 
     steps:

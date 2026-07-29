@@ -3,20 +3,36 @@
   "version": "0.1.0",
   "type": "module",
   "description": "ODRL Policy Editor — visual policy builder embeddable as a Web Component",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/SEAMWARE/odrl-pap/tree/main/frontend#readme",
+  "bugs": {
+    "url": "https://github.com/SEAMWARE/odrl-pap/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SEAMWARE/odrl-pap.git",
+    "directory": "frontend"
+  },
   "main": "dist-component/odrl-policy-editor.js",
   "module": "dist-component/odrl-policy-editor.js",
+  "types": "dist-component/odrl-policy-editor.d.ts",
   "exports": {
     ".": {
-      "import": "./dist-component/odrl-policy-editor.js"
+      "import": "./dist-component/odrl-policy-editor.js",
+      "types": "./dist-component/odrl-policy-editor.d.ts"
     }
   },
   "files": [
-    "dist-component/odrl-policy-editor.js"
+    "dist-component/odrl-policy-editor.js",
+    "dist-component/odrl-policy-editor.d.ts"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:component": "vite build --config vite.component.config.ts",
+    "build:component": "vite build --config vite.component.config.ts && cp src/web-component/types.d.ts dist-component/odrl-policy-editor.d.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
