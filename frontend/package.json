@@ -1,11 +1,22 @@
 {
-  "name": "frontend",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@fiware/odrl-policy-editor",
+  "version": "0.1.0",
   "type": "module",
+  "description": "ODRL Policy Editor — visual policy builder embeddable as a Web Component",
+  "main": "dist-component/odrl-policy-editor.js",
+  "module": "dist-component/odrl-policy-editor.js",
+  "exports": {
+    ".": {
+      "import": "./dist-component/odrl-policy-editor.js"
+    }
+  },
+  "files": [
+    "dist-component/odrl-policy-editor.js"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:component": "vite build --config vite.component.config.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
