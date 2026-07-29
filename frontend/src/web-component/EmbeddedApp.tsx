@@ -16,6 +16,7 @@ import { PapService } from '../api/services/PapService';
 import { UiService } from '../api/services/UiService';
 import type { OdrlPolicyJson, ValidationResponse } from '../services/api';
 import { configureApi } from '../services/api';
+import type { PolicyTemplate } from '../types';
 import { TestRequest } from '../api/models/TestRequest';
 import type { GenericJsonInput } from '../api/models/GenericJsonInput';
 import type { ValidationMode } from '../components/ValidationEditor';
@@ -82,6 +83,8 @@ export interface EmbeddedAppProps {
    * should be applied (typically the shadow-DOM container div).
    */
   containerRef?: RefObject<HTMLDivElement | null>;
+  /** Optional policy template for pre-filling and constraining the editor. */
+  template?: PolicyTemplate;
 }
 
 /**
@@ -96,6 +99,7 @@ const EmbeddedApp = ({
   i18nOverrides,
   themeOverrides,
   containerRef,
+  template,
 }: EmbeddedAppProps) => {
   const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent } = config;
 
@@ -221,7 +225,7 @@ const EmbeddedApp = ({
             className="mb-3"
           >
             <Tab eventKey="builder" title="Policy Builder">
-              <PolicyBuilder policy={policy} setPolicy={setPolicy} />
+              <PolicyBuilder policy={policy} setPolicy={setPolicy} template={template} />
             </Tab>
             <Tab eventKey="odrl" title="Raw ODRL">
               <Form.Control

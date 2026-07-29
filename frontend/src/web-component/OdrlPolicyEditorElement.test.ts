@@ -279,4 +279,59 @@ describe('OdrlPolicyEditorElement', () => {
     expect(el1.getAttribute('api-base-url')).toBe('https://api1.example.com');
     expect(el2.getAttribute('api-base-url')).toBe('https://api2.example.com');
   });
+
+  // -----------------------------------------------------------
+  // Template property
+  // -----------------------------------------------------------
+
+  it('accepts template via JS property', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    mockRender.mockClear();
+
+    const template = {
+      id: 'test-tmpl',
+      name: 'Test Template',
+      description: 'A test template',
+      category: 'Testing',
+      skeleton: { '@context': 'http://www.w3.org/ns/odrl/2/' },
+      editableFields: [],
+      lockedFields: [],
+    };
+    el.template = template;
+    expect(el.template).toBe(template);
+
+    // Should trigger a re-render
+    await vi.dynamicImportSettled();
+    expect(mockRender).toHaveBeenCalled();
+  });
+
+  it('returns undefined for template when none is set', () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    expect(el.template).toBeUndefined();
+  });
+
+  it('allows clearing the template by setting undefined', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+
+    const template = {
+      id: 'test-tmpl',
+      name: 'Test',
+      description: '',
+      category: 'Test',
+      skeleton: {},
+      editableFields: [],
+      lockedFields: [],
+    };
+    el.template = template;
+    expect(el.template).toBe(template);
+
+    el.template = undefined;
+    expect(el.template).toBeUndefined();
+  });
 });

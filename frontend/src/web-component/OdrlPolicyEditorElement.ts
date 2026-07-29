@@ -29,6 +29,7 @@
  *
  * - `i18nStrings` — partial i18n override object (deep-merged with defaults)
  * - `themeConfig` — partial ThemeConfig override merged on top of the preset
+ * - `template` — a {@link PolicyTemplate} object to pre-fill and constrain the editor
  *
  * @example
  * ```html
@@ -54,6 +55,7 @@ import type { EmbeddedConfig, EditorMode, EmbeddedThemePreset } from './Embedded
 import type { DeepPartial } from '../i18n/I18nContext';
 import type { I18nStrings } from '../i18n/en';
 import type { ThemeConfig } from '../theme/defaultTheme';
+import type { PolicyTemplate } from '../types';
 
 // Bootstrap CSS imported as a string for shadow-DOM injection.
 // The `?inline` suffix tells Vite to return the CSS text, not inject it
@@ -99,6 +101,9 @@ export class OdrlPolicyEditorElement extends HTMLElement {
   /** Partial theme overrides set via JS property. */
   private _themeConfig: Partial<ThemeConfig> | undefined;
 
+  /** Policy template set via JS property. */
+  private _template: PolicyTemplate | undefined;
+
   /**
    * Sets partial i18n string overrides (JS property, not HTML attribute).
    *
@@ -137,6 +142,36 @@ export class OdrlPolicyEditorElement extends HTMLElement {
   /** Returns the current theme overrides. */
   get themeConfig(): Partial<ThemeConfig> | undefined {
     return this._themeConfig;
+  }
+
+  /**
+   * Sets a policy template (JS property, not HTML attribute).
+   *
+   * When set, the editor pre-fills the form from the template skeleton
+   * and locks fields listed in `lockedFields`.
+   *
+   * @example
+   * ```js
+   * const editor = document.querySelector('odrl-policy-editor');
+   * editor.template = {
+   *   id: 'dome-access',
+   *   name: 'DOME Marketplace Access',
+   *   description: 'Grants access to a DOME resource',
+   *   category: 'DOME',
+   *   skeleton: { '@context': 'http://www.w3.org/ns/odrl/2/', ... },
+   *   editableFields: [{ path: 'odrl:permission.odrl:target', ... }],
+   *   lockedFields: ['odrl:permission.odrl:action'],
+   * };
+   * ```
+   */
+  set template(value: PolicyTemplate | undefined) {
+    this._template = value;
+    this.renderReact();
+  }
+
+  /** Returns the current policy template, or `undefined` if none is set. */
+  get template(): PolicyTemplate | undefined {
+    return this._template;
   }
 
   // ------------------------------------------------------------------
@@ -236,6 +271,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
           i18nOverrides: this._i18nStrings,
           themeOverrides: this._themeConfig,
           containerRef: this.containerRef,
+          template: this._template,
         }),
       );
     });

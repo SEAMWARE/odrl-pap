@@ -23,6 +23,8 @@ interface AssigneeEditorProps {
   setAssignee: (assignee: unknown) => void;
   /** Available mappings for populating dropdowns. */
   mappings: Mappings;
+  /** When `true`, all controls are disabled (set by template mode). */
+  locked?: boolean;
 }
 
 /** Checks whether the assignee is a PartyCollection object. */
@@ -38,7 +40,7 @@ function isPartyCollection(assignee: unknown): boolean {
  * Assignee editor with namespace-grouped dropdowns, help text,
  * and improved Party Collection UX.
  */
-const AssigneeEditor = ({ assignee, setAssignee, mappings }: AssigneeEditorProps) => {
+const AssigneeEditor = ({ assignee, setAssignee, mappings, locked = false }: AssigneeEditorProps) => {
   const { strings } = useI18n();
   const t = strings.assigneeEditor;
 
@@ -68,6 +70,7 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings }: AssigneeEditorProps
             label={t.simpleAssignee}
             checked={!isCollection}
             onChange={() => setType('simple')}
+            disabled={locked}
           />
           <Form.Check
             type="radio"
@@ -75,6 +78,7 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings }: AssigneeEditorProps
             label={t.partyCollection}
             checked={isCollection}
             onChange={() => setType('collection')}
+            disabled={locked}
           />
         </Col>
       </Row>
@@ -93,6 +97,7 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings }: AssigneeEditorProps
                     setSimpleAssigneeType('text');
                     setAssignee('');
                   }}
+                  disabled={locked}
                 />
                 <Form.Check
                   type="radio"
@@ -103,7 +108,7 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings }: AssigneeEditorProps
                     setSimpleAssigneeType('dropdown');
                     setAssignee({ '@id': '' });
                   }}
-                  disabled={availableAssignees.length === 0}
+                  disabled={locked || availableAssignees.length === 0}
                 />
               </Col>
             </Row>
@@ -116,6 +121,7 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings }: AssigneeEditorProps
                     value={(assignee as string) || ''}
                     onChange={(e) => setAssignee(e.target.value)}
                     aria-label={t.customAssignee}
+                    disabled={locked}
                   />
                 ) : (
                   <NamespacedDropdown
@@ -124,6 +130,7 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings }: AssigneeEditorProps
                     onChange={(val) => setAssignee({ '@id': val })}
                     placeholder={t.selectAssignee}
                     ariaLabel={t.selectAssignee}
+                    disabled={locked}
                   />
                 )}
               </Col>
