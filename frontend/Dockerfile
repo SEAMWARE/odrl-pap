@@ -11,6 +11,9 @@ RUN npx vite build
 # Stage 2: Serve the static build artifacts with runtime env injection
 FROM nginx:1.21.6-alpine
 
+# Use custom nginx config with SPA fallback, gzip, and cache headers
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # The env-config.js template uses shell variable syntax ($VITE_API_BASE_URL)
@@ -19,6 +22,10 @@ COPY --from=build /app/dist /usr/share/nginx/html
 COPY --from=build /app/dist/env-config.js /usr/share/nginx/html/env-config.js.template
 
 EXPOSE 80
+
+# Health check using the /healthz endpoint defined in nginx.conf
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://localhost/healthz || exit 1
 
 # At startup, substitute environment variables into env-config.js, then start nginx.
 # Only the explicitly listed variables are substituted to avoid corrupting other

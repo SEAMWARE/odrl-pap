@@ -220,6 +220,7 @@ const PolicyEditor = () => {
             rows={20}
             value={JSON.stringify(policy, null, 2)}
             onChange={(e) => setPolicy(JSON.parse(e.target.value))}
+            aria-label={t.tabRawOdrl}
           />
         </Tab>
       </Tabs>
