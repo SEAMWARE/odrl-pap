@@ -10,7 +10,7 @@
  * 3. Empty string fallback (dev-server proxy handles relative paths)
  */
 import { OpenAPI } from '../api';
-import type { Mappings, OdrlPolicyJson, Policy, TestRequest, ValidationResponse } from '../api';
+import type { GenericJsonInput, Mappings, OdrlPolicyJson, Policy, TestRequest, ValidationResponse } from '../api';
 
 /**
  * Resolves the API base URL from available configuration sources.
@@ -56,4 +56,4 @@ OpenAPI.HEADERS = async () => {
 };
 
 export { OpenAPI, resolveApiBaseUrl };
-export type { Mappings, OdrlPolicyJson, Policy, TestRequest, ValidationResponse };
+export type { GenericJsonInput, Mappings, OdrlPolicyJson, Policy, TestRequest, ValidationResponse };

@@ -7,6 +7,7 @@ export { CancelablePromise, CancelError } from './core/CancelablePromise';
 export { OpenAPI } from './core/OpenAPI';
 export type { OpenAPIConfig } from './core/OpenAPI';
 
+export type { GenericJsonInput } from './models/GenericJsonInput';
 export type { Headers } from './models/Headers';
 export type { Id } from './models/Id';
 export type { Mapping } from './models/Mapping';

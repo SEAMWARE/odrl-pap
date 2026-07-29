@@ -3,6 +3,7 @@
  *
  * Provides realistic mock data for the `/mappings` and `/validate` endpoints,
  * matching the Mappings and ValidationResponse schemas from api/odrl.yaml.
+ * Supports both HTTP Request (testRequest) and JSON Payload (jsonInput) modes.
  */
 import { http, HttpResponse } from 'msw';
 import type { Mappings, ValidationResponse } from '../../api';
@@ -64,13 +65,13 @@ export const MOCK_MAPPINGS: Mappings = {
 };
 
 /** Mock validation response indicating an allowed request. */
-const MOCK_VALIDATION_ALLOW: ValidationResponse = {
+export const MOCK_VALIDATION_ALLOW: ValidationResponse = {
   allow: true,
   explanation: [],
 };
 
 /** Mock validation response indicating a denied request. */
-const MOCK_VALIDATION_DENY: ValidationResponse = {
+export const MOCK_VALIDATION_DENY: ValidationResponse = {
   allow: false,
   explanation: [
     'Policy evaluation failed: constraint not satisfied',
@@ -82,7 +83,8 @@ const MOCK_VALIDATION_DENY: ValidationResponse = {
  * Default MSW request handlers.
  *
  * - GET /mappings — returns realistic mock Mappings data
- * - POST /validate — returns allow/deny based on request body content
+ * - POST /validate — returns allow/deny based on request body content.
+ *   Supports both testRequest (HTTP mode) and jsonInput (JSON payload mode).
  */
 export const handlers = [
   http.get('/mappings', () => {
