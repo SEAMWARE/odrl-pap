@@ -102,15 +102,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node 24 bundles npm 11, which is required for trusted publishing
+      # (>= 11.5.1). npm is still upgraded below as a belt-and-suspenders guard.
+      #
+      # NOTE: `registry-url` is intentionally omitted. Setting it makes
+      # setup-node write an .npmrc line `//registry.npmjs.org/:_authToken=...`,
+      # and with no token present npm treats that as (empty) credentials and
+      # skips the OIDC handshake entirely, publishing anonymously -> E404.
+      # Without it, npm uses the default registry and engages trusted publishing.
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      # Trusted publishing requires npm >= 11.5.1; the npm bundled with the
-      # Node 22 setup can be older, so upgrade it explicitly.
+      # Trusted publishing requires npm >= 11.5.1; ensure it regardless of the
+      # exact npm shipped with the Node runtime.
       - name: Ensure npm supports trusted publishing
         run: npm install -g npm@latest
 
