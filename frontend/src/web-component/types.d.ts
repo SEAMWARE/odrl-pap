@@ -77,6 +77,14 @@ export interface EmbeddedConfig {
    * When set, overrides the built-in default context.
    */
   policyContext?: Record<string, string> | string | null;
+  /**
+   * Optional service ID to scope policy operations under a specific service.
+   *
+   * When set, the editor uses service-scoped API endpoints
+   * (e.g., `POST /service/{serviceId}/policy`) instead of root-level
+   * endpoints (`POST /policy`).
+   */
+  serviceId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +108,7 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | `theme`          | `"light"` or `"dark"`                         | `"light"`  |
  * | `locale`         | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
  * | `policy-context` | JSON-LD `@context` for new policies (JSON)    | `null`     |
+ * | `service-id`     | Service ID for service-scoped policy ops       | `null`     |
  *
  * ## JS Properties
  *
@@ -107,6 +116,7 @@ export const TAG_NAME: 'odrl-policy-editor';
  * - `themeConfig` — partial ThemeConfig override merged on top of the preset
  * - `template` — a PolicyTemplate object to pre-fill and constrain the editor
  * - `policyContext` — custom JSON-LD `@context` object/string for new policies
+ * - `serviceId` — service ID string for service-scoped policy operations
  *
  * ## Custom Events
  *
@@ -172,6 +182,20 @@ export declare class OdrlPolicyEditorElement extends HTMLElement {
    * ```
    */
   policyContext: Record<string, string> | string | undefined;
+
+  /**
+   * Service ID for service-scoped policy operations.
+   *
+   * When set, the editor uses service-scoped API endpoints instead of
+   * root-level endpoints. The JS property takes precedence over the
+   * `service-id` HTML attribute.
+   *
+   * @example
+   * ```js
+   * editor.serviceId = 'my-service';
+   * ```
+   */
+  serviceId: string | undefined;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,181 +1,142 @@
-# Implementation Plan: Publish ODRL-PAP Frontend
+# Implementation Plan: Create policies under services
 
 ## Overview
 
-Publish the existing ODRL Policy Editor Web Component (`@seamware/odrl-policy-editor`) to the npm public registry via the existing GitHub Actions CI pipeline, add frontend Docker image builds, and provide integration documentation showing how to embed the component in the target applications (FDSC-Dashboard, BAE Logic Proxy). The Web Component, build config, and embedding README are already complete on the `frontend` branch; the remaining work is CI pipeline integration, version management, and target-application-specific integration guides.
+Add frontend support for creating policies under existing services. The backend already exposes service CRUD and service-scoped policy endpoints (`POST /service/{service-id}/policy`, etc.). The frontend needs to: (1) regenerate its API client to include `ServiceService`, (2) add a service dropdown to the existing `PolicyEditor` so users can optionally assign a policy to a service, and (3) extend the web component with a `service-id` attribute.
+
+No dedicated Service Management UI is needed. Instead, a dropdown listing existing services is added to the `PolicyEditor`. When a service is selected, the policy is created/saved via `POST /service/{service-id}/policy` (or `PUT /service/{service-id}/policy/{id}`). When no service is selected, the plain `/policy` endpoint is used, preserving the current behavior.
 
 ## Steps
 
-### Step 1: Frontend CI — Lint, Test, and Build Validation
+### Step 1: Regenerate API Client & Configure Service Proxy
 
-**Goal:** Add frontend lint, test, and build validation jobs to the existing GitHub Actions workflows so that every push validates the frontend code. This establishes the quality gate that must pass before npm publishing can be added in Step 2.
+**Goal:** Regenerate the TypeScript OpenAPI client so it includes `ServiceService` with all service and service-policy endpoints, and add `/service` proxy configuration to the Vite dev server and Nginx production config.
+
+**Why first:** Every subsequent step depends on `ServiceService` being available and `/service` API calls being routed correctly.
 
 **Files to modify:**
 
-- `.github/workflows/test.yaml` — Add a new `frontend-test` job alongside the existing `test` and `opa-test` jobs:
-  - Checkout the repository (`actions/checkout@v6` — matching existing usage)
-  - Set up Node.js 18 with npm cache (`actions/setup-node@v4`, `cache: npm`, `cache-dependency-path: frontend/package-lock.json`)
-  - Run `npm ci` in `frontend/` (reproducible installs for CI)
-  - Run `npm run lint` (ESLint with jsx-a11y plugin)
-  - Run `npm run test:ci` (Vitest in verbose non-watch mode)
-  - Run `npm run build` (standalone SPA build — validates TypeScript compilation and Vite bundling)
-  - Run `npm run build:component` (Web Component library build — validates the artifact that will be published to npm)
-  - The job runs in parallel with the existing Java `test` and `opa-test` jobs (no `needs` dependency between them)
-  - Use `working-directory: frontend` on each step to keep the workflow clean
+- `frontend/src/api/` — Regenerate by running `npm run generate-api` in the `frontend/` directory. This reads `api/odrl.yaml` (which already defines all `/service/*` endpoints) and produces a new `ServiceService.ts` alongside the existing `PapService.ts` and `UiService.ts`. The generated `ServiceService` should include:
+  - `createService(requestBody: ServiceCreate)` — POST `/service`
+  - `getServices(page?, pageSize?)` — GET `/service`
+  - `getService(serviceId)` — GET `/service/{service-id}`
+  - `deleteService(serviceId)` — DELETE `/service/{service-id}`
+  - `createServicePolicy(serviceId, requestBody)` — POST `/service/{service-id}/policy`
+  - `getServicePolicies(serviceId, page?, pageSize?)` — GET `/service/{service-id}/policy`
+  - `createServicePolicyWithId(serviceId, id, requestBody)` — PUT `/service/{service-id}/policy/{id}`
+  - `getServicePolicyById(serviceId, id)` — GET `/service/{service-id}/policy/{id}`
+  - `deleteServicePolicyById(serviceId, id)` — DELETE `/service/{service-id}/policy/{id}`
+  - `getServicePolicyByUid(serviceId, id)` — GET `/service/{service-id}/policy/odrl/{id}`
+  - `deleteServicePolicyByUid(serviceId, id)` — DELETE `/service/{service-id}/policy/odrl/{id}`
+- Verify the generated models include `ServiceCreate` (with `id: string`), `Service` (with `id`, `policyPath`, `policies` fields), and `ServiceList` types.
+
+- `frontend/vite.config.ts` — Add `'/service'` to the proxy configuration object alongside the existing `'/mappings'`, `'/policy'`, and `'/validate'` entries. Use the same `proxyConfig` object already defined (lines 12-34).
+
+- `frontend/nginx.conf` — Add a `location /service` block with the same proxy settings as the existing `/policy`, `/mappings`, and `/validate` blocks (proxy_pass to `$PAP_BACKEND_URL`, proxy_set_header for Host, X-Real-IP, X-Forwarded-For, X-Forwarded-Proto, strip Origin/Referer, HTTP/1.1).
 
 **Acceptance criteria:**
-- Every push triggers frontend lint, test, and both builds
-- The `frontend-test` job fails if lint, tests, or either build fails
-- Existing Java `test` and `opa-test` jobs are completely unaffected
-- The workflow uses `npm ci` (not `npm install`) for reproducible CI builds
-- Node.js dependency caching reduces install time on repeat runs
+- `frontend/src/api/services/ServiceService.ts` exists and contains all service-level API methods listed above
+- Generated models include `ServiceCreate`, `Service`, and `ServiceList` types
+- `npm run build` succeeds with the regenerated client (no TypeScript errors)
+- `npm run lint` passes
+- Dev server proxies `/service/*` requests to the backend
+- Nginx config proxies `/service/*` requests to the backend in production
+- Existing `PapService` and `UiService` clients remain unchanged in behavior
 
 ---
 
-### Step 2: npm Publishing Pipeline & Version Management
+### Step 2: Service Dropdown in PolicyEditor
 
-**Goal:** Add npm package publishing to the existing release and pre-release workflows so the Web Component is automatically published to the npm registry when a new version is tagged. Synchronize the package version with the semver tag generated by the existing `generate-version` job. Additionally, build and push the frontend Docker image to quay.io.
+**Goal:** Add a service selection dropdown to the existing `PolicyEditor` page so users can optionally assign a policy to a service. When a service is selected, use the service-scoped policy endpoints; when none is selected, use the plain `/policy` endpoint.
 
 **Files to modify:**
 
-- `frontend/package.json` — Add npm publishing metadata:
-  - Add `"publishConfig": { "access": "public" }` so the scoped `@seamware/*` package publishes without requiring `--access public` on every invocation
-  - Add `"repository": { "type": "git", "url": "https://github.com/SEAMWARE/odrl-pap.git", "directory": "frontend" }`
-  - Add `"license": "Apache-2.0"` (matching the repository license)
-  - Add `"homepage": "https://github.com/SEAMWARE/odrl-pap/tree/main/frontend#readme"`
-  - Add `"bugs": { "url": "https://github.com/SEAMWARE/odrl-pap/issues" }`
-  - Add a type declaration file to `files` array: `["dist-component/odrl-policy-editor.js", "dist-component/odrl-policy-editor.d.ts"]`
-  - Add `"types": "dist-component/odrl-policy-editor.d.ts"` for TypeScript consumers
-  - Keep `version` at `0.1.0` — CI will override it at publish time via `npm version`
+- `frontend/src/pages/PolicyEditor.tsx` — Add service selection:
+  - On mount, fetch the list of available services via `ServiceService.getServices()` and store in component state
+  - Add a `<Form.Select>` dropdown at the top of the editor (before the existing tabs) with:
+    - A default option: "(No service — create standalone policy)" or similar
+    - One `<option>` per service, showing the service ID as both value and label
+  - Track the selected service ID in component state (e.g., `const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)`)
+  - In the policy load effect (when editing an existing policy):
+    - If the policy was loaded via a service context (e.g., from a `serviceId` route param or query param), pre-select that service in the dropdown
+  - In `handleSave()`:
+    - When `selectedServiceId` is present and creating (no `id`): call `ServiceService.createServicePolicy(selectedServiceId, requestBody)`
+    - When `selectedServiceId` is present and editing (has `id`): call `ServiceService.createServicePolicyWithId(selectedServiceId, id, requestBody)`
+    - When `selectedServiceId` is null: keep existing `PapService.createPolicy(requestBody)` / `PapService.createPolicyWithId(id, requestBody)` calls
+  - Import `ServiceService` from the generated API client
+  - Handle errors from the service list fetch gracefully (show the editor without the dropdown if services can't be loaded, or show an inline error)
 
-- `frontend/dist-component/odrl-policy-editor.d.ts` — This file is NOT committed; it is generated as part of the build. Instead, create `frontend/src/web-component/types.d.ts` — A handcrafted TypeScript declaration file re-exporting the public API types for npm consumers. This will be copied into `dist-component/` during the `build:component` script. The types include:
-  - `OdrlPolicyEditorElement` class definition with observed attributes and JS properties
-  - `TAG_NAME` constant
-  - `EmbeddedConfig`, `EmbeddedEventMap`, `EditorMode`, `EmbeddedThemePreset`, `OnEventCallback` type exports
-  - `HTMLElementTagNameMap` augmentation so `document.querySelector('odrl-policy-editor')` returns the correct type
+- `frontend/src/pages/PolicyList.tsx` — (Optional enhancement) Show the service each policy belongs to, if applicable:
+  - This is optional and depends on whether the existing `GET /policy` response includes service association info
+  - If the response includes service info, add a "Service" column to the policy table
 
-- `frontend/package.json` — Update the `build:component` script to also copy the type declaration:
-  - Change from: `"build:component": "vite build --config vite.component.config.ts"`
-  - Change to: `"build:component": "vite build --config vite.component.config.ts && cp src/web-component/types.d.ts dist-component/odrl-policy-editor.d.ts"`
-
-- `.github/workflows/release.yaml` — Add two new jobs:
-  1. **`publish-npm`** job (needs: `generate-version`):
-     - Checkout the repository
-     - Set up Node.js 18 with `registry-url: https://registry.npmjs.org`
-     - `npm ci` in `frontend/`
-     - Run lint and tests as a safety gate: `npm run lint && npm run test:ci`
-     - Set version: `npm version ${{ needs.generate-version.outputs.version }} --no-git-tag-version` in `frontend/`
-     - Build: `npm run build:component`
-     - Publish: `npm publish` with env `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`
-     - Runs in parallel with `build-arm` and `build-amd` (all depend only on `generate-version`)
-  2. **`build-frontend-image`** job (needs: `generate-version`):
-     - Checkout the repository
-     - Log into quay.io using existing `QUAY_USERNAME` / `QUAY_PASSWORD` secrets
-     - Build: `docker build -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap-frontend:${{ needs.generate-version.outputs.version }} frontend/`
-     - Push: `docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap-frontend:${{ needs.generate-version.outputs.version }}`
-     - Runs in parallel with backend image builds
-  - Update the `git-release` job `needs` array to include `publish-npm` and `build-frontend-image` so the GitHub release is only created after all artifacts are published
-
-- `.github/workflows/pre-release.yaml` — Add two new jobs:
-  1. **`publish-npm-prerelease`** job (needs: `generate-version`):
-     - Same Node.js setup as the release job
-     - Set pre-release version (e.g., `1.2.3-PRE-42`)
-     - Build the component
-     - Publish with `--tag next` so pre-releases don't become the default `latest` dist-tag
-     - Runs in parallel with backend image builds
-  2. **`build-frontend-image`** job (needs: `generate-version`):
-     - Build and push the frontend Docker image with the pre-release version tag
-
-- Add a comment block at the top of the `publish-npm` job documenting the required `NPM_TOKEN` repository secret:
-  ```yaml
-  # Requires NPM_TOKEN secret configured in the repository settings:
-  #   Settings → Secrets and variables → Actions → New repository secret
-  # The token must have publish permissions for the @seamware npm scope.
-  # Generate at: https://www.npmjs.com → Access Tokens → Generate New Token (Automation)
+- `frontend/src/i18n/en.ts` — Add i18n strings for the service dropdown:
+  ```
+  policyEditor: {
+    ...existing keys,
+    serviceLabel: 'Service',
+    serviceNone: '(No service — standalone policy)',
+    serviceLoadError: 'Could not load services.',
+    serviceTooltip: 'Optionally assign this policy to an existing service. If no service is selected, the policy is created as a standalone policy.',
+  }
   ```
 
 **Acceptance criteria:**
-- On push to `main` (release): `@seamware/odrl-policy-editor@<version>` is published to npm with `latest` dist-tag
-- On PR events (pre-release): package is published with `<version>-PRE-<PR#>` and `next` dist-tag
-- The npm package version matches the git semver tag exactly
-- The frontend Docker image is pushed to `quay.io/fiware/odrl-pap-frontend:<version>`
-- The npm package includes only `dist-component/odrl-policy-editor.js` and `dist-component/odrl-policy-editor.d.ts` (no source code, no `node_modules`)
-- `publishConfig.access` is set to `"public"`
-- TypeScript consumers get type-checking when importing the package
-- Lint and tests run before publishing as a safety gate
-- The GitHub release is only created after all artifacts (backend images, frontend image, npm package) succeed
-- Required secrets are documented in workflow comments
+- The PolicyEditor page shows a service dropdown populated with existing services from the backend
+- Selecting a service and saving a new policy calls `POST /service/{service-id}/policy`
+- Selecting a service and saving an existing policy calls `PUT /service/{service-id}/policy/{id}`
+- Leaving the dropdown on the default (no service) uses the plain `POST /policy` or `PUT /policy/{id}`
+- The dropdown handles empty service lists gracefully (shows only the "no service" option)
+- The dropdown handles API errors gracefully (editor still usable without service selection)
+- All user-facing strings use the i18n system
+- `npm run build` and `npm run lint` succeed
+- Root-level policy CRUD continues to work unchanged (no regressions)
 
 ---
 
-### Step 3: Integration Guides & Embedding Documentation
+### Step 3: Web Component Service Support
 
-**Goal:** Create concrete, step-by-step integration guides showing how to embed the published `@seamware/odrl-policy-editor` Web Component into the two target applications (FDSC-Dashboard and BAE Logic Proxy) and any generic web application. Update the main README with npm installation instructions and badges.
+**Goal:** Extend the `<odrl-policy-editor>` web component with a `service-id` attribute so that host pages can create/edit policies under a specific service without needing the full SPA routing.
 
-**Files to create/modify:**
+**Files to modify:**
 
-- `frontend/README.md` — Update the top of the file:
-  - Replace the `:warning: experimental` notice with an npm version badge: `[![npm](https://img.shields.io/npm/v/@seamware/odrl-policy-editor)](https://www.npmjs.com/package/@seamware/odrl-policy-editor)`
-  - Add an **Installation** section right after Prerequisites showing:
-    - npm install: `npm install @seamware/odrl-policy-editor`
-    - CDN via unpkg: `<script type="module" src="https://unpkg.com/@seamware/odrl-policy-editor@latest"></script>`
-    - CDN via jsdelivr: `<script type="module" src="https://cdn.jsdelivr.net/npm/@seamware/odrl-policy-editor@latest"></script>`
-  - Add a **Quick Integration** section with a minimal 10-line HTML snippet that works copy-paste
-  - Add a **Docker** section for the frontend image: `docker pull quay.io/fiware/odrl-pap-frontend:<version>`
-  - Add links to the detailed integration guides in `docs/`
+- `frontend/src/web-component/EmbeddedContext.tsx`:
+  - Add `serviceId: string | null` field to the `EmbeddedConfig` interface (default `null`)
+  - The field flows through `EmbeddedProvider` to any component that calls `useEmbeddedContext()`
+  - Document the new field with a JSDoc comment
 
-- `frontend/docs/integration-fdsc-dashboard.md` — Vue 3 integration guide for [FDSC-Dashboard](https://github.com/SEAMWARE/fdsc-dashboard):
-  - The FDSC-Dashboard uses Vue 3 + Vuetify 3 + Vite + TypeScript + Pinia + `oidc-client-ts`
-  - **Install:** `npm install @seamware/odrl-policy-editor`
-  - **Vite config:** Add `vue.template.compilerOptions.isCustomElement` rule for `odrl-policy-editor` in `vite.config.ts` so Vue does not try to resolve it as a Vue component
-  - **Vue wrapper component:** Create `OdrlPolicyEditor.vue` (full copy-pasteable `<script setup lang="ts">` + `<template>` example):
-    - Import `'@seamware/odrl-policy-editor'` (side-effect import to register the custom element)
-    - Bind `api-base-url` to the dashboard's BFF proxy URL
-    - Bind `auth-token` from the existing `oidc-client-ts` user store (`user.access_token`)
-    - Listen for `@policy-created` and `@editor-cancelled` custom events
-    - Pass `locale` from Vue I18n's current locale
-    - Show how to bridge Vuetify theme colors to `themeConfig` property using `ref()` and `onMounted()`
-  - **Route registration:** Add a route in the dashboard's Vue Router config
-  - **Navigation:** Add a sidebar/nav item linking to the policy editor page
+- `frontend/src/web-component/OdrlPolicyEditorElement.ts`:
+  - Add `'service-id'` to the `observedAttributes` array (line 88)
+  - In `buildConfig()` (line 278), read `this.getAttribute('service-id')` and include as `serviceId` in the returned config
+  - Add a private `_serviceId: string | undefined` field
+  - Add a JS property `serviceId` with getter/setter (following the pattern of existing `_policyContext` property): setter calls `this.renderReact()` to trigger re-render
+  - Update `buildConfig()` to prefer the JS property `_serviceId` over the HTML attribute (like `resolvePolicyContextAttr`)
+  - Update the JSDoc table at the top of the file to document the new `service-id` attribute
+  - Update the `@example` HTML snippet to show `service-id` usage
 
-- `frontend/docs/integration-bae-logic-proxy.md` — Integration guide for [BAE Logic Proxy](https://github.com/FIWARE-TMForum/business-ecosystem-logic-proxy):
-  - The BAE Logic Proxy is a Node.js/Express server with an embedded `portal/bae-frontend` web portal
-  - **Option A (CDN — no build step):**
-    - Add a `<script type="module" src="https://unpkg.com/@seamware/odrl-policy-editor@latest"></script>` tag to the portal HTML
-    - Place `<odrl-policy-editor>` in the desired portal page
-    - Wire `auth-token` from the existing session/cookie auth mechanism via inline JS
-    - Set `api-base-url` to the PAP backend endpoint
-  - **Option B (npm bundle):**
-    - `npm install @seamware/odrl-policy-editor`
-    - Import in the portal's JS entry point
-  - **Event handling:** Listen for `policy-created` to integrate with the BAE's product/offering workflow
-  - Provide a complete HTML snippet example for each option
+- `frontend/src/web-component/EmbeddedApp.tsx`:
+  - Extract `serviceId` from `config` alongside `apiBaseUrl`, `authToken`, etc.
+  - Import `ServiceService` from `'../api/services/ServiceService'`
+  - In the policy load effect: when `serviceId` is present and `mode === 'edit'` and `policyId` is present, use `ServiceService.getServicePolicyById(serviceId, policyId)` instead of `PapService.getPolicyById(policyId)`
+  - In `handleSave()`:
+    - When `serviceId` is present and `mode === 'create'`: use `ServiceService.createServicePolicy(serviceId, policy)`
+    - When `serviceId` is present and `mode === 'edit'`: use `ServiceService.createServicePolicyWithId(serviceId, policyId, policy)`
+    - When `serviceId` is absent: keep existing `PapService` calls (backward compatible)
 
-- `frontend/docs/integration-generic.md` — Generic integration guide for any web application:
-  - **Vanilla HTML/JS** — `<script type="module">` + `<odrl-policy-editor>` (simplest path)
-  - **React** — Import the package as a side effect; use the custom element in JSX with `ref` for property access
-  - **Angular** — Add `CUSTOM_ELEMENTS_SCHEMA` to the NgModule; use the element in templates
-  - **Vue 2** — Configure `Vue.config.ignoredElements = ['odrl-policy-editor']`
-  - **Vue 3** — `compilerOptions.isCustomElement` (same as FDSC guide, but standalone)
-  - **Server-side rendering (SSR)** — Note that the custom element requires a browser DOM; use dynamic imports or `<ClientOnly>` wrappers in SSR frameworks (Next.js, Nuxt, SvelteKit)
-  - **Security:** CSP `script-src` must allow the CDN domain or `'self'` if self-hosted; note CORS requirements for `api-base-url`
-  - **Performance:** Lazy-load with `import()`, add `<link rel="preconnect">` to the API host
+- `frontend/src/web-component/types.d.ts` (exists from ticket-46):
+  - Add `service-id` to the attribute documentation in the `OdrlPolicyEditorElement` class definition
+  - Add `serviceId: string | undefined` JS property type
 
-- `frontend/examples/vue-integration/` — Minimal Vue 3 example:
-  - `OdrlPolicyEditor.vue` — Vue 3 wrapper component (copy-pasteable)
-  - `README.md` — 5-line setup instructions
-
-- `frontend/examples/vanilla-integration/` — Minimal vanilla HTML/JS example:
-  - `index.html` — Standalone page loading from CDN with event listeners and a simple config panel
-  - `README.md` — 5-line setup instructions
+- `frontend/src/web-component/OdrlPolicyEditorElement.test.ts`:
+  - Add test case verifying `'service-id'` is in `OdrlPolicyEditorElement.observedAttributes`
+  - Add test case verifying the `serviceId` JS property setter triggers a re-render
 
 **Acceptance criteria:**
-- `frontend/docs/integration-fdsc-dashboard.md` provides a complete, copy-pasteable integration for the FDSC-Dashboard (Vue 3 + Vuetify + oidc-client-ts)
-- `frontend/docs/integration-bae-logic-proxy.md` provides a complete integration for the BAE Logic Proxy (both CDN and npm approaches)
-- `frontend/docs/integration-generic.md` covers vanilla JS, React, Angular, Vue 2, Vue 3, and SSR considerations
-- The main `frontend/README.md` has an npm badge, installation commands (npm + CDN), quick-start snippet, and links to detailed guides
-- The `:warning: experimental` notice is replaced with the npm badge
-- Example directories in `frontend/examples/` are self-contained with their own README
-- All documentation references the correct npm package name (`@seamware/odrl-policy-editor`)
-- CDN URLs use both `unpkg.com` and `cdn.jsdelivr.net` alternatives
-- Security (CSP) and performance (lazy-loading, preconnect) considerations are documented
+- `<odrl-policy-editor service-id="my-service" mode="create">` creates policies via `POST /service/my-service/policy`
+- `<odrl-policy-editor service-id="my-service" mode="edit" policy-id="abc123">` loads via `GET /service/my-service/policy/abc123` and saves via `PUT /service/my-service/policy/abc123`
+- Omitting `service-id` preserves existing root-level behavior (fully backward compatible)
+- The `serviceId` JS property works as an alternative to the HTML attribute
+- `npm run build:component` succeeds (Web Component library build)
+- `npm run build` succeeds (SPA build)
+- `npm run lint` passes
+- Tests pass and cover the new attribute and property

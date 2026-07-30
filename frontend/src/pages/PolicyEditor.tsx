@@ -7,11 +7,13 @@
  * Test request data persists in session storage across modal open/close.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Form, Button, Tabs, Tab, Modal, Alert, InputGroup, Badge, CloseButton } from 'react-bootstrap';
-import { PapService } from '../api/services/PapService';
+import { PolicyService } from '../api/services/PolicyService';
+import { ServiceService } from '../api/services/ServiceService';
 import { UiService } from '../api/services/UiService';
 import type { OdrlPolicyJson, Policy, ValidationResponse } from '../services/api';
+import type { ServiceList } from '../api/models/ServiceList';
 import { TestRequest } from '../api/models/TestRequest';
 import type { GenericJsonInput } from '../api/models/GenericJsonInput';
 import type { ValidationMode } from '../components/ValidationEditor';
@@ -100,12 +102,25 @@ const persistState = (
  */
 const PolicyEditor = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { strings } = useI18n();
   const t = strings.policyEditor;
 
   const [policy, setPolicy] = useState<OdrlPolicyJson>({});
   const [activeTab, setActiveTab] = useState('builder');
+
+  // --- Service selection state ---
+  /** List of available services fetched from the backend. */
+  const [services, setServices] = useState<ServiceList>([]);
+  /** Whether the service list is currently loading. */
+  const [servicesLoading, setServicesLoading] = useState(true);
+  /** Error message if the service list fetch failed. */
+  const [servicesError, setServicesError] = useState('');
+  /** The currently selected service ID (null = standalone/root-level policy). */
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
+    searchParams.get('serviceId'),
+  );
 
   // --- Raw ODRL tab state ---
   /** Raw JSON text decoupled from the policy object so the user can type freely. */
@@ -129,15 +144,39 @@ const PolicyEditor = () => {
   const [validationError, setValidationError] = useState('');
   const [isValidating, setIsValidating] = useState(false);
 
+  // Fetch available services on mount
+  useEffect(() => {
+    setServicesLoading(true);
+    ServiceService.getServices()
+      .then((list: ServiceList) => {
+        setServices(list);
+        setServicesError('');
+      })
+      .catch(() => {
+        setServicesError(t.serviceLoadError);
+      })
+      .finally(() => {
+        setServicesLoading(false);
+      });
+  }, [t.serviceLoadError]);
+
+  // Load existing policy or initialize a new one
   useEffect(() => {
     if (id) {
-      PapService.getPolicyById(id)
-        .then((p: Policy) => setPolicy(JSON.parse(p.odrl!)))
-        .catch(console.error);
+      const serviceIdParam = searchParams.get('serviceId');
+      if (serviceIdParam) {
+        ServiceService.getServicePolicyById(serviceIdParam, id)
+          .then((p: Policy) => setPolicy(JSON.parse(p.odrl!)))
+          .catch(console.error);
+      } else {
+        PolicyService.getPolicyById(id)
+          .then((p: Policy) => setPolicy(JSON.parse(p.odrl!)))
+          .catch(console.error);
+      }
     } else {
       setPolicy(createNewPolicy() as OdrlPolicyJson);
     }
-  }, [id]);
+  }, [id, searchParams]);
 
   // Sync rawText from the current policy when switching TO the raw tab.
   // Intentionally does NOT depend on `policy` so edits in the textarea
@@ -222,17 +261,34 @@ const PolicyEditor = () => {
     }
   }, [policy]);
 
-  /** Saves the policy (create or update). */
+  /**
+   * Saves the policy (create or update).
+   *
+   * When a service is selected, uses the service-scoped policy endpoints.
+   * When no service is selected, uses the root-level policy endpoints.
+   */
   const handleSave = () => {
     const requestBody = policy;
-    if (id) {
-      PapService.createPolicyWithId(id, requestBody)
-        .then(() => navigate('/'))
-        .catch(console.error);
+    if (selectedServiceId) {
+      if (id) {
+        ServiceService.createServicePolicyWithId(selectedServiceId, id, requestBody)
+          .then(() => navigate('/'))
+          .catch(console.error);
+      } else {
+        ServiceService.createServicePolicy(selectedServiceId, requestBody)
+          .then(() => navigate('/'))
+          .catch(console.error);
+      }
     } else {
-      PapService.createPolicy(requestBody)
-        .then(() => navigate('/'))
-        .catch(console.error);
+      if (id) {
+        PolicyService.createPolicyWithId(id, requestBody)
+          .then(() => navigate('/'))
+          .catch(console.error);
+      } else {
+        PolicyService.createPolicy(requestBody)
+          .then(() => navigate('/'))
+          .catch(console.error);
+      }
     }
   };
 
@@ -282,9 +338,45 @@ const PolicyEditor = () => {
     setValidationError('');
   };
 
+  /**
+   * Handles service dropdown selection changes.
+   *
+   * @param value - The selected option value (empty string for no service).
+   */
+  const handleServiceChange = (value: string) => {
+    setSelectedServiceId(value || null);
+  };
+
   return (
     <>
       <h1>{id ? t.editTitle : t.newTitle}</h1>
+
+      {/* Service selection dropdown */}
+      {!servicesLoading && !servicesError && (
+        <Form.Group className="mb-3" controlId="service-select">
+          <Form.Label>{t.serviceLabel}</Form.Label>
+          <Form.Select
+            value={selectedServiceId ?? ''}
+            onChange={(e) => handleServiceChange(e.target.value)}
+            aria-label={t.serviceLabel}
+            title={t.serviceTooltip}
+          >
+            <option value="">{t.serviceNone}</option>
+            {services.map((svc) => (
+              <option key={svc.id} value={svc.id}>
+                {svc.id}
+              </option>
+            ))}
+          </Form.Select>
+          <Form.Text className="text-muted">{t.serviceTooltip}</Form.Text>
+        </Form.Group>
+      )}
+      {servicesError && (
+        <Alert variant="warning" className="mb-3">
+          {servicesError}
+        </Alert>
+      )}
+
       <Tabs
         id="policy-editor-tabs"
         activeKey={activeTab}

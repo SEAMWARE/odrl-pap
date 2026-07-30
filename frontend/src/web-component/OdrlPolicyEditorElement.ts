@@ -16,6 +16,7 @@
  * | `theme`          | `"light"` or `"dark"`                         | `"light"`  |
  * | `locale`         | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
  * | `policy-context` | JSON-LD `@context` for new policies (JSON)    | `null`     |
+ * | `service-id`     | Service ID for service-scoped policy ops       | `null`     |
  *
  * ## Custom Events
  *
@@ -32,6 +33,7 @@
  * - `themeConfig` — partial ThemeConfig override merged on top of the preset
  * - `template` — a {@link PolicyTemplate} object to pre-fill and constrain the editor
  * - `policyContext` — custom JSON-LD `@context` object/string for new policies
+ * - `serviceId` — service ID string for service-scoped policy operations
  *
  * @example
  * ```html
@@ -39,6 +41,7 @@
  *   api-base-url="https://pap.example.com"
  *   auth-token="eyJhbG..."
  *   mode="create"
+ *   service-id="my-service"
  *   theme="light"
  *   locale="en"
  * ></odrl-policy-editor>
@@ -85,7 +88,7 @@ const DEFAULT_LOCALE = 'en';
 export class OdrlPolicyEditorElement extends HTMLElement {
   /** Attributes that trigger re-renders when changed. */
   static get observedAttributes(): string[] {
-    return ['api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale', 'policy-context'];
+    return ['api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale', 'policy-context', 'service-id'];
   }
 
   /** React root instance (created on connect, destroyed on disconnect). */
@@ -108,6 +111,9 @@ export class OdrlPolicyEditorElement extends HTMLElement {
 
   /** Custom JSON-LD `@context` set via JS property. */
   private _policyContext: Record<string, string> | string | undefined;
+
+  /** Service ID for service-scoped policy operations, set via JS property. */
+  private _serviceId: string | undefined;
 
   /**
    * Sets partial i18n string overrides (JS property, not HTML attribute).
@@ -207,6 +213,32 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     return this._policyContext;
   }
 
+  /**
+   * Sets the service ID for service-scoped policy operations (JS property).
+   *
+   * When set, the editor uses service-scoped API endpoints
+   * (e.g., `POST /service/{serviceId}/policy`) instead of root-level
+   * endpoints (`POST /policy`).
+   *
+   * Can also be set via the `service-id` HTML attribute, but the JS
+   * property takes precedence.
+   *
+   * @example
+   * ```js
+   * const editor = document.querySelector('odrl-policy-editor');
+   * editor.serviceId = 'my-service';
+   * ```
+   */
+  set serviceId(value: string | undefined) {
+    this._serviceId = value;
+    this.renderReact();
+  }
+
+  /** Returns the current service ID, or `undefined` if not set. */
+  get serviceId(): string | undefined {
+    return this._serviceId;
+  }
+
   // ------------------------------------------------------------------
   // Lifecycle
   // ------------------------------------------------------------------
@@ -274,6 +306,21 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     return undefined;
   }
 
+  /**
+   * Resolves the service ID from the JS property or the HTML attribute.
+   *
+   * The JS property (`_serviceId`) takes precedence. If not set,
+   * falls back to reading the `service-id` HTML attribute.
+   *
+   * @returns The resolved service ID, or `null` if not set.
+   */
+  private resolveServiceId(): string | null {
+    if (this._serviceId !== undefined) {
+      return this._serviceId;
+    }
+    return this.getAttribute('service-id');
+  }
+
   /** Builds the {@link EmbeddedConfig} from the current attribute values. */
   private buildConfig(): EmbeddedConfig {
     const policyContext = this.resolvePolicyContextAttr();
@@ -285,6 +332,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       locale: this.getAttribute('locale') ?? DEFAULT_LOCALE,
       theme: (this.getAttribute('theme') as EmbeddedThemePreset) ?? DEFAULT_THEME,
       onEvent: this.dispatchComponentEvent.bind(this),
+      serviceId: this.resolveServiceId(),
       ...(policyContext !== undefined && { policyContext }),
     };
   }

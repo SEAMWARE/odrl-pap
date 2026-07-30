@@ -9,7 +9,7 @@ import type { Uid } from '../models/Uid';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
-export class PapService {
+export class PolicyService {
     /**
      * Creates a new policy from the given odrl-json
      * @param requestBody
