@@ -2,7 +2,9 @@
 
 ## Overview
 
-Add frontend support for creating and managing policies at the service level, using `POST /service/{service-id}/policy` and related service endpoints that already exist in the backend. The work includes regenerating the TypeScript API client to expose `ServiceService`, building service management pages, updating `PolicyEditor` and `PolicyList` to work within a service context, and extending the web component with a `service-id` attribute.
+Add frontend support for creating policies under existing services. The backend already exposes service CRUD and service-scoped policy endpoints (`POST /service/{service-id}/policy`, etc.). The frontend needs to: (1) regenerate its API client to include `ServiceService`, (2) add a service dropdown to the existing `PolicyEditor` so users can optionally assign a policy to a service, and (3) extend the web component with a `service-id` attribute.
+
+No dedicated Service Management UI is needed. Instead, a dropdown listing existing services is added to the `PolicyEditor`. When a service is selected, the policy is created/saved via `POST /service/{service-id}/policy` (or `PUT /service/{service-id}/policy/{id}`). When no service is selected, the plain `/policy` endpoint is used, preserving the current behavior.
 
 ## Steps
 
@@ -43,138 +45,56 @@ Add frontend support for creating and managing policies at the service level, us
 
 ---
 
-### Step 2: Service Management UI — List, Create, Delete
+### Step 2: Service Dropdown in PolicyEditor
 
-**Goal:** Create a service management page where users can view all services, create new services, and delete existing services. Add routing and navigation so users can access services from the navbar.
-
-**Files to create:**
-
-- `frontend/src/pages/ServiceList.tsx` — New page component that:
-  - Fetches all services via `ServiceService.getServices()` on mount
-  - Displays services in a `react-bootstrap` `Table` with columns: Service ID, Policy Path, Actions
-  - Provides a "New Service" inline form (input field + create button) that prompts for a service ID string and calls `ServiceService.createService({ id: serviceId })`
-  - Each row has a "View Policies" link (`<Link to={`/services/${serviceId}`}>`) and a "Delete" button
-  - Delete button calls `ServiceService.deleteService(serviceId)` with a confirmation (warn that all policies under the service will also be deleted)
-  - Show an empty-state message when no services exist
-  - Handle and display API errors (e.g., 409 for duplicate service ID)
-  - Follow the same patterns as `PolicyList.tsx` (hooks, state management, error handling, table layout)
-  - All user-facing strings must use the i18n system
+**Goal:** Add a service selection dropdown to the existing `PolicyEditor` page so users can optionally assign a policy to a service. When a service is selected, use the service-scoped policy endpoints; when none is selected, use the plain `/policy` endpoint.
 
 **Files to modify:**
 
-- `frontend/src/App.tsx` — Add new route inside the `<Route path="/" element={<Layout />}>` block:
-  - `<Route path="services" element={<ServiceList />} />`
-  - Import `ServiceList` at the top of the file
-
-- `frontend/src/components/Layout.tsx` — Add a "Services" `Nav.Link` to the navbar, placed after the existing "Policies" link:
-  - `<Nav.Link href="/services">Services</Nav.Link>`
-
-- `frontend/src/i18n/en.ts` — Add a new `serviceList` section to the `en` object:
-  ```
-  serviceList: {
-    title: 'Services',
-    newService: 'New Service',
-    columnId: 'Service ID',
-    columnPolicyPath: 'Policy Path',
-    columnActions: 'Actions',
-    viewPolicies: 'View Policies',
-    createService: 'Create Service',
-    serviceIdLabel: 'Service ID',
-    serviceIdPlaceholder: 'Enter a unique service identifier',
-    confirmDelete: 'Are you sure you want to delete this service? All policies under it will also be deleted.',
-    deleteSuccess: 'Service deleted successfully.',
-    createSuccess: 'Service created successfully.',
-    emptyState: 'No services found. Create one to organize policies.',
-    createError: 'Failed to create service.',
-    deleteError: 'Failed to delete service.',
-  }
-  ```
-
-**Acceptance criteria:**
-- Navigating to `/services` shows a table of all services from the backend
-- Users can create a new service by entering an ID and clicking "Create"
-- Creating a service with a duplicate ID shows an error (409 response handling)
-- Users can delete a service with a confirmation warning about cascading policy deletion
-- The navbar has a "Services" link that navigates to `/services`
-- Empty state message displayed when no services exist
-- `npm run build` and `npm run lint` succeed
-- All visible text uses the i18n system
-
----
-
-### Step 3: Service-Scoped Policy CRUD
-
-**Goal:** Enable creating, listing, editing, and deleting policies within a specific service context. Reuse the existing `PolicyEditor` component and create a service detail page that shows a service's policies.
-
-**Files to create:**
-
-- `frontend/src/pages/ServiceDetail.tsx` — New page component that:
-  - Reads `serviceId` from route params via `useParams()`
-  - Fetches the service info via `ServiceService.getService(serviceId)` on mount
-  - Displays service ID and policy path as a page header/breadcrumb
-  - Lists the service's policies in a table (same format as `PolicyList.tsx`) fetched via `ServiceService.getServicePolicies(serviceId)`
-  - Provides a "New Policy" button linking to `/services/${serviceId}/policies/new`
-  - Each policy row has:
-    - "Edit" link → `/services/${serviceId}/policies/edit/${policyId}`
-    - "Delete" button → calls `ServiceService.deleteServicePolicyById(serviceId, policyId)`
-  - Includes breadcrumb navigation: `Services > {serviceId}`
-  - "Back to Services" link at the top
-  - Handle 404 (service not found) with an appropriate message
-  - Follow patterns from `PolicyList.tsx` for table rendering and state management
-  - All user-facing strings must use the i18n system
-
-**Files to modify:**
-
-- `frontend/src/pages/PolicyEditor.tsx` — Make service-aware:
-  - Read an optional `serviceId` from route params: update destructuring to `const { id, serviceId } = useParams()`
-  - In the policy load effect (lines 132-140):
-    - When `serviceId` is present and `id` is present: call `ServiceService.getServicePolicyById(serviceId, id)` instead of `PapService.getPolicyById(id)`
-    - When `serviceId` is absent: keep existing `PapService.getPolicyById(id)` behavior
-  - In `handleSave()` (lines 226-237):
-    - When `serviceId` is present and creating (no `id`): call `ServiceService.createServicePolicy(serviceId, requestBody)`
-    - When `serviceId` is present and editing (has `id`): call `ServiceService.createServicePolicyWithId(serviceId, id, requestBody)`
-    - When `serviceId` is absent: keep existing `PapService` calls
-  - Update all `navigate('/')` calls: when `serviceId` is present, navigate to `/services/${serviceId}` instead of `/`
-  - Display service context: when `serviceId` is present, show breadcrumb `Services > {serviceId} > New Policy / Edit Policy` and update the page title (e.g., "New Policy — Service: {serviceId}")
+- `frontend/src/pages/PolicyEditor.tsx` — Add service selection:
+  - On mount, fetch the list of available services via `ServiceService.getServices()` and store in component state
+  - Add a `<Form.Select>` dropdown at the top of the editor (before the existing tabs) with:
+    - A default option: "(No service — create standalone policy)" or similar
+    - One `<option>` per service, showing the service ID as both value and label
+  - Track the selected service ID in component state (e.g., `const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)`)
+  - In the policy load effect (when editing an existing policy):
+    - If the policy was loaded via a service context (e.g., from a `serviceId` route param or query param), pre-select that service in the dropdown
+  - In `handleSave()`:
+    - When `selectedServiceId` is present and creating (no `id`): call `ServiceService.createServicePolicy(selectedServiceId, requestBody)`
+    - When `selectedServiceId` is present and editing (has `id`): call `ServiceService.createServicePolicyWithId(selectedServiceId, id, requestBody)`
+    - When `selectedServiceId` is null: keep existing `PapService.createPolicy(requestBody)` / `PapService.createPolicyWithId(id, requestBody)` calls
   - Import `ServiceService` from the generated API client
+  - Handle errors from the service list fetch gracefully (show the editor without the dropdown if services can't be loaded, or show an inline error)
 
-- `frontend/src/App.tsx` — Add the service-scoped routes inside the `<Route path="/" element={<Layout />}>` block:
-  - `<Route path="services/:serviceId" element={<ServiceDetail />} />`
-  - `<Route path="services/:serviceId/policies/new" element={<PolicyEditor />} />`
-  - `<Route path="services/:serviceId/policies/edit/:id" element={<PolicyEditor />} />`
-  - Import `ServiceDetail` at the top of the file
+- `frontend/src/pages/PolicyList.tsx` — (Optional enhancement) Show the service each policy belongs to, if applicable:
+  - This is optional and depends on whether the existing `GET /policy` response includes service association info
+  - If the response includes service info, add a "Service" column to the policy table
 
-- `frontend/src/i18n/en.ts` — Add a `serviceDetail` section to the `en` object:
+- `frontend/src/i18n/en.ts` — Add i18n strings for the service dropdown:
   ```
-  serviceDetail: {
-    title: 'Service: {serviceId}',
-    policyPath: 'Policy Path',
-    policiesTitle: 'Policies',
-    newPolicy: 'New Policy',
-    backToServices: 'Back to Services',
-    notFound: 'Service not found.',
-    noPolicies: 'No policies in this service. Create one to get started.',
-    breadcrumbServices: 'Services',
-    breadcrumbNewPolicy: 'New Policy',
-    breadcrumbEditPolicy: 'Edit Policy',
+  policyEditor: {
+    ...existing keys,
+    serviceLabel: 'Service',
+    serviceNone: '(No service — standalone policy)',
+    serviceLoadError: 'Could not load services.',
+    serviceTooltip: 'Optionally assign this policy to an existing service. If no service is selected, the policy is created as a standalone policy.',
   }
   ```
 
 **Acceptance criteria:**
-- Navigating to `/services/my-service` shows the service detail with its policies listed
-- Clicking "New Policy" on the service detail page navigates to `/services/my-service/policies/new`
-- Creating a policy from that page calls `POST /service/my-service/policy`
-- Editing a service-scoped policy loads via `GET /service/my-service/policy/{id}` and saves via `PUT /service/my-service/policy/{id}`
-- Deleting a service-scoped policy calls `DELETE /service/my-service/policy/{id}`
-- Root-level policy CRUD (`/`, `/new`, `/edit/:id`) continues to work unchanged (no regressions)
-- Cancel in service-scoped PolicyEditor navigates back to `/services/my-service` (not `/`)
-- Breadcrumb navigation shows the service context when in service-scoped routes
-- 404 handling when service does not exist
+- The PolicyEditor page shows a service dropdown populated with existing services from the backend
+- Selecting a service and saving a new policy calls `POST /service/{service-id}/policy`
+- Selecting a service and saving an existing policy calls `PUT /service/{service-id}/policy/{id}`
+- Leaving the dropdown on the default (no service) uses the plain `POST /policy` or `PUT /policy/{id}`
+- The dropdown handles empty service lists gracefully (shows only the "no service" option)
+- The dropdown handles API errors gracefully (editor still usable without service selection)
+- All user-facing strings use the i18n system
 - `npm run build` and `npm run lint` succeed
+- Root-level policy CRUD continues to work unchanged (no regressions)
 
 ---
 
-### Step 4: Web Component Service Support
+### Step 3: Web Component Service Support
 
 **Goal:** Extend the `<odrl-policy-editor>` web component with a `service-id` attribute so that host pages can create/edit policies under a specific service without needing the full SPA routing.
 
@@ -195,10 +115,10 @@ Add frontend support for creating and managing policies at the service level, us
   - Update the `@example` HTML snippet to show `service-id` usage
 
 - `frontend/src/web-component/EmbeddedApp.tsx`:
-  - Extract `serviceId` from `config` alongside `apiBaseUrl`, `authToken`, etc. (line 98)
+  - Extract `serviceId` from `config` alongside `apiBaseUrl`, `authToken`, etc.
   - Import `ServiceService` from `'../api/services/ServiceService'`
-  - In the policy load effect (lines ~122-127): when `serviceId` is present and `mode === 'edit'` and `policyId` is present, use `ServiceService.getServicePolicyById(serviceId, policyId)` instead of `PapService.getPolicyById(policyId)`
-  - In `handleSave()` (lines ~229-244):
+  - In the policy load effect: when `serviceId` is present and `mode === 'edit'` and `policyId` is present, use `ServiceService.getServicePolicyById(serviceId, policyId)` instead of `PapService.getPolicyById(policyId)`
+  - In `handleSave()`:
     - When `serviceId` is present and `mode === 'create'`: use `ServiceService.createServicePolicy(serviceId, policy)`
     - When `serviceId` is present and `mode === 'edit'`: use `ServiceService.createServicePolicyWithId(serviceId, policyId, policy)`
     - When `serviceId` is absent: keep existing `PapService` calls (backward compatible)
