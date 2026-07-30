@@ -62,6 +62,14 @@ export interface EmbeddedConfig {
    * Accepts an object (namespaced map) or a string (context URI).
    */
   policyContext?: Record<string, string> | string | null;
+  /**
+   * Optional service ID to scope policy operations under a specific service.
+   *
+   * When set, the editor uses service-scoped API endpoints
+   * (e.g., `POST /service/{serviceId}/policy`) instead of root-level
+   * endpoints (`POST /policy`).
+   */
+  serviceId: string | null;
 }
 
 /** Full context value including an `isEmbedded` flag. */

@@ -131,7 +131,12 @@ describe('OdrlPolicyEditorElement', () => {
       'theme',
       'locale',
       'policy-context',
+      'service-id',
     ]);
+  });
+
+  it('includes service-id in observed attributes', () => {
+    expect(OdrlPolicyEditorElement.observedAttributes).toContain('service-id');
   });
 
   it('re-renders when an observed attribute changes', async () => {
@@ -334,5 +339,61 @@ describe('OdrlPolicyEditorElement', () => {
 
     el.template = undefined;
     expect(el.template).toBeUndefined();
+  });
+
+  // -----------------------------------------------------------
+  // Service ID property
+  // -----------------------------------------------------------
+
+  it('accepts serviceId via JS property and triggers re-render', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    mockRender.mockClear();
+
+    el.serviceId = 'my-service';
+    expect(el.serviceId).toBe('my-service');
+
+    // Should trigger a re-render
+    await vi.dynamicImportSettled();
+    expect(mockRender).toHaveBeenCalled();
+  });
+
+  it('returns undefined for serviceId when none is set', () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    expect(el.serviceId).toBeUndefined();
+  });
+
+  it('allows clearing serviceId by setting undefined', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+
+    el.serviceId = 'test-service';
+    expect(el.serviceId).toBe('test-service');
+
+    el.serviceId = undefined;
+    expect(el.serviceId).toBeUndefined();
+  });
+
+  it('reads service-id from HTML attribute', () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    el.setAttribute('service-id', 'attr-service');
+    expect(el.getAttribute('service-id')).toBe('attr-service');
+  });
+
+  it('re-renders when service-id attribute changes', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    mockRender.mockClear();
+
+    el.setAttribute('service-id', 'new-service');
+
+    await vi.dynamicImportSettled();
+    expect(mockRender).toHaveBeenCalled();
   });
 });
