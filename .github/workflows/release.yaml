@@ -130,48 +130,9 @@ jobs:
           
           docker manifest push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap:${{ needs.generate-version.outputs.version }}
 
-  # ---------------------------------------------------------------------------
-  # Frontend: publish npm package
-  # ---------------------------------------------------------------------------
-  # Requires NPM_TOKEN secret configured in the repository settings:
-  #   Settings -> Secrets and variables -> Actions -> New repository secret
-  # The token must have publish permissions for the @seamware npm scope.
-  # Generate at: https://www.npmjs.com -> Access Tokens -> Generate New Token (Automation)
-  publish-npm:
-    needs: [ "generate-version" ]
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Lint and test
-        working-directory: frontend
-        run: npm run lint && npm run test:ci
-
-      - name: Set package version
-        working-directory: frontend
-        run: npm version ${{ needs.generate-version.outputs.version }} --no-git-tag-version
-
-      - name: Build Web Component
-        working-directory: frontend
-        run: npm run build:component
-
-      - name: Publish to npm
-        working-directory: frontend
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+  # NOTE: npm publishing lives in the dedicated `publish-npm.yaml` workflow.
+  # It is the single entry-point registered as the npm Trusted Publisher and
+  # publishes via OIDC (no NPM_TOKEN) for both stable and pre-release versions.
 
   # ---------------------------------------------------------------------------
   # Frontend: build and push Docker image
@@ -193,7 +154,7 @@ jobs:
         run: docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap-frontend:${{ needs.generate-version.outputs.version }}
 
   git-release:
-    needs: [ "generate-version", "multi-arch", "publish-npm", "build-frontend-image" ]
+    needs: [ "generate-version", "multi-arch", "build-frontend-image" ]
     runs-on: ubuntu-latest
 
     steps:

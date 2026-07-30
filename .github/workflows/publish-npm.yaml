@@ -1,0 +1,137 @@
+# ---------------------------------------------------------------------------
+# Frontend: publish the @seamware/odrl-policy-editor npm package
+# ---------------------------------------------------------------------------
+# This is the single entry-point workflow for npm publishing and MUST be the
+# one registered as the npm Trusted Publisher:
+#   npmjs.com -> package settings -> Trusted Publisher
+#     Workflow filename: publish-npm.yaml
+#
+# npm validates the *entry* (caller) workflow filename against the Trusted
+# Publisher configuration, and a package may only have a single Trusted
+# Publisher. Handling both stable releases and pre-releases from this one
+# workflow is therefore what lets both flows publish token-free via OIDC.
+#
+# No NPM_TOKEN is used: authentication happens via OpenID Connect (OIDC),
+# which the npm CLI (>= 11.5.1, on Node >= 22.14.0) detects automatically and
+# which also generates package provenance.
+#
+#   push to main         -> stable version, published under the "latest" tag
+#   pull_request events  -> "<version>-PRE-<pr-number>.<run-number>" (the run
+#                           number keeps each PR push unique), under "next"
+# ---------------------------------------------------------------------------
+name: Publish npm
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+
+# Least-privilege default; the publish job additionally requests id-token.
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.out.outputs.version }}
+      dist-tag: ${{ steps.out.outputs.dist-tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- stable release (push to main): bump from the merged PR labels ---
+      - id: merged-pr
+        if: github.event_name == 'push'
+        uses: actions-ecosystem/action-get-merged-pull-request@v1.0.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - if: github.event_name == 'push'
+        uses: zwaldowski/semver-release-action@v2
+        with:
+          dry_run: true
+          bump: ${{ steps.merged-pr.outputs.labels || 'patch' }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- pre-release (pull request): bump from the PR's semver label ---
+      - id: bump
+        if: github.event_name == 'pull_request'
+        uses: zwaldowski/match-label-action@v1
+        with:
+          allowed: major,minor,patch
+
+      - if: github.event_name == 'pull_request'
+        uses: zwaldowski/semver-release-action@v2
+        with:
+          dry_run: true
+          bump: ${{ steps.bump.outputs.match }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Both semver-release-action invocations export the resolved semver as the
+      # VERSION environment variable; only one of them runs per event.
+      - name: Compute version and dist-tag
+        id: out
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "version=${VERSION}-PRE-${{ github.event.pull_request.number }}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+            echo "dist-tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "dist-tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: [ "version" ]
+    runs-on: ubuntu-latest
+
+    # id-token: write is what allows GitHub Actions to mint the OIDC token that
+    # npm exchanges for short-lived publish credentials (trusted publishing).
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      # Trusted publishing requires npm >= 11.5.1; the npm bundled with the
+      # Node 22 setup can be older, so upgrade it explicitly.
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint and test
+        working-directory: frontend
+        run: npm run lint && npm run test:ci
+
+      - name: Set package version
+        working-directory: frontend
+        run: npm version ${{ needs.version.outputs.version }} --no-git-tag-version
+
+      - name: Build Web Component
+        working-directory: frontend
+        run: npm run build:component
+
+      # No NODE_AUTH_TOKEN: the npm CLI authenticates via OIDC (trusted
+      # publishing) and attaches provenance automatically.
+      - name: Publish to npm
+        working-directory: frontend
+        run: npm publish --tag ${{ needs.version.outputs.dist-tag }}
