@@ -32,9 +32,14 @@ src/main/java/org/fiware/odrl/
     OdrlAttribute.java    # Enum: LEFT_OPERAND, RIGHT_OPERAND, OPERATOR, etc.
     NamespacedMap.java    # Map<String, Map<String, RegoMethod>>
     LeftOperandMapper.java, ConstraintMapper.java, OperatorMapper.java, RightOperandMapper.java
+  ServiceResource.java  # Service + service-policy endpoints (implements ServiceApi)
+  ApiResource.java       # Base class: createPolicyWithId(id, serviceId, policy)
   persistence/
     PolicyRepository.java # JPA repository for policies
-    ServiceRepository.java
+    ServiceRepository.java # Service CRUD interface
+    PersistentServiceRepository.java # JPA impl of ServiceRepository
+    ServiceEntity.java    # JPA entity (serviceId, packageName, policies list)
+    PolicyEntity.java     # Has optional ManyToOne link to ServiceEntity
   rego/
     RegoMethod.java       # Record(regoPackage, regoMethod, description)
     MappingResult.java    # Generated rego output container
@@ -83,6 +88,22 @@ src/test/
 ./mvnw quarkus:dev
 ```
 
+## Backend Service Endpoints (fully implemented)
+The backend supports service-level policy management via `ServiceResource.java`:
+- `POST /service` — Create a service (`ServiceCreate { id }` → `PolicyPath { policyPath }`)
+- `GET /service` — List all services (paginated → `ServiceList`)
+- `GET /service/{service-id}` — Get service detail (→ `Service { id, policyPath, policies }`)
+- `DELETE /service/{service-id}` — Delete service + cascade-delete all policies
+- `POST /service/{service-id}/policy` — Create policy under service
+- `GET /service/{service-id}/policy` — List policies under service (paginated)
+- `PUT /service/{service-id}/policy/{id}` — Create/update policy under service
+- `GET /service/{service-id}/policy/{id}` — Get policy by ID under service
+- `DELETE /service/{service-id}/policy/{id}` — Delete policy by ID under service
+- `GET /service/{service-id}/policy/odrl/{id}` — Get by ODRL UID under service
+- `DELETE /service/{service-id}/policy/odrl/{id}` — Delete by ODRL UID under service
+
+Reserved service IDs: `policy`, `data`, `methods`. Reserved policy ID: `main`.
+
 ## Key Conventions
 - OpenAPI-first: Models are generated from `api/odrl.yaml` via quarkus-openapi-generator
 - PEP selection: `general.pep` config property selects which `rego/utils/*.rego` helper is loaded
@@ -108,7 +129,7 @@ src/test/
 - **Stack:** React 19, TypeScript 5.8, Vite 7, Bootstrap 5, React-Bootstrap
 - **Location:** `frontend/`
 - **API Client:** Auto-generated from `api/odrl.yaml` via `openapi-typescript-codegen` (`npm run generate-api`)
-- **Services:** `PapService` (policy CRUD), `UiService` (GET /mappings, POST /validate)
+- **Services:** `PapService` (policy CRUD), `UiService` (GET /mappings, POST /validate). Note: `ServiceService` does NOT exist yet — must be generated via `npm run generate-api`
 - **Entry:** `frontend/src/main.tsx` → `App.tsx` (React Router v7)
 
 ### Frontend Structure
@@ -158,7 +179,7 @@ npm run lint         # ESLint
 
 ### Frontend Docker
 - Multi-stage: Node 18 build → Nginx 1.21 serve (port 80)
-- Nginx reverse-proxies API paths (`/policy`, `/mappings`, `/validate`) to `PAP_BACKEND_URL`
+- Nginx reverse-proxies API paths (`/policy`, `/mappings`, `/validate`) to `PAP_BACKEND_URL`. Note: `/service` is NOT proxied yet
 - `PAP_BACKEND_URL` injected at container start via `envsubst` (no rebuild needed)
 - Health check at `/healthz`
 
