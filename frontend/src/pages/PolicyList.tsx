@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Table, Button } from 'react-bootstrap';
-import { PapService } from '../api/services/PapService';
+import { PolicyService } from '../api/services/PolicyService';
 import type { Policy } from '../services/api';
 import { Link } from 'react-router-dom';
 
@@ -17,14 +17,14 @@ const PolicyList = () => {
   const [policies, setPolicies] = useState<Policy[]>([]);
 
   useEffect(() => {
-    PapService.getPolicies()
+    PolicyService.getPolicies()
       .then(setPolicies)
       .catch(console.error);
   }, []);
 
   /** Deletes a policy by ID and removes it from the displayed list. */
   const handleDelete = (id: string) => {
-    PapService.deletePolicyById(id)
+    PolicyService.deletePolicyById(id)
       .then(() => {
         setPolicies(policies.filter(p => p.id !== id));
       })

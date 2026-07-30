@@ -39,6 +39,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/mappings': proxyConfig,
         '/policy': proxyConfig,
+        '/service': proxyConfig,
         '/validate': proxyConfig,
       },
     },

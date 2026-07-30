@@ -9,14 +9,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PolicyEditor from './PolicyEditor';
-import { PapService } from '../api/services/PapService';
+import { PolicyService } from '../api/services/PolicyService';
 import { UiService } from '../api/services/UiService';
 import { I18nProvider } from '../i18n';
 import type { Mappings, Policy, ValidationResponse } from '../services/api';
 
 // Mock services
-vi.mock('../api/services/PapService', () => ({
-  PapService: {
+vi.mock('../api/services/PolicyService', () => ({
+  PolicyService: {
     getPolicyById: vi.fn(),
     createPolicy: vi.fn(),
     createPolicyWithId: vi.fn(),
@@ -101,9 +101,9 @@ const renderEditMode = (id = 'existing-policy-1') =>
 
 describe('PolicyEditor', () => {
   beforeEach(() => {
-    vi.mocked(PapService.getPolicyById).mockReset();
-    vi.mocked(PapService.createPolicy).mockReset();
-    vi.mocked(PapService.createPolicyWithId).mockReset();
+    vi.mocked(PolicyService.getPolicyById).mockReset();
+    vi.mocked(PolicyService.createPolicy).mockReset();
+    vi.mocked(PolicyService.createPolicyWithId).mockReset();
     vi.mocked(UiService.getMappings).mockReset();
     vi.mocked(UiService.validatePolicy).mockReset();
     // Default: mappings load successfully
@@ -165,7 +165,7 @@ describe('PolicyEditor', () => {
 
     it('calls createPolicy on save in create mode', async () => {
       const user = userEvent.setup();
-      vi.mocked(PapService.createPolicy).mockResolvedValue(undefined as never);
+      vi.mocked(PolicyService.createPolicy).mockResolvedValue(undefined as never);
 
       renderCreateMode();
 
@@ -175,13 +175,13 @@ describe('PolicyEditor', () => {
 
       await user.click(screen.getByText('Save'));
 
-      expect(PapService.createPolicy).toHaveBeenCalled();
+      expect(PolicyService.createPolicy).toHaveBeenCalled();
     });
   });
 
   describe('Edit mode', () => {
     it('renders with "Edit Policy" title', async () => {
-      vi.mocked(PapService.getPolicyById).mockResolvedValue(MOCK_EXISTING_POLICY);
+      vi.mocked(PolicyService.getPolicyById).mockResolvedValue(MOCK_EXISTING_POLICY);
 
       renderEditMode();
 
@@ -191,19 +191,19 @@ describe('PolicyEditor', () => {
     });
 
     it('loads the existing policy data', async () => {
-      vi.mocked(PapService.getPolicyById).mockResolvedValue(MOCK_EXISTING_POLICY);
+      vi.mocked(PolicyService.getPolicyById).mockResolvedValue(MOCK_EXISTING_POLICY);
 
       renderEditMode();
 
       await waitFor(() => {
-        expect(PapService.getPolicyById).toHaveBeenCalledWith('existing-policy-1');
+        expect(PolicyService.getPolicyById).toHaveBeenCalledWith('existing-policy-1');
       });
     });
 
     it('calls createPolicyWithId on save in edit mode', async () => {
       const user = userEvent.setup();
-      vi.mocked(PapService.getPolicyById).mockResolvedValue(MOCK_EXISTING_POLICY);
-      vi.mocked(PapService.createPolicyWithId).mockResolvedValue(undefined as never);
+      vi.mocked(PolicyService.getPolicyById).mockResolvedValue(MOCK_EXISTING_POLICY);
+      vi.mocked(PolicyService.createPolicyWithId).mockResolvedValue(undefined as never);
 
       renderEditMode();
 
@@ -213,7 +213,7 @@ describe('PolicyEditor', () => {
 
       await user.click(screen.getByText('Save'));
 
-      expect(PapService.createPolicyWithId).toHaveBeenCalledWith(
+      expect(PolicyService.createPolicyWithId).toHaveBeenCalledWith(
         'existing-policy-1',
         expect.any(Object),
       );

@@ -12,7 +12,7 @@
  */
 import { useState, useEffect, useCallback, useRef, type RefObject } from 'react';
 import { Form, Button, Tabs, Tab, Alert, InputGroup, Badge, CloseButton } from 'react-bootstrap';
-import { PapService } from '../api/services/PapService';
+import { PolicyService } from '../api/services/PolicyService';
 import { UiService } from '../api/services/UiService';
 import type { OdrlPolicyJson, ValidationResponse } from '../services/api';
 import { configureApi } from '../services/api';
@@ -120,7 +120,7 @@ const EmbeddedApp = ({
   // Load existing policy in edit mode
   useEffect(() => {
     if (mode === 'edit' && policyId) {
-      PapService.getPolicyById(policyId)
+      PolicyService.getPolicyById(policyId)
         .then((p) => setPolicy(JSON.parse(p.odrl!)))
         .catch((err: Error) => setSaveError(err.message));
     }
@@ -233,8 +233,8 @@ const EmbeddedApp = ({
 
     const savePromise =
       mode === 'edit' && policyId
-        ? PapService.createPolicyWithId(policyId, policy)
-        : PapService.createPolicy(policy);
+        ? PolicyService.createPolicyWithId(policyId, policy)
+        : PolicyService.createPolicy(policy);
 
     savePromise
       .then(() => {
