@@ -30,6 +30,13 @@ vi.mock('./EmbeddedApp', () => ({
   default: vi.fn(() => null),
 }));
 
+// Mock the shared API client configuration so we can assert it is invoked
+// synchronously on connect — before the async EmbeddedApp import resolves.
+const mockConfigureApi = vi.fn();
+vi.mock('../services/api', () => ({
+  configureApi: (...args: unknown[]) => mockConfigureApi(...args),
+}));
+
 // Mock CSS imports to avoid Vite-specific `?inline` handling in tests
 vi.mock('bootstrap/dist/css/bootstrap.min.css?inline', () => ({
   default: '/* bootstrap-mock */',
@@ -107,6 +114,24 @@ describe('OdrlPolicyEditorElement', () => {
     // Wait for the dynamic import in renderReact()
     await vi.dynamicImportSettled();
 
+    expect(mockRender).toHaveBeenCalled();
+  });
+
+  it('configures the API client synchronously before React renders', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    el.setAttribute('api-base-url', 'https://pap.example.com');
+    el.setAttribute('auth-token', 'tok-123');
+    document.body.appendChild(el);
+
+    // The API base URL must be set before any data fetch. React runs child
+    // effects before parent effects, so the mappings fetch in a descendant
+    // would otherwise race ahead of EmbeddedApp's own configuration effect.
+    // configureApi therefore runs synchronously on connect — before the
+    // dynamic EmbeddedApp import resolves and React renders.
+    expect(mockConfigureApi).toHaveBeenCalledWith('https://pap.example.com', 'tok-123');
+    expect(mockRender).not.toHaveBeenCalled();
+
+    await vi.dynamicImportSettled();
     expect(mockRender).toHaveBeenCalled();
   });
 

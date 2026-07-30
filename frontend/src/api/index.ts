@@ -10,6 +10,7 @@ export type { OpenAPIConfig } from './core/OpenAPI';
 export type { GenericJsonInput } from './models/GenericJsonInput';
 export type { Headers } from './models/Headers';
 export type { Id } from './models/Id';
+export type { Id } from './models/Id';
 export type { Mapping } from './models/Mapping';
 export type { Mappings } from './models/Mappings';
 export type { OdrlPolicyJson } from './models/OdrlPolicyJson';

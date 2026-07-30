@@ -56,6 +56,7 @@
  */
 import { createElement, createRef, type RefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { configureApi } from '../services/api';
 import type { EmbeddedConfig, EditorMode, EmbeddedThemePreset } from './EmbeddedContext';
 import type { DeepPartial } from '../i18n/I18nContext';
 import type { I18nStrings } from '../i18n/en';
@@ -368,12 +369,22 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     (this.containerRef as { current: HTMLDivElement | null }).current =
       this.container;
 
+    const config = this.buildConfig();
+
+    // Configure the shared API client synchronously, BEFORE React mounts.
+    // React runs effects child-before-parent, so configuring inside
+    // EmbeddedApp's effect races with the `useMappings` fetch in a
+    // descendant component — the fetch would fire first with the default
+    // (empty) base URL and hit the wrong origin. Setting the base URL here
+    // guarantees it is in place before any data fetch starts.
+    configureApi(config.apiBaseUrl, config.authToken);
+
     // Lazy-import EmbeddedApp to avoid circular dependency at module parse time
     // and to allow tree-shaking in the standalone app build.
     import('./EmbeddedApp').then(({ default: EmbeddedApp }) => {
       this.reactRoot?.render(
         createElement(EmbeddedApp, {
-          config: this.buildConfig(),
+          config,
           i18nOverrides: this._i18nStrings,
           themeOverrides: this._themeConfig,
           containerRef: this.containerRef,
