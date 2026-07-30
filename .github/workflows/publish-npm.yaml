@@ -137,6 +137,17 @@ jobs:
         working-directory: frontend
         run: npm run build:component
 
+      # Diagnostic: confirms npm >= 11.5.1 and that GitHub is exposing the OIDC
+      # token endpoint to this job. If the URL line prints "yes", OIDC is
+      # available and any auth failure is a trusted-publisher config mismatch
+      # on npmjs.com; if it prints empty, the id-token permission isn't taking
+      # effect (e.g. a fork PR, which cannot receive an OIDC token).
+      - name: Diagnose OIDC availability
+        run: |
+          echo "node version: $(node --version)"
+          echo "npm version:  $(npm --version)"
+          echo "OIDC token endpoint present: ${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
+
       # No NODE_AUTH_TOKEN: the npm CLI authenticates via OIDC (trusted
       # publishing) and attaches provenance automatically.
       - name: Publish to npm
