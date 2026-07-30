@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback, useRef, type RefObject } from 'react';
 import { Form, Button, Tabs, Tab, Alert, InputGroup, Badge, CloseButton } from 'react-bootstrap';
 import { PolicyService } from '../api/services/PolicyService';
+import { ServiceService } from '../api/services/ServiceService';
 import { UiService } from '../api/services/UiService';
 import type { OdrlPolicyJson, ValidationResponse } from '../services/api';
 import { configureApi } from '../services/api';
@@ -95,7 +96,7 @@ const EmbeddedApp = ({
   containerRef,
   template,
 }: EmbeddedAppProps) => {
-  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext } = config;
+  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext, serviceId } = config;
 
   // --- API configuration ---
   useEffect(() => {
@@ -117,14 +118,18 @@ const EmbeddedApp = ({
   );
   const [saveError, setSaveError] = useState('');
 
-  // Load existing policy in edit mode
+  // Load existing policy in edit mode (uses service-scoped endpoint when serviceId is set)
   useEffect(() => {
     if (mode === 'edit' && policyId) {
-      PolicyService.getPolicyById(policyId)
+      const loadPromise = serviceId
+        ? ServiceService.getServicePolicyById(serviceId, policyId)
+        : PolicyService.getPolicyById(policyId);
+
+      loadPromise
         .then((p) => setPolicy(JSON.parse(p.odrl!)))
         .catch((err: Error) => setSaveError(err.message));
     }
-  }, [mode, policyId]);
+  }, [mode, policyId, serviceId]);
 
   // --- Editor tab state ---
   const [activeTab, setActiveTab] = useState('builder');
@@ -225,16 +230,30 @@ const EmbeddedApp = ({
     }
   }, [policy]);
 
-  /** Saves the policy and emits the appropriate event. */
+  /**
+   * Saves the policy and emits the appropriate event.
+   *
+   * When `serviceId` is set, uses service-scoped endpoints
+   * (`POST /service/{serviceId}/policy` or `PUT /service/{serviceId}/policy/{id}`).
+   * Otherwise, falls back to root-level endpoints.
+   */
   const handleSave = useCallback(() => {
     setSaveError('');
     const uid = (policy as Record<string, unknown>)['odrl:uid'] as string | undefined;
     const effectiveId = policyId ?? uid ?? '';
 
-    const savePromise =
-      mode === 'edit' && policyId
-        ? PolicyService.createPolicyWithId(policyId, policy)
-        : PolicyService.createPolicy(policy);
+    let savePromise;
+    if (serviceId) {
+      savePromise =
+        mode === 'edit' && policyId
+          ? ServiceService.createServicePolicyWithId(serviceId, policyId, policy)
+          : ServiceService.createServicePolicy(serviceId, policy);
+    } else {
+      savePromise =
+        mode === 'edit' && policyId
+          ? PolicyService.createPolicyWithId(policyId, policy)
+          : PolicyService.createPolicy(policy);
+    }
 
     savePromise
       .then(() => {
@@ -242,7 +261,7 @@ const EmbeddedApp = ({
         onEvent(eventType, { policy, id: effectiveId });
       })
       .catch((err: Error) => setSaveError(err.message));
-  }, [policy, mode, policyId, onEvent]);
+  }, [policy, mode, policyId, onEvent, serviceId]);
 
   /** Cancels editing and notifies the host. */
   const handleCancel = useCallback(() => {
