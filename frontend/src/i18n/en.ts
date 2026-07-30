@@ -190,6 +190,10 @@ export const en = {
     removeContext: 'Remove',
     applyJson: 'Apply JSON',
     jsonParseError: 'Fix JSON errors before adding context.',
+    serviceLabel: 'Service',
+    serviceNone: '(No service — standalone policy)',
+    serviceLoadError: 'Could not load services.',
+    serviceTooltip: 'Optionally assign this policy to an existing service. If no service is selected, the policy is created as a standalone policy.',
   },
 
   namespacedDropdown: {
