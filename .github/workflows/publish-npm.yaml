@@ -150,6 +150,8 @@ jobs:
 
       # No NODE_AUTH_TOKEN: the npm CLI authenticates via OIDC (trusted
       # publishing) and attaches provenance automatically.
+      # --loglevel verbose surfaces npm's OIDC token-exchange attempt and the
+      # registry's response, which is what reveals why OIDC is (not) used.
       - name: Publish to npm
         working-directory: frontend
-        run: npm publish --tag ${{ needs.version.outputs.dist-tag }}
+        run: npm publish --tag ${{ needs.version.outputs.dist-tag }} --loglevel verbose
