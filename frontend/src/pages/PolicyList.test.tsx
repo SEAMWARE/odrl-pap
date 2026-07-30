@@ -9,12 +9,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import PolicyList from './PolicyList';
-import { PapService } from '../api/services/PapService';
+import { PolicyService } from '../api/services/PolicyService';
 import type { Policy } from '../services/api';
 
-// Mock the PapService
-vi.mock('../api/services/PapService', () => ({
-  PapService: {
+// Mock the PolicyService
+vi.mock('../api/services/PolicyService', () => ({
+  PolicyService: {
     getPolicies: vi.fn(),
     deletePolicyById: vi.fn(),
   },
@@ -33,12 +33,12 @@ const renderWithRouter = (ui: React.ReactElement) =>
 
 describe('PolicyList', () => {
   beforeEach(() => {
-    vi.mocked(PapService.getPolicies).mockReset();
-    vi.mocked(PapService.deletePolicyById).mockReset();
+    vi.mocked(PolicyService.getPolicies).mockReset();
+    vi.mocked(PolicyService.deletePolicyById).mockReset();
   });
 
   it('renders the policy table with all policies', async () => {
-    vi.mocked(PapService.getPolicies).mockResolvedValue(MOCK_POLICIES);
+    vi.mocked(PolicyService.getPolicies).mockResolvedValue(MOCK_POLICIES);
 
     renderWithRouter(<PolicyList />);
 
@@ -53,7 +53,7 @@ describe('PolicyList', () => {
   });
 
   it('renders column headers', async () => {
-    vi.mocked(PapService.getPolicies).mockResolvedValue(MOCK_POLICIES);
+    vi.mocked(PolicyService.getPolicies).mockResolvedValue(MOCK_POLICIES);
 
     renderWithRouter(<PolicyList />);
 
@@ -67,7 +67,7 @@ describe('PolicyList', () => {
   });
 
   it('renders ODRL UIDs in the table', async () => {
-    vi.mocked(PapService.getPolicies).mockResolvedValue(MOCK_POLICIES);
+    vi.mocked(PolicyService.getPolicies).mockResolvedValue(MOCK_POLICIES);
 
     renderWithRouter(<PolicyList />);
 
@@ -80,7 +80,7 @@ describe('PolicyList', () => {
   });
 
   it('renders a "New Policy" link that navigates to /new', async () => {
-    vi.mocked(PapService.getPolicies).mockResolvedValue([]);
+    vi.mocked(PolicyService.getPolicies).mockResolvedValue([]);
 
     renderWithRouter(<PolicyList />);
 
@@ -90,7 +90,7 @@ describe('PolicyList', () => {
   });
 
   it('renders Edit links for each policy', async () => {
-    vi.mocked(PapService.getPolicies).mockResolvedValue(MOCK_POLICIES);
+    vi.mocked(PolicyService.getPolicies).mockResolvedValue(MOCK_POLICIES);
 
     renderWithRouter(<PolicyList />);
 
@@ -105,8 +105,8 @@ describe('PolicyList', () => {
 
   it('deletes a policy when delete button is clicked', async () => {
     const user = userEvent.setup();
-    vi.mocked(PapService.getPolicies).mockResolvedValue([...MOCK_POLICIES]);
-    vi.mocked(PapService.deletePolicyById).mockResolvedValue(undefined as never);
+    vi.mocked(PolicyService.getPolicies).mockResolvedValue([...MOCK_POLICIES]);
+    vi.mocked(PolicyService.deletePolicyById).mockResolvedValue(undefined as never);
 
     renderWithRouter(<PolicyList />);
 
@@ -119,7 +119,7 @@ describe('PolicyList', () => {
     await user.click(deleteButtons[0]);
 
     // deletePolicyById should have been called with the correct ID
-    expect(PapService.deletePolicyById).toHaveBeenCalledWith('policy-1');
+    expect(PolicyService.deletePolicyById).toHaveBeenCalledWith('policy-1');
 
     // The policy should be removed from the table
     await waitFor(() => {
@@ -128,7 +128,7 @@ describe('PolicyList', () => {
   });
 
   it('handles empty policy list gracefully', async () => {
-    vi.mocked(PapService.getPolicies).mockResolvedValue([]);
+    vi.mocked(PolicyService.getPolicies).mockResolvedValue([]);
 
     renderWithRouter(<PolicyList />);
 
@@ -143,7 +143,7 @@ describe('PolicyList', () => {
   });
 
   it('renders the page title', async () => {
-    vi.mocked(PapService.getPolicies).mockResolvedValue([]);
+    vi.mocked(PolicyService.getPolicies).mockResolvedValue([]);
 
     renderWithRouter(<PolicyList />);
 

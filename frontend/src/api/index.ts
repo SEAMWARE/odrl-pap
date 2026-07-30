@@ -17,10 +17,16 @@ export type { Page } from './models/Page';
 export type { PageSize } from './models/PageSize';
 export type { Policy } from './models/Policy';
 export type { PolicyList } from './models/PolicyList';
+export type { PolicyPath } from './models/PolicyPath';
+export type { Service } from './models/Service';
+export type { ServiceCreate } from './models/ServiceCreate';
+export type { ServiceId } from './models/ServiceId';
+export type { ServiceList } from './models/ServiceList';
 export { TestRequest } from './models/TestRequest';
 export type { Uid } from './models/Uid';
 export type { ValidationRequest } from './models/ValidationRequest';
 export type { ValidationResponse } from './models/ValidationResponse';
 
-export { PapService } from './services/PapService';
+export { PolicyService } from './services/PolicyService';
+export { ServiceService } from './services/ServiceService';
 export { UiService } from './services/UiService';

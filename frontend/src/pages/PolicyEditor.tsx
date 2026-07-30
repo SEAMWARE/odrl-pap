@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Form, Button, Tabs, Tab, Modal, Alert, InputGroup, Badge, CloseButton } from 'react-bootstrap';
-import { PapService } from '../api/services/PapService';
+import { PolicyService } from '../api/services/PolicyService';
 import { UiService } from '../api/services/UiService';
 import type { OdrlPolicyJson, Policy, ValidationResponse } from '../services/api';
 import { TestRequest } from '../api/models/TestRequest';
@@ -131,7 +131,7 @@ const PolicyEditor = () => {
 
   useEffect(() => {
     if (id) {
-      PapService.getPolicyById(id)
+      PolicyService.getPolicyById(id)
         .then((p: Policy) => setPolicy(JSON.parse(p.odrl!)))
         .catch(console.error);
     } else {
@@ -226,11 +226,11 @@ const PolicyEditor = () => {
   const handleSave = () => {
     const requestBody = policy;
     if (id) {
-      PapService.createPolicyWithId(id, requestBody)
+      PolicyService.createPolicyWithId(id, requestBody)
         .then(() => navigate('/'))
         .catch(console.error);
     } else {
-      PapService.createPolicy(requestBody)
+      PolicyService.createPolicy(requestBody)
         .then(() => navigate('/'))
         .catch(console.error);
     }
