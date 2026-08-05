@@ -41,6 +41,10 @@ public class BundleResource implements DefaultApi {
     private static final String UTILS_PATH = "rego/utils";
     private static final String UTILS_FILE_TEMPLATE = UTILS_PATH + "/%s.rego";
     private static final String GENERIC_UTILS_FILE = UTILS_PATH + "/generic.rego";
+    // Only files with this extension are loaded as additional rego methods from paths.rego. This keeps
+    // sibling files in the same folder (e.g. a mapping.json, or the ..data symlink directory created by
+    // a mounted Kubernetes ConfigMap) from being parsed as rego, which would corrupt the methods bundle.
+    private static final String REGO_FILE_EXTENSION = ".rego";
     @Inject
     private PolicyRepository policyRepository;
 
@@ -77,6 +81,10 @@ public class BundleResource implements DefaultApi {
         }
         if (pathsConfiguration.rego().isPresent() && pathsConfiguration.rego().get().exists()) {
             for (String file : getFiles(Paths.get(pathsConfiguration.rego().get().getAbsolutePath()))) {
+                if (!file.endsWith(REGO_FILE_EXTENSION)) {
+                    log.debug("Skipping non-rego file in the rego path: {}", file);
+                    continue;
+                }
                 addRegoMethodFromFile(file);
             }
         }
