@@ -1,15 +1,22 @@
 package org.fiware.odrl;
 
-import io.quarkus.runtime.annotations.StaticInitSafe;
 import io.smallrye.config.ConfigMapping;
 
 import java.io.File;
 import java.util.Optional;
 
 /**
+ * Runtime configuration for the optional filesystem paths that extend the built-in behaviour
+ * (additional mapping, additional rego methods, alternative compaction context).
+ * <p>
+ * This is deliberately a <em>runtime</em> {@link ConfigMapping} (not {@code @StaticInitSafe}): the
+ * paths are only consumed at runtime ({@link org.fiware.odrl.AppConfig#mappingConfiguration()} and
+ * {@link org.fiware.odrl.BundleResource}'s startup observer). Marking it {@code @StaticInitSafe}
+ * causes the values to be resolved at native-image build time, so environment variables such as
+ * {@code PATHS_MAPPING}/{@code PATHS_REGO} set only at container start would be ignored.
+ *
  * @author <a href="https://github.com/wistefan">Stefan Wiedemann</a>
  */
-@StaticInitSafe
 @ConfigMapping(prefix = "paths")
 public interface PathsConfiguration {
 
