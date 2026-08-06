@@ -41,8 +41,15 @@ public class PersistentPolicyRepository implements PolicyRepository {
             throw new IllegalArgumentException(String.format("Policy with uid %s already exists.", uid));
         }
 
-
-        entityMapper.map(id, uid, service, policy).persist();
+        // The service entity may have been loaded outside this transaction (the API resource looks it up
+        // before calling this @Transactional method), leaving it detached. Re-load it by its service id so
+        // the new policy's @ManyToOne references a managed entity - persisting a detached reference fails
+        // for a service-scoped policy on some providers (e.g. PostgreSQL), while a `main` policy (no service)
+        // is unaffected.
+        Optional<ServiceEntity> managedService = service
+                .map(ServiceEntity::getServiceId)
+                .flatMap(ServiceEntity::findByServiceId);
+        entityMapper.map(id, uid, managedService, policy).persist();
         return id;
     }
 
