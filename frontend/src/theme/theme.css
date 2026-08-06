@@ -1,17 +1,37 @@
+/**
+ * Base theme CSS using custom properties from ThemeProvider.
+ *
+ * The `--odrl-*` properties are injected at runtime by ThemeProvider.
+ * These rules provide a CSS-level bridge so that standard elements
+ * respond to theme changes without per-component inline styles.
+ *
+ * The `:root` block provides static fallbacks for cases where
+ * ThemeProvider is not yet mounted (e.g., initial page load).
+ */
+
 :root {
-  --primary-color: #0B2B40;
-  --secondary-color: #F07D00;
-  --background-color: #FFFFFF;
-  --text-color: #333333;
-  --font-family: 'Lato', sans-serif;
+  --odrl-primary-color: #0B2B40;
+  --odrl-secondary-color: #F07D00;
+  --odrl-bg-color: #FFFFFF;
+  --odrl-text-color: #333333;
+  --odrl-text-muted: #6c757d;
+  --odrl-card-bg: #f8f9fa;
+  --odrl-border-color: #dee2e6;
+  --odrl-font-family: 'Lato', sans-serif;
+  --odrl-border-radius: 0.375rem;
+  --odrl-section-header-bg: #e9ecef;
+  --odrl-success-color: #198754;
+  --odrl-danger-color: #dc3545;
+  --odrl-info-color: #0dcaf0;
+  --odrl-card-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
 }
 
 body {
-  font-family: var(--font-family);
-  color: var(--text-color);
-  background-color: var(--background-color);
+  font-family: var(--odrl-font-family);
+  color: var(--odrl-text-color);
+  background-color: var(--odrl-bg-color);
 }
 
 .navbar-dark {
-    background-color: var(--primary-color);
+  background-color: var(--odrl-primary-color) !important;
 }

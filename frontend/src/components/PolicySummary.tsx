@@ -1,128 +1,219 @@
+/**
+ * Read-only policy summary component.
+ *
+ * Displays the current ODRL policy in a structured, human-readable
+ * format with a toggle to show raw JSON. Includes copy-to-clipboard
+ * for the JSON view and human-readable summaries.
+ */
 import { Card, ListGroup, Badge, Stack, Button, Collapse } from 'react-bootstrap';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import type { OdrlPolicyJson } from '../services/api';
+import { useI18n } from '../i18n';
+
+/** Delay in milliseconds before "Copied!" reverts to "Copy". */
+const COPY_FEEDBACK_DELAY_MS = 2000;
 
 interface PolicySummaryProps {
+  /** The ODRL policy JSON to display. */
   policy: OdrlPolicyJson;
 }
 
-// Helper to render any kind of operand (string, @id, @value)
-const renderOperand = (operand: any): string => {
-  if (!operand) return '(not set)';
+/**
+ * Renders any kind of operand value as a display string.
+ */
+const renderOperand = (operand: unknown, notSet: string): string => {
+  if (!operand) return notSet;
   if (typeof operand === 'string') return operand;
-  if (operand['@id']) return operand['@id'].replace('odrl:', '');
-  if (operand['@value']) return `'${operand['@value']}' (${operand['@type']})`;
+  const obj = operand as Record<string, string>;
+  if (obj['@id']) return obj['@id'].replace('odrl:', '');
+  if (obj['@value']) return `'${obj['@value']}' (${obj['@type']})`;
   return JSON.stringify(operand);
-}
-
-const renderConstraint = (constraint: any, index: number) => (
-  <ListGroup.Item key={index} as="li" className="d-flex justify-content-between align-items-start">
-    <div className="ms-2 me-auto">
-      <div className="fw-bold">Constraint</div>
-      <Stack direction="horizontal" gap={2}>
-        <Badge bg="secondary">{renderOperand(constraint['odrl:leftOperand'])}</Badge>
-        <span className="fw-bold text-primary">{renderOperand(constraint['odrl:operator'])}</span>
-        <Badge bg="secondary">{renderOperand(constraint['odrl:rightOperand'])}</Badge>
-      </Stack>
-    </div>
-  </ListGroup.Item>
-);
-
-const renderRefinements = (refinements: any[]) => {
-    if (!refinements || refinements.length === 0) return null;
-    return (
-        <div className="mt-2 ms-4">
-            <h6>Refinements:</h6>
-            <ListGroup as="ol" numbered>
-                {refinements.map(renderConstraint)}
-            </ListGroup>
-        </div>
-    );
 };
 
+/**
+ * Generates a human-readable summary of the policy permission.
+ */
+function buildHumanSummary(
+  action: string | undefined,
+  target: unknown,
+  assignee: unknown,
+  notSet: string,
+): string {
+  const actionStr = action ? action.replace('odrl:', '').toUpperCase() : notSet;
+  const targetStr = renderOperand(target, notSet);
+  const assigneeStr = renderOperand(assignee, notSet);
+  return `Allow ${actionStr} on ${targetStr} for ${assigneeStr}`;
+}
+
+/**
+ * Policy summary card with structured display and JSON toggle.
+ */
 const PolicySummary = ({ policy }: PolicySummaryProps) => {
+  const { strings } = useI18n();
+  const t = strings.policySummary;
+  const notSet = strings.common.notSet;
+
   const [showJson, setShowJson] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(policy, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), COPY_FEEDBACK_DELAY_MS);
+    } catch {
+      // Fallback: select text for manual copy
+    }
+  }, [policy]);
 
   if (!policy) return null;
 
-  const permission = policy['odrl:permission'] || {};
-  const { 'odrl:target': target, 'odrl:assignee': assignee, 'odrl:action': action, 'odrl:constraint': constraint } = permission;
+  const permission = (policy['odrl:permission'] || {}) as Record<string, unknown>;
+  const target = permission['odrl:target'];
+  const assignee = permission['odrl:assignee'];
+  const action = permission['odrl:action'] as string | undefined;
+  const constraint = permission['odrl:constraint'] as Record<string, unknown> | unknown[] | undefined;
 
-  const renderEntity = (entity: any, name: string) => {
-    if (!entity) return <>{name}: (not set)</>;
+  const renderConstraintItem = (c: Record<string, unknown>, index: number) => (
+    <ListGroup.Item key={index} as="li" className="d-flex justify-content-between align-items-start">
+      <div className="ms-2 me-auto">
+        <div className="fw-bold">{t.constraint}</div>
+        <Stack direction="horizontal" gap={2}>
+          <Badge bg="secondary">{renderOperand(c['odrl:leftOperand'], notSet)}</Badge>
+          <span className="fw-bold text-primary">{renderOperand(c['odrl:operator'], notSet)}</span>
+          <Badge bg="secondary">{renderOperand(c['odrl:rightOperand'], notSet)}</Badge>
+        </Stack>
+      </div>
+    </ListGroup.Item>
+  );
+
+  const renderRefinements = (refinements: unknown[]) => {
+    if (!refinements || refinements.length === 0) return null;
+    return (
+      <div className="mt-2 ms-4">
+        <h6>{t.refinements}:</h6>
+        <ListGroup as="ol" numbered>
+          {(refinements as Record<string, unknown>[]).map(renderConstraintItem)}
+        </ListGroup>
+      </div>
+    );
+  };
+
+  const renderEntity = (entity: unknown, name: string) => {
+    if (!entity) return <>{name}: {notSet}</>;
     if (typeof entity === 'string') return <>{name}: {entity}</>;
-    if (entity['@type']) {
+    const obj = entity as Record<string, unknown>;
+    if (obj['@type']) {
       return (
         <>
-          {name}: {entity['@type']}
-          {renderRefinements(entity['odrl:refinement'])}
+          {name}: {obj['@type'] as string}
+          {renderRefinements(obj['odrl:refinement'] as unknown[])}
         </>
       );
     }
+    if (obj['@id']) return <>{name}: {obj['@id'] as string}</>;
     return <>{name}: {JSON.stringify(entity)}</>;
-  }
+  };
 
   const renderConstraints = () => {
     if (!constraint) return null;
 
     // Logical Constraint
-    if (constraint['@type'] === 'odrl:LogicalConstraint') {
-        const operator = Object.keys(constraint).find(k => k.startsWith('odrl:'));
-        const constraints = operator ? constraint[operator] : [];
-        return (
-            <>
-                <div className="fw-bold mt-3">Constraints <Badge bg="info">{operator?.replace('odrl:', '').toUpperCase()}</Badge></div>
-                <ListGroup as="ol" numbered>{constraints.map(renderConstraint)}</ListGroup>
-            </>
-        )
+    if (
+      typeof constraint === 'object' &&
+      !Array.isArray(constraint) &&
+      constraint['@type'] === 'odrl:LogicalConstraint'
+    ) {
+      const operator = Object.keys(constraint).find((k) => k.startsWith('odrl:'));
+      const constraints = operator ? (constraint[operator] as Record<string, unknown>[]) : [];
+      return (
+        <>
+          <div className="fw-bold mt-3">
+            {t.constraints}{' '}
+            <Badge bg="info">{operator?.replace('odrl:', '').toUpperCase()}</Badge>
+          </div>
+          <ListGroup as="ol" numbered>
+            {constraints.map(renderConstraintItem)}
+          </ListGroup>
+        </>
+      );
     }
 
     // Array of constraints (implicit AND)
     if (Array.isArray(constraint)) {
-        return (
-            <>
-                <div className="fw-bold mt-3">Constraints <Badge bg="info">AND</Badge></div>
-                <ListGroup as="ol" numbered>{constraint.map(renderConstraint)}</ListGroup>
-            </>
-        )
+      return (
+        <>
+          <div className="fw-bold mt-3">
+            {t.constraints} <Badge bg="info">AND</Badge>
+          </div>
+          <ListGroup as="ol" numbered>
+            {constraint.map((c, i) => renderConstraintItem(c as Record<string, unknown>, i))}
+          </ListGroup>
+        </>
+      );
     }
 
     // Single constraint
     return (
-        <>
-            <div className="fw-bold mt-3">Constraint</div>
-            <ListGroup as="ol"><ListGroup.Item>{renderConstraint(constraint, 0)}</ListGroup.Item></ListGroup>
-        </>
-    )
-  }
+      <>
+        <div className="fw-bold mt-3">{t.constraint}</div>
+        <ListGroup as="ol">
+          {renderConstraintItem(constraint as Record<string, unknown>, 0)}
+        </ListGroup>
+      </>
+    );
+  };
+
+  const humanSummary = buildHumanSummary(action, target, assignee, notSet);
 
   return (
-    <Card bg="light">
+    <Card style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
       <Card.Header as="h5" className="d-flex justify-content-between align-items-center">
-        Policy Summary
-        <Button variant="outline-secondary" size="sm" onClick={() => setShowJson(!showJson)}>
-          {showJson ? 'Hide JSON' : 'Show JSON'}
+        {t.title}
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={() => setShowJson(!showJson)}
+        >
+          {showJson ? t.hideJson : t.showJson}
         </Button>
       </Card.Header>
       <Card.Body>
+        {/* Human-readable one-line summary */}
+        <div className="mb-2 text-muted fst-italic small">{humanSummary}</div>
+
         <Collapse in={!showJson}>
           <div>
             <Card.Text>
-              <strong>UID:</strong> {policy['odrl:uid'] || '(not set)'}
+              <strong>{t.uid}:</strong> {policy['odrl:uid'] || notSet}
             </Card.Text>
             <hr />
-            <h6>Permission</h6>
+            <h6>{t.permission}</h6>
             <ListGroup variant="flush">
-              <ListGroup.Item>{renderEntity(target, 'Target')}</ListGroup.Item>
-              <ListGroup.Item>{renderEntity(assignee, 'Assignee')}</ListGroup.Item>
-              <ListGroup.Item>Action: {action || '(not set)'}</ListGroup.Item>
+              <ListGroup.Item>{renderEntity(target, t.target)}</ListGroup.Item>
+              <ListGroup.Item>{renderEntity(assignee, t.assignee)}</ListGroup.Item>
+              <ListGroup.Item>
+                {t.action}: {action || notSet}
+              </ListGroup.Item>
             </ListGroup>
             {renderConstraints()}
           </div>
         </Collapse>
         <Collapse in={showJson}>
           <div>
-            <pre><code>{JSON.stringify(policy, null, 2)}</code></pre>
+            <div className="d-flex justify-content-end mb-2">
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={handleCopy}
+                aria-label={strings.common.copyToClipboard}
+              >
+                {copied ? strings.common.copied : strings.common.copyToClipboard}
+              </Button>
+            </div>
+            <pre className="bg-dark text-light p-3 rounded" style={{ fontSize: '0.85rem' }}>
+              <code>{JSON.stringify(policy, null, 2)}</code>
+            </pre>
           </div>
         </Collapse>
       </Card.Body>

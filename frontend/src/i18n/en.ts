@@ -1,0 +1,221 @@
+/**
+ * Default English translation strings for the ODRL Policy Builder UI.
+ *
+ * All user-facing text is organized by component/section. This file
+ * serves as both the default locale and the reference for creating
+ * additional translations.
+ */
+
+/** Complete set of UI strings, keyed by component section. */
+export const en = {
+  common: {
+    loading: 'Loading...',
+    error: 'An error occurred',
+    retry: 'Retry',
+    save: 'Save',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    edit: 'Edit',
+    create: 'Create',
+    close: 'Close',
+    copyToClipboard: 'Copy to clipboard',
+    copied: 'Copied!',
+    notSet: '(not set)',
+    selectOption: 'Select an option',
+    noItems: 'No items available',
+    search: 'Search...',
+  },
+
+  policyBuilder: {
+    title: 'Policy Builder',
+    loadingMappings: 'Loading policy mappings...',
+    errorLoadingMappings: 'Failed to load policy mappings. Please try again.',
+    stepTarget: 'Target',
+    stepTargetHelp: 'Define what resource or asset this policy applies to. This could be a specific URL, an API endpoint, or a class of resources.',
+    stepAssignee: 'Assignee',
+    stepAssigneeHelp: 'Specify who is granted or denied the permission. This can be a specific user, organization, or a group defined by attributes.',
+    stepAction: 'Action',
+    stepActionHelp: 'Choose what operation is being permitted or prohibited on the target resource.',
+    stepConstraints: 'Constraints',
+    stepConstraintsHelp: 'Add conditions that must be met for this permission to apply. For example, time restrictions, role requirements, or geographic limitations.',
+    selectAction: 'Select an action',
+    summaryTitle: 'Policy Summary',
+  },
+
+  targetEditor: {
+    simpleTarget: 'Simple Target',
+    assetCollection: 'Asset Collection',
+    customTarget: 'Custom Target (URL)',
+    selectFromOptions: 'Select from available targets',
+    enterTargetUrl: 'Enter target URL (e.g., https://example.com/resource)',
+    selectTarget: 'Select a target',
+    refinementsTitle: 'Refinements',
+    refinementsHelp: 'Add constraints that narrow down which assets in the collection this policy applies to.',
+    invalidUrl: 'Please enter a valid URL',
+    enterTargetValue: 'Enter the target value (e.g., urn:resource:123 or https://example.com/resource)',
+  },
+
+  assigneeEditor: {
+    simpleAssignee: 'Simple Assignee',
+    partyCollection: 'Party Collection',
+    customAssignee: 'Custom Assignee (ID)',
+    selectFromOptions: 'Select from available assignees',
+    enterAssigneeId: 'Enter assignee identifier',
+    selectAssignee: 'Select an assignee',
+    refinementsTitle: 'Refinements',
+    refinementsHelp: 'Add constraints that define which parties in the collection this policy applies to.',
+    enterAssigneeValue: 'Enter the assignee value (e.g., did:example:org123 or urn:party:456)',
+  },
+
+  constraintBuilder: {
+    title: 'Constraints',
+    addConstraint: 'Add Constraint',
+    removeConstraint: 'Remove',
+    groupingLabel: 'Constraint Logic',
+    groupingAnd: 'ALL must match (AND)',
+    groupingAndHelp: 'Every constraint must be satisfied for the permission to apply.',
+    groupingOr: 'ANY can match (OR)',
+    groupingOrHelp: 'At least one constraint must be satisfied for the permission to apply.',
+    groupingXone: 'Exactly ONE must match (XONE)',
+    groupingXoneHelp: 'Exactly one constraint must be satisfied \u2014 not zero, not more than one.',
+    selectLeftOperand: 'Select left operand',
+    selectOperator: 'Select operator',
+    selectRightOperand: 'Select right operand',
+    rightOperandNamed: 'Named value (URI)',
+    rightOperandLiteral: 'Literal value',
+    valuePlaceholder: 'Value',
+    typePlaceholder: 'Type (e.g., xsd:date)',
+    constraintLabel: 'Constraint',
+  },
+
+  policySummary: {
+    title: 'Policy Summary',
+    showJson: 'Show JSON',
+    hideJson: 'Hide JSON',
+    uid: 'UID',
+    permission: 'Permission',
+    target: 'Target',
+    assignee: 'Assignee',
+    action: 'Action',
+    constraints: 'Constraints',
+    constraint: 'Constraint',
+    refinements: 'Refinements',
+    humanSummary: 'Allow {action} on {target} for {assignee}',
+  },
+
+  validationEditor: {
+    title: 'Validate Policy',
+    modeHttpRequest: 'HTTP Request',
+    modeJsonPayload: 'JSON Payload',
+    method: 'Method',
+    host: 'Host',
+    path: 'Path',
+    protocol: 'Protocol',
+    headers: 'Headers',
+    customHeaders: 'Custom Headers',
+    addHeader: 'Add Header',
+    removeHeader: 'Remove',
+    headerName: 'Header Name',
+    headerValue: 'Header Value',
+    contentType: 'Content-Type',
+    authType: 'Authorization Type',
+    authNone: 'None',
+    authManual: 'Manual Bearer Token',
+    authJwt: 'JWT Helper',
+    authHeader: 'Authorization Header',
+    jwtHelper: 'JWT Helper',
+    jwtHelperDescription: 'Create an unsigned JWT for testing. Enter the payload claims below and click Generate to produce a Bearer token.',
+    jwtPayload: 'JWT Payload (JSON)',
+    jwtPreview: 'Decoded JWT Preview',
+    generateJwt: 'Generate Unsigned JWT',
+    body: 'Body',
+    bodyPlaceholder: 'Enter JSON body',
+    runValidation: 'Run Validation',
+    testAgain: 'Test Again',
+    selectMethod: 'Select Method',
+    hostPlaceholder: 'e.g., example.com',
+    pathPlaceholder: 'e.g., /my/resource',
+    authPlaceholder: 'e.g., Bearer ...',
+    loadExample: 'Load Example',
+    copyAsCurl: 'Copy as cURL',
+    copiedCurl: 'cURL copied!',
+    jsonPayload: 'Payload (JSON)',
+    jsonPayloadHelp: 'The JSON data to evaluate the policy against. This can represent any data structure that the policy rules will inspect.',
+    jsonPayloadPlaceholder: '{\n  "type": "Product",\n  "id": "urn:example:product:123",\n  "name": "Example Product"\n}',
+    jsonSubject: 'Subject (JSON, optional)',
+    jsonSubjectHelp: 'Optional identity or credential information about the requesting party. Used by assignee and subject-based policy constraints.',
+    jsonSubjectPlaceholder: '{\n  "type": "VerifiableCredential",\n  "credentialSubject": {\n    "role": "admin"\n  }\n}',
+    invalidJson: 'Invalid JSON syntax',
+    invalidJsonDetail: 'Please check the JSON syntax and try again.',
+  },
+
+  policyList: {
+    title: 'Policies',
+    newPolicy: 'New Policy',
+    columnId: 'ID',
+    columnUid: 'ODRL UID',
+    columnActions: 'Actions',
+    confirmDelete: 'Are you sure you want to delete this policy?',
+  },
+
+  validationResult: {
+    title: 'Validation Result',
+    allowed: 'Request Allowed',
+    denied: 'Request Denied',
+    allowedDescription: 'The policy permits this request.',
+    deniedDescription: 'The policy does not permit this request.',
+    explanationTitle: 'Explanation',
+    noExplanation: 'No additional details available.',
+    showRawResponse: 'Show Raw Response',
+    hideRawResponse: 'Hide Raw Response',
+    validatedPolicy: 'Validated Policy',
+    showPolicy: 'Show Policy',
+    hidePolicy: 'Hide Policy',
+  },
+
+  policyEditor: {
+    editTitle: 'Edit Policy',
+    newTitle: 'New Policy',
+    tabBuilder: 'Policy Builder',
+    tabRawOdrl: 'Raw ODRL',
+    validate: 'Validate',
+    jsonValid: 'Valid JSON',
+    jsonInvalid: 'Invalid JSON',
+    contextTitle: 'JSON-LD Context (@context)',
+    contextPrefix: 'Prefix',
+    contextPrefixPlaceholder: 'e.g., dome-op',
+    contextUri: 'Namespace URI',
+    contextUriPlaceholder: 'e.g., https://example.com/ns/',
+    addContext: 'Add Context',
+    removeContext: 'Remove',
+    applyJson: 'Apply JSON',
+    jsonParseError: 'Fix JSON errors before adding context.',
+    serviceLabel: 'Service',
+    serviceNone: '(No service — standalone policy)',
+    serviceLoadError: 'Could not load services.',
+    serviceTooltip: 'Optionally assign this policy to an existing service. If no service is selected, the policy is created as a standalone policy.',
+  },
+
+  namespacedDropdown: {
+    noResults: 'No matching items',
+    filterPlaceholder: 'Type to filter...',
+  },
+
+  templateMode: {
+    banner: 'Creating policy from template: {name}',
+    bannerDescription: '{description}',
+    lockedFieldTooltip: 'This field is locked by the template and cannot be changed.',
+    lockedBadge: 'Locked',
+  },
+} as const;
+
+/**
+ * Recursively widens string-literal types to plain `string` so that
+ * translated values are not forced to match the English originals.
+ */
+type DeepStringify<T> = {
+  [K in keyof T]: T[K] extends string ? string : DeepStringify<T[K]>;
+};
+
+/** Type representing the complete i18n string tree (with widened value types). */
+export type I18nStrings = DeepStringify<typeof en>;
