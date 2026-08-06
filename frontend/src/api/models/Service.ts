@@ -2,10 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { Id } from './Id';
+import type { Identifier } from './Identifier';
 import type { PolicyList } from './PolicyList';
 export type Service = {
-    id?: Id;
+    id?: Identifier;
     policyPath?: string;
     policies?: PolicyList;
 };

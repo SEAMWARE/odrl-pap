@@ -2,8 +2,8 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { Id } from './Id';
+import type { Identifier } from './Identifier';
 export type ServiceList = Array<{
-    id?: Id;
+    id?: Identifier;
     policyPath?: string;
 }>;

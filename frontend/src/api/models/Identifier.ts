@@ -2,8 +2,4 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { Identifier } from './Identifier';
-export type ServiceCreate = {
-    id?: Identifier;
-};
-
+export type Identifier = string;

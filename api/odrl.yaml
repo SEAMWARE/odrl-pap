@@ -413,18 +413,18 @@ components:
       properties:
         policyPath:
           type: string
-    Id:
+    Identifier:
       type: string
     ServiceCreate:
       type: object
       properties:
         id:
-          $ref: '#/components/schemas/Id'
+          $ref: '#/components/schemas/Identifier'
     Service:
       type: object
       properties:
         id:
-          $ref: '#/components/schemas/Id'
+          $ref: '#/components/schemas/Identifier'
         policyPath:
           type: string
         policies:
@@ -435,7 +435,7 @@ components:
         type: object
         properties:
           id:
-            $ref: '#/components/schemas/Id'
+            $ref: '#/components/schemas/Identifier'
           policyPath:
             type: string
     ValidationRequest:
