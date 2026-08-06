@@ -130,8 +130,31 @@ jobs:
           
           docker manifest push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap:${{ needs.generate-version.outputs.version }}
 
+  # NOTE: npm publishing lives in the dedicated `publish-npm.yaml` workflow.
+  # It is the single entry-point registered as the npm Trusted Publisher and
+  # publishes via OIDC (no NPM_TOKEN) for both stable and pre-release versions.
+
+  # ---------------------------------------------------------------------------
+  # Frontend: build and push Docker image
+  # ---------------------------------------------------------------------------
+  build-frontend-image:
+    needs: [ "generate-version" ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Log into quay.io
+        run: docker login -u "${{ secrets.QUAY_USERNAME }}" -p "${{ secrets.QUAY_PASSWORD }}" ${{ env.REGISTRY }}
+
+      - name: Build frontend image
+        run: docker build -t ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap-frontend:${{ needs.generate-version.outputs.version }} frontend/
+
+      - name: Push frontend image
+        run: docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap-frontend:${{ needs.generate-version.outputs.version }}
+
   git-release:
-    needs: [ "generate-version","multi-arch" ]
+    needs: [ "generate-version", "multi-arch", "build-frontend-image" ]
     runs-on: ubuntu-latest
 
     steps:
