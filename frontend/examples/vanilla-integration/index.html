@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ODRL Policy Editor — Vanilla Integration</title>
+
+  <!-- Load the Web Component from unpkg CDN -->
+  <script
+    type="module"
+    src="https://unpkg.com/@seamware/odrl-policy-editor@latest"
+  ></script>
+
+  <!--
+    Alternative: jsDelivr CDN
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/@seamware/odrl-policy-editor@latest"
+    ></script>
+  -->
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 1.5rem;
+    }
+
+    /* Configuration panel */
+    .config-panel {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: end;
+    }
+
+    .config-panel label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.85rem;
+      font-weight: 600;
+      gap: 0.25rem;
+    }
+
+    .config-panel input,
+    .config-panel select {
+      padding: 0.4rem 0.6rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    .config-panel input[type="text"] {
+      width: 280px;
+    }
+
+    /* Event log */
+    .event-log {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1.5rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .event-log h2 {
+      margin-top: 0;
+      font-size: 1rem;
+    }
+
+    .event-log ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    .event-log li {
+      padding: 0.25rem 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    /* Editor container */
+    odrl-policy-editor {
+      display: block;
+      max-width: 960px;
+    }
+  </style>
+</head>
+<body>
+  <h1>ODRL Policy Editor — Vanilla Integration Example</h1>
+
+  <!-- Configuration panel -->
+  <div class="config-panel">
+    <label>
+      API Base URL
+      <input type="text" id="api-url" value="http://localhost:8080" />
+    </label>
+    <label>
+      Theme
+      <select id="theme-select">
+        <option value="light" selected>Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </label>
+    <label>
+      Locale
+      <select id="locale-select">
+        <option value="en" selected>English</option>
+        <option value="de">Deutsch</option>
+      </select>
+    </label>
+    <label>
+      Mode
+      <select id="mode-select">
+        <option value="create" selected>Create</option>
+        <option value="edit">Edit</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- The Web Component -->
+  <odrl-policy-editor
+    id="editor"
+    api-base-url="http://localhost:8080"
+    mode="create"
+    theme="light"
+    locale="en"
+  ></odrl-policy-editor>
+
+  <!-- Event log -->
+  <div class="event-log">
+    <h2>Event Log</h2>
+    <ul id="log"></ul>
+  </div>
+
+  <script>
+    const editor = document.getElementById('editor');
+    const log = document.getElementById('log');
+
+    // --- Configuration panel bindings ---
+
+    document.getElementById('api-url').addEventListener('input', (e) => {
+      editor.setAttribute('api-base-url', e.target.value);
+    });
+
+    document.getElementById('theme-select').addEventListener('change', (e) => {
+      editor.setAttribute('theme', e.target.value);
+    });
+
+    document.getElementById('locale-select').addEventListener('change', (e) => {
+      editor.setAttribute('locale', e.target.value);
+    });
+
+    document.getElementById('mode-select').addEventListener('change', (e) => {
+      editor.setAttribute('mode', e.target.value);
+    });
+
+    // --- Event logging ---
+
+    /**
+     * Appends a timestamped message to the event log panel.
+     * @param {string} eventName - The event type name.
+     * @param {unknown} detail - The event detail payload.
+     */
+    function logEvent(eventName, detail) {
+      const time = new Date().toLocaleTimeString();
+      const li = document.createElement('li');
+      li.textContent = `[${time}] ${eventName}: ${JSON.stringify(detail)}`;
+      log.prepend(li);
+    }
+
+    editor.addEventListener('policy-created', (e) => {
+      logEvent('policy-created', e.detail);
+    });
+
+    editor.addEventListener('policy-updated', (e) => {
+      logEvent('policy-updated', e.detail);
+    });
+
+    editor.addEventListener('policy-validated', (e) => {
+      logEvent('policy-validated', e.detail);
+    });
+
+    editor.addEventListener('editor-cancelled', (e) => {
+      logEvent('editor-cancelled', e.detail);
+    });
+  </script>
+</body>
+</html>

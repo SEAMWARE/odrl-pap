@@ -32,9 +32,14 @@ src/main/java/org/fiware/odrl/
     OdrlAttribute.java    # Enum: LEFT_OPERAND, RIGHT_OPERAND, OPERATOR, etc.
     NamespacedMap.java    # Map<String, Map<String, RegoMethod>>
     LeftOperandMapper.java, ConstraintMapper.java, OperatorMapper.java, RightOperandMapper.java
+  ServiceResource.java  # Service + service-policy endpoints (implements ServiceApi)
+  ApiResource.java       # Base class: createPolicyWithId(id, serviceId, policy)
   persistence/
     PolicyRepository.java # JPA repository for policies
-    ServiceRepository.java
+    ServiceRepository.java # Service CRUD interface
+    PersistentServiceRepository.java # JPA impl of ServiceRepository
+    ServiceEntity.java    # JPA entity (serviceId, packageName, policies list)
+    PolicyEntity.java     # Has optional ManyToOne link to ServiceEntity
   rego/
     RegoMethod.java       # Record(regoPackage, regoMethod, description)
     MappingResult.java    # Generated rego output container
@@ -83,6 +88,22 @@ src/test/
 ./mvnw quarkus:dev
 ```
 
+## Backend Service Endpoints (fully implemented)
+The backend supports service-level policy management via `ServiceResource.java`:
+- `POST /service` — Create a service (`ServiceCreate { id }` → `PolicyPath { policyPath }`)
+- `GET /service` — List all services (paginated → `ServiceList`)
+- `GET /service/{service-id}` — Get service detail (→ `Service { id, policyPath, policies }`)
+- `DELETE /service/{service-id}` — Delete service + cascade-delete all policies
+- `POST /service/{service-id}/policy` — Create policy under service
+- `GET /service/{service-id}/policy` — List policies under service (paginated)
+- `PUT /service/{service-id}/policy/{id}` — Create/update policy under service
+- `GET /service/{service-id}/policy/{id}` — Get policy by ID under service
+- `DELETE /service/{service-id}/policy/{id}` — Delete policy by ID under service
+- `GET /service/{service-id}/policy/odrl/{id}` — Get by ODRL UID under service
+- `DELETE /service/{service-id}/policy/odrl/{id}` — Delete by ODRL UID under service
+
+Reserved service IDs: `policy`, `data`, `methods`. Reserved policy ID: `main`.
+
 ## Key Conventions
 - OpenAPI-first: Models are generated from `api/odrl.yaml` via quarkus-openapi-generator
 - PEP selection: `general.pep` config property selects which `rego/utils/*.rego` helper is loaded
@@ -103,3 +124,71 @@ src/test/
 - `src/main/java/org/fiware/odrl/mapping/OdrlMapper.java` - ODRL-to-Rego mapper
 - `src/main/resources/rego/utils/apisix.rego` - APISIX helper (reference for new helpers)
 - `src/main/resources/rego/http/leftOperand.rego` - Has `body_value()` with JSONPath-like walk
+
+## Frontend (React SPA)
+- **Stack:** React 19, TypeScript 5.8, Vite 7, Bootstrap 5, React-Bootstrap
+- **Location:** `frontend/`
+- **API Client:** Auto-generated from `api/odrl.yaml` via `openapi-typescript-codegen` (`npm run generate-api`)
+- **Services:** `PapService` (policy CRUD), `UiService` (GET /mappings, POST /validate). Note: `ServiceService` does NOT exist yet — must be generated via `npm run generate-api`
+- **Entry:** `frontend/src/main.tsx` → `App.tsx` (React Router v7)
+
+### Frontend Structure
+```
+frontend/src/
+  api/              # Auto-generated OpenAPI client (models, services, core)
+  components/
+    Baukasten.tsx       # Main visual policy builder (dropdowns from /mappings)
+    ConstraintBuilder.tsx # AND/OR/XONE constraint editor with operand dropdowns
+    TargetEditor.tsx    # Simple target or AssetCollection with refinements
+    AssigneeEditor.tsx  # Simple assignee or PartyCollection with refinements
+    ValidationEditor.tsx # HTTP test request builder (method, host, path, headers, body, JWT helper)
+    PolicySummary.tsx   # Read-only policy display + raw JSON toggle
+    Layout.tsx          # Navbar + route outlet
+  pages/
+    PolicyList.tsx      # Policy CRUD table
+    PolicyEditor.tsx    # Tabs: visual builder ("Baukasten") / raw JSON editor + validation modal
+  services/
+    api.ts              # OpenAPI base URL + auth header config
+  theme/
+    theme.css           # CSS custom properties (primary: #0B2B40, secondary: #F07D00)
+```
+
+### Frontend Build & Dev
+```bash
+cd frontend
+npm install
+npm run dev          # Vite dev server (proxies /mappings, /policy, /validate to backend)
+npm run build        # tsc -b && vite build → dist/
+npm run generate-api # Regenerate OpenAPI client from ../api/odrl.yaml
+npm run lint         # ESLint
+```
+
+### Frontend Environment
+- `VITE_API_PROXY_TARGET` — Dev proxy target (default: http://localhost:8080)
+- `VITE_API_BASE_URL` — Production API base URL (default: /api)
+
+### Frontend Web Component (npm Package)
+- **Package:** `@seamware/odrl-policy-editor` (scoped, public)
+- **Build:** `npm run build:component` → `dist-component/odrl-policy-editor.js` (single self-contained ES module)
+- **Config:** `frontend/vite.component.config.ts` (library build, inlines all CSS/deps)
+- **Entry:** `frontend/src/web-component/index.ts` → registers `<odrl-policy-editor>` custom element
+- **Shadow DOM:** Full style isolation; Bootstrap + theme CSS inlined
+- **Attributes:** `api-base-url`, `auth-token`, `mode`, `policy-id`, `theme`, `locale`, `policy-context`
+- **JS Properties:** `i18nStrings`, `themeConfig`, `template`, `policyContext`
+- **Events:** `policy-created`, `policy-updated`, `policy-validated`, `editor-cancelled`
+
+### Frontend Docker
+- Multi-stage: Node 18 build → Nginx 1.21 serve (port 80)
+- Nginx reverse-proxies API paths (`/policy`, `/mappings`, `/validate`) to `PAP_BACKEND_URL`. Note: `/service` is NOT proxied yet
+- `PAP_BACKEND_URL` injected at container start via `envsubst` (no rebuild needed)
+- Health check at `/healthz`
+
+## CI/CD Workflows (`.github/workflows/`)
+- `test.yaml` — Runs on every push: Java Maven tests + OPA rego tests
+- `it.yaml` — Integration tests (currently partially disabled)
+- `check.yml` — PR check: validates semver label (major/minor/patch)
+- `pre-release.yaml` — On PR events: builds + pushes pre-release Docker images to quay.io
+- `release.yaml` — On push to main: generates semver version, builds multi-arch Docker images, pushes to quay.io, creates GitHub release
+- **Registry:** `quay.io/fiware/odrl-pap` (backend image)
+- **Secrets used:** `QUAY_USERNAME`, `QUAY_PASSWORD`, `GITHUB_TOKEN`
+- **Version generation:** `zwaldowski/semver-release-action` from PR labels

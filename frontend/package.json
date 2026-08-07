@@ -1,13 +1,47 @@
 {
-  "name": "frontend",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@seamware/odrl-policy-editor",
+  "version": "0.1.0",
   "type": "module",
+  "description": "ODRL Policy Editor — visual policy builder embeddable as a Web Component",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/SEAMWARE/odrl-pap/tree/main/frontend#readme",
+  "bugs": {
+    "url": "https://github.com/SEAMWARE/odrl-pap/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SEAMWARE/odrl-pap.git",
+    "directory": "frontend"
+  },
+  "main": "dist-component/odrl-policy-editor.js",
+  "module": "dist-component/odrl-policy-editor.js",
+  "types": "dist-component/odrl-policy-editor.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist-component/odrl-policy-editor.js",
+      "types": "./dist-component/odrl-policy-editor.d.ts"
+    }
+  },
+  "files": [
+    "dist-component/odrl-policy-editor.js",
+    "dist-component/odrl-policy-editor.d.ts"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:component": "vite build --config vite.component.config.ts && cp src/web-component/types.d.ts dist-component/odrl-policy-editor.d.ts",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ci": "vitest run --reporter=verbose",
     "generate-api": "openapi --input ../api/odrl.yaml --output ./src/api --client axios"
   },
   "dependencies": {
@@ -20,16 +54,23 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.3",
     "eslint": "^9.36.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.4.0",
+    "jsdom": "^30.0.0",
+    "msw": "^2.15.0",
     "openapi-typescript-codegen": "^0.29.0",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.44.0",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "vitest": "^4.1.10"
   }
 }
