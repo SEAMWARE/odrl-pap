@@ -61,7 +61,7 @@ Template endpoints mirror the existing policy API pattern and are placed under t
 **Acceptance Criteria:**
 - The OpenAPI spec is valid (can be parsed by openapi-generator)
 - All template endpoints are documented with proper request/response schemas
-- General template endpoints are tagged under `UI`
+- General template endpoints are tagged under `Template` (revised from `UI` per Step 3 design decision — generates a clean `TemplateApi` interface separate from `UiApi`)
 - Service-scoped template endpoints are tagged under `Service`
 - The `TemplatePlaceholder.type` enum includes exactly: `string`, `number`, `boolean`, `xsd:date`
 

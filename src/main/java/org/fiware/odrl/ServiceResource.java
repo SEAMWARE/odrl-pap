@@ -19,6 +19,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * JAX-RS resource handling service-level operations including service CRUD
+ * and service-scoped policy management. Implements the generated {@link ServiceApi}
+ * interface from the OpenAPI specification.
+ */
 @Slf4j
 public class ServiceResource extends ApiResource implements ServiceApi {
 
@@ -159,5 +164,74 @@ public class ServiceResource extends ApiResource implements ServiceApi {
         if (List.of(POLICY_PACKAGE, DATA_PACKAGE, METHODS_PACKAGE).contains(serviceId)) {
             throw new IllegalArgumentException(String.format("%s cannot be used as service id.", serviceId));
         }
+    }
+
+    // --- Service-scoped template stubs (implemented in Step 3) ---
+
+    /**
+     * Creates a new policy template scoped to the specified service.
+     * Stub implementation — returns 501 until the template repository is available.
+     *
+     * @param serviceId the service to scope the template to
+     * @param templateCreate the template creation payload
+     * @return 501 Not Implemented
+     */
+    @Override
+    public Response createServiceTemplate(String serviceId, TemplateCreate templateCreate) {
+        return Response.status(Response.Status.NOT_IMPLEMENTED).entity("Template support not yet implemented").build();
+    }
+
+    /**
+     * Deletes a service-scoped policy template by ID.
+     * Stub implementation — returns 501 until the template repository is available.
+     *
+     * @param serviceId the service the template belongs to
+     * @param templateId the unique identifier of the template
+     * @return 501 Not Implemented
+     */
+    @Override
+    public Response deleteServiceTemplateById(String serviceId, String templateId) {
+        return Response.status(Response.Status.NOT_IMPLEMENTED).entity("Template support not yet implemented").build();
+    }
+
+    /**
+     * Returns a service-scoped policy template by ID.
+     * Stub implementation — returns 501 until the template repository is available.
+     *
+     * @param serviceId the service the template belongs to
+     * @param templateId the unique identifier of the template
+     * @return 501 Not Implemented
+     */
+    @Override
+    public Response getServiceTemplateById(String serviceId, String templateId) {
+        return Response.status(Response.Status.NOT_IMPLEMENTED).entity("Template support not yet implemented").build();
+    }
+
+    /**
+     * Lists policy templates scoped to the specified service.
+     * Stub implementation — returns 501 until the template repository is available.
+     *
+     * @param serviceId the service to list templates for
+     * @param page the page number (zero-based)
+     * @param pageSize the number of items per page
+     * @return 501 Not Implemented
+     */
+    @Override
+    public Response getServiceTemplates(String serviceId, Integer page, Integer pageSize) {
+        return Response.status(Response.Status.NOT_IMPLEMENTED).entity("Template support not yet implemented").build();
+    }
+
+    /**
+     * Updates a service-scoped policy template.
+     * Stub implementation — returns 501 until the template repository is available.
+     *
+     * @param serviceId the service the template belongs to
+     * @param templateId the unique identifier of the template
+     * @param templateCreate the updated template payload
+     * @return 501 Not Implemented
+     */
+    @Override
+    public Response updateServiceTemplate(String serviceId, String templateId, TemplateCreate templateCreate) {
+        return Response.status(Response.Status.NOT_IMPLEMENTED).entity("Template support not yet implemented").build();
     }
 }

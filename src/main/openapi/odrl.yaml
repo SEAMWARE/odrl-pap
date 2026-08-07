@@ -10,6 +10,8 @@ tags:
     description: Set of endpoints to manage policies for the main policy
   - name: UI
     description: Set of endpoint intended to support integration with frontends
+  - name: Template
+    description: Set of endpoints to manage policy templates
 
 paths:
   /service:
@@ -379,6 +381,199 @@ paths:
               schema:
                 $ref: '#/components/schemas/Mappings'
 
+  /template:
+    post:
+      tags:
+        - Template
+      operationId: createTemplate
+      summary: Create a new policy template
+      description: >
+        Creates a new policy template with placeholder definitions. Templates
+        contain an ODRL policy skeleton with {{PLACEHOLDER}} tokens that can
+        be filled in later to create concrete policies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateCreate'
+      responses:
+        '201':
+          description: Template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+    get:
+      tags:
+        - Template
+      operationId: getTemplates
+      summary: List all general policy templates
+      description: >
+        Returns a paginated list of general (non-service-scoped) policy templates.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Successfully retrieved templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateList'
+  /template/{template-id}:
+    get:
+      tags:
+        - Template
+      operationId: getTemplateById
+      summary: Get a policy template by ID
+      parameters:
+        - $ref: '#/components/parameters/TemplateId'
+      responses:
+        '200':
+          description: Successfully retrieved the template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+        '404':
+          description: No such template exists
+    put:
+      tags:
+        - Template
+      operationId: updateTemplate
+      summary: Update an existing policy template
+      parameters:
+        - $ref: '#/components/parameters/TemplateId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateCreate'
+      responses:
+        '200':
+          description: Template updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+        '404':
+          description: No such template exists
+    delete:
+      tags:
+        - Template
+      operationId: deleteTemplateById
+      summary: Delete a policy template by ID
+      parameters:
+        - $ref: '#/components/parameters/TemplateId'
+      responses:
+        '204':
+          description: Template successfully deleted
+        '404':
+          description: No such template exists
+
+  /service/{service-id}/template:
+    post:
+      tags:
+        - Service
+      operationId: createServiceTemplate
+      summary: Create a new policy template under a service
+      description: >
+        Creates a new policy template scoped to the specified service. The
+        template contains an ODRL policy skeleton with {{PLACEHOLDER}} tokens.
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateCreate'
+      responses:
+        '201':
+          description: Template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+        '404':
+          description: No such service exists
+    get:
+      tags:
+        - Service
+      operationId: getServiceTemplates
+      summary: List policy templates under a service
+      description: >
+        Returns a paginated list of policy templates scoped to the specified service.
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Successfully retrieved templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateList'
+        '404':
+          description: No such service exists
+  /service/{service-id}/template/{template-id}:
+    get:
+      tags:
+        - Service
+      operationId: getServiceTemplateById
+      summary: Get a service-scoped policy template by ID
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/TemplateId'
+      responses:
+        '200':
+          description: Successfully retrieved the template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+        '404':
+          description: No such template or service exists
+    put:
+      tags:
+        - Service
+      operationId: updateServiceTemplate
+      summary: Update a service-scoped policy template
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/TemplateId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateCreate'
+      responses:
+        '200':
+          description: Template updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+        '404':
+          description: No such template or service exists
+    delete:
+      tags:
+        - Service
+      operationId: deleteServiceTemplateById
+      summary: Delete a service-scoped policy template by ID
+      parameters:
+        - $ref: '#/components/parameters/ServiceId'
+        - $ref: '#/components/parameters/TemplateId'
+      responses:
+        '204':
+          description: Template successfully deleted
+        '404':
+          description: No such template or service exists
+
 components:
   parameters:
     Id:
@@ -407,24 +602,31 @@ components:
       schema:
         type: integer
         default: 25
+    TemplateId:
+      name: template-id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: The unique identifier of the template
   schemas:
     PolicyPath:
       type: object
       properties:
         policyPath:
           type: string
-    Id:
+    Identifier:
       type: string
     ServiceCreate:
       type: object
       properties:
         id:
-          $ref: '#/components/schemas/Id'
+          $ref: '#/components/schemas/Identifier'
     Service:
       type: object
       properties:
         id:
-          $ref: '#/components/schemas/Id'
+          $ref: '#/components/schemas/Identifier'
         policyPath:
           type: string
         policies:
@@ -435,7 +637,7 @@ components:
         type: object
         properties:
           id:
-            $ref: '#/components/schemas/Id'
+            $ref: '#/components/schemas/Identifier'
           policyPath:
             type: string
     ValidationRequest:
@@ -593,3 +795,103 @@ components:
     OdrlPolicyJson:
       type: object
       additionalProperties: true
+    TemplatePlaceholder:
+      type: object
+      description: >
+        Defines a placeholder variable within a policy template. Each placeholder
+        corresponds to a {{KEY}} token in the ODRL skeleton and natural language text.
+      required:
+        - key
+        - name
+        - type
+      properties:
+        key:
+          type: string
+          description: >
+            The placeholder key matching a {{KEY}} token in the ODRL skeleton
+            and natural language text. Must follow the pattern [A-Z_][A-Z0-9_]*.
+        name:
+          type: string
+          description: Display name for the input field shown to the user
+        description:
+          type: string
+          description: Help text shown to the user below the input field
+        type:
+          type: string
+          description: The data type of the placeholder value
+          enum:
+            - string
+            - number
+            - boolean
+            - "xsd:date"
+        options:
+          type: array
+          description: >
+            Optional list of allowed values. If provided, the placeholder is
+            rendered as a dropdown select; if absent, a free-form input is shown.
+          items:
+            type: string
+    TemplateCreate:
+      type: object
+      description: >
+        Request body for creating or updating a policy template. Contains the
+        ODRL policy skeleton with {{PLACEHOLDER}} tokens, a human-readable
+        natural language description, and placeholder definitions.
+      required:
+        - name
+        - odrl
+        - placeholders
+      properties:
+        name:
+          type: string
+          description: Human-readable name of the template
+        description:
+          type: string
+          description: Human-readable description of what the template does
+        odrl:
+          $ref: '#/components/schemas/OdrlPolicyJson'
+        naturalLanguage:
+          type: string
+          description: >
+            A human-readable sentence using {{PLACEHOLDER}} keys, e.g.
+            "Allow read access to {{RESOURCE_ID}} for users in role {{ROLE}}"
+        placeholders:
+          type: array
+          description: List of placeholder definitions used in the ODRL skeleton and natural language text
+          items:
+            $ref: '#/components/schemas/TemplatePlaceholder'
+    Template:
+      type: object
+      description: A stored policy template with its generated ID
+      required:
+        - id
+        - name
+        - odrl
+        - placeholders
+      properties:
+        id:
+          type: string
+          description: The unique identifier of the template (auto-generated)
+        name:
+          type: string
+          description: Human-readable name of the template
+        description:
+          type: string
+          description: Human-readable description of what the template does
+        odrl:
+          $ref: '#/components/schemas/OdrlPolicyJson'
+        naturalLanguage:
+          type: string
+          description: >
+            A human-readable sentence using {{PLACEHOLDER}} keys, e.g.
+            "Allow read access to {{RESOURCE_ID}} for users in role {{ROLE}}"
+        placeholders:
+          type: array
+          description: List of placeholder definitions used in the ODRL skeleton and natural language text
+          items:
+            $ref: '#/components/schemas/TemplatePlaceholder'
+    TemplateList:
+      type: array
+      description: A list of policy templates
+      items:
+        $ref: '#/components/schemas/Template'
