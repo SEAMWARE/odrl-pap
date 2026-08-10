@@ -128,9 +128,9 @@ const TemplateEditor = () => {
   /**
    * Handles changes in the ODRL JSON textarea.
    *
-   * Validates JSON and auto-detects placeholder keys. New keys
-   * that are not already in the placeholder list are automatically
-   * added with default values.
+   * Validates JSON syntax. Placeholder synchronization (adding new
+   * keys, removing stale ones) is handled by the combined effect
+   * that watches both `odrlText` and `naturalLanguage`.
    *
    * @param text - The raw ODRL JSON text.
    */
@@ -145,40 +145,30 @@ const TemplateEditor = () => {
         parsedOdrlRef.current = null;
         setOdrlError(err instanceof Error ? err.message : t.jsonInvalid);
       }
-
-      // Auto-detect placeholder keys from the full text
-      const keys = extractPlaceholderKeys(text);
-      const keySet = new Set(keys);
-      setDetectedKeys(keySet);
-
-      // Add newly detected keys to placeholders (if not already present)
-      setPlaceholders((prev) => {
-        const existingKeys = new Set(prev.map((p) => p.key));
-        const newKeys = keys.filter((k) => !existingKeys.has(k));
-        if (newKeys.length === 0) return prev;
-        return [
-          ...prev,
-          ...newKeys.map((k) => createEmptyPlaceholder(k)),
-        ];
-      });
     },
     [t.jsonInvalid],
   );
 
-  // Also detect placeholders from natural language text
+  // Synchronize placeholders with detected keys from ODRL + NL text.
+  // Adds entries for newly detected keys and removes entries whose
+  // keys no longer appear in either source (prevents stale entries
+  // accumulating while the user edits a placeholder token).
   useEffect(() => {
     const nlKeys = extractPlaceholderKeys(naturalLanguage);
     const odrlKeys = extractPlaceholderKeys(odrlText);
     const allKeys = new Set([...odrlKeys, ...nlKeys]);
     setDetectedKeys(allKeys);
 
-    // Add newly detected NL keys to placeholders
     setPlaceholders((prev) => {
       const existingKeys = new Set(prev.map((p) => p.key));
-      const newKeys = nlKeys.filter((k) => !existingKeys.has(k));
-      if (newKeys.length === 0) return prev;
+      const newKeys = [...allKeys].filter((k) => !existingKeys.has(k));
+
+      // Remove placeholders whose keys are no longer detected
+      const filtered = prev.filter((p) => allKeys.has(p.key));
+
+      if (newKeys.length === 0 && filtered.length === prev.length) return prev;
       return [
-        ...prev,
+        ...filtered,
         ...newKeys.map((k) => createEmptyPlaceholder(k)),
       ];
     });
