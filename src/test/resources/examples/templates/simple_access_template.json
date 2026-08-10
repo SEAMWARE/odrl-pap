@@ -1,0 +1,29 @@
+{
+  "name": "Simple Access Policy",
+  "description": "A template for granting read access to a specific resource",
+  "odrl": {
+    "@context": "http://www.w3.org/ns/odrl.jsonld",
+    "@type": "odrl:Set",
+    "odrl:permission": {
+      "odrl:target": "{{RESOURCE_ID}}",
+      "odrl:action": "odrl:read",
+      "odrl:assignee": "{{ASSIGNEE}}"
+    }
+  },
+  "naturalLanguage": "Allow {{ASSIGNEE}} to read {{RESOURCE_ID}}",
+  "placeholders": [
+    {
+      "key": "RESOURCE_ID",
+      "name": "Resource Identifier",
+      "description": "The URI of the resource to grant access to",
+      "type": "string"
+    },
+    {
+      "key": "ASSIGNEE",
+      "name": "Assignee",
+      "description": "The party who receives access",
+      "type": "string",
+      "options": ["admin", "user", "viewer"]
+    }
+  ]
+}
