@@ -23,6 +23,11 @@ export type { Service } from './models/Service';
 export type { ServiceCreate } from './models/ServiceCreate';
 export type { ServiceId } from './models/ServiceId';
 export type { ServiceList } from './models/ServiceList';
+export type { Template } from './models/Template';
+export type { TemplateCreate } from './models/TemplateCreate';
+export type { TemplateId } from './models/TemplateId';
+export type { TemplateList } from './models/TemplateList';
+export { TemplatePlaceholder } from './models/TemplatePlaceholder';
 export { TestRequest } from './models/TestRequest';
 export type { Uid } from './models/Uid';
 export type { ValidationRequest } from './models/ValidationRequest';
@@ -30,4 +35,5 @@ export type { ValidationResponse } from './models/ValidationResponse';
 
 export { PolicyService } from './services/PolicyService';
 export { ServiceService } from './services/ServiceService';
+export { TemplateService } from './services/TemplateService';
 export { UiService } from './services/UiService';
