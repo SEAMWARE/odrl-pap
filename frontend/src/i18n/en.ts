@@ -176,6 +176,7 @@ export const en = {
   policyEditor: {
     editTitle: 'Edit Policy',
     newTitle: 'New Policy',
+    tabTemplate: 'Template',
     tabBuilder: 'Policy Builder',
     tabRawOdrl: 'Raw ODRL',
     validate: 'Validate',
@@ -194,6 +195,8 @@ export const en = {
     serviceNone: '(No service — standalone policy)',
     serviceLoadError: 'Could not load services.',
     serviceTooltip: 'Optionally assign this policy to an existing service. If no service is selected, the policy is created as a standalone policy.',
+    templateCreated: 'This policy was created from a template and cannot be further edited.',
+    templateLoadError: 'Could not load templates.',
   },
 
   namespacedDropdown: {
@@ -220,6 +223,26 @@ export const en = {
     loadError: 'Could not load templates.',
     serviceFilter: 'Filter by Service',
     allGeneral: '(All general templates)',
+  },
+
+  templateSelector: {
+    selectLabel: 'Choose a template',
+    noTemplates: 'No templates available. Create a template first.',
+    selectedBadge: 'Selected',
+    templateCardLabel: 'Template',
+  },
+
+  templateFiller: {
+    previewTitle: 'Policy Description',
+    fillPlaceholders: 'Fill in the template values',
+    noPlaceholders: 'This template has no placeholders to fill in.',
+    createPolicy: 'Create Policy from Template',
+    selectPlaceholder: 'Select a value...',
+    stringPlaceholder: 'Enter a value',
+    numberPlaceholder: 'Enter a number',
+    boolTrue: 'Yes',
+    boolFalse: 'No',
+    createdFromTemplate: 'Created from template',
   },
 
   templateEditor: {
