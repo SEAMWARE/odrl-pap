@@ -5,7 +5,7 @@ import org.openapi.quarkus.odrl_yaml.model.TemplateCreate;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Repository interface for template CRUD operations.
@@ -15,9 +15,6 @@ import java.util.Random;
  * ({@link Template}, {@link TemplateCreate}) and the JPA entity layer.</p>
  */
 public interface TemplateRepository {
-
-    /** Shared random instance used for template ID generation. */
-    Random RANDOM = new Random();
 
     /** Length of auto-generated template identifiers. */
     int TEMPLATE_ID_LENGTH = 10;
@@ -36,7 +33,7 @@ public interface TemplateRepository {
      * @return a random 10-character string of lowercase letters
      */
     static String generateTemplateId() {
-        return RANDOM.ints(ASCII_LOWER_A, ASCII_LOWER_Z + 1)
+        return ThreadLocalRandom.current().ints(ASCII_LOWER_A, ASCII_LOWER_Z + 1)
                 .limit(TEMPLATE_ID_LENGTH)
                 .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
                 .toString();
