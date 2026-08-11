@@ -7,16 +7,20 @@
  *
  * ## Observed attributes
  *
- * | Attribute        | Description                                   | Default    |
- * |------------------|-----------------------------------------------|------------|
- * | `api-base-url`   | PAP API base URL                              | `""`       |
- * | `auth-token`     | Bearer token for API authentication           | `null`     |
- * | `mode`           | `"create"` or `"edit"`                        | `"create"` |
- * | `policy-id`      | Policy ID to load (when `mode="edit"`)        | `null`     |
- * | `theme`          | `"light"` or `"dark"`                         | `"light"`  |
- * | `locale`         | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
- * | `policy-context` | JSON-LD `@context` for new policies (JSON)    | `null`     |
- * | `service-id`     | Service ID for service-scoped policy ops       | `null`     |
+ * | Attribute                | Description                                          | Default    |
+ * |--------------------------|------------------------------------------------------|------------|
+ * | `api-base-url`           | PAP API base URL                                     | `""`       |
+ * | `auth-token`             | Bearer token for API authentication                  | `null`     |
+ * | `mode`                   | `"create"` or `"edit"`                               | `"create"` |
+ * | `policy-id`              | Policy ID to load (when `mode="edit"`)               | `null`     |
+ * | `theme`                  | `"light"` or `"dark"`                                | `"light"`  |
+ * | `locale`                 | Language code (e.g., `"en"`, `"de"`)                 | `"en"`     |
+ * | `policy-context`         | JSON-LD `@context` for new policies (JSON)           | `null`     |
+ * | `service-id`             | Service ID for service-scoped policy ops              | `null`     |
+ * | `hide-builder-tab`       | Boolean — hides the visual policy builder tab        | absent     |
+ * | `hide-raw-tab`           | Boolean — hides the raw ODRL JSON editor tab         | absent     |
+ * | `hide-template-tab`      | Boolean — hides the template selection tab           | absent     |
+ * | `hide-template-create-tab` | Boolean — hides the template management tab        | absent     |
  *
  * ## Custom Events
  *
@@ -26,6 +30,8 @@
  * | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string }`    |
  * | `policy-validated` | `{ result: ValidationResponse }`            |
  * | `editor-cancelled` | `{}`                                        |
+ * | `template-created` | `{ template: object, id: string }`          |
+ * | `template-updated` | `{ template: object, id: string }`          |
  *
  * ## JS Properties
  *
@@ -57,7 +63,7 @@
 import { createElement, createRef, type RefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { configureApi } from '../services/api';
-import type { EmbeddedConfig, EditorMode, EmbeddedThemePreset } from './EmbeddedContext';
+import type { EmbeddedConfig, EditorMode, EmbeddedThemePreset, TabVisibility } from './EmbeddedContext';
 import type { DeepPartial } from '../i18n/I18nContext';
 import type { I18nStrings } from '../i18n/en';
 import type { ThemeConfig } from '../theme/defaultTheme';
@@ -89,7 +95,11 @@ const DEFAULT_LOCALE = 'en';
 export class OdrlPolicyEditorElement extends HTMLElement {
   /** Attributes that trigger re-renders when changed. */
   static get observedAttributes(): string[] {
-    return ['api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale', 'policy-context', 'service-id'];
+    return [
+      'api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale',
+      'policy-context', 'service-id',
+      'hide-builder-tab', 'hide-raw-tab', 'hide-template-tab', 'hide-template-create-tab',
+    ];
   }
 
   /** React root instance (created on connect, destroyed on disconnect). */
@@ -322,6 +332,23 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     return this.getAttribute('service-id');
   }
 
+  /**
+   * Resolves tab visibility from the `hide-*-tab` boolean attributes.
+   *
+   * Boolean HTML attributes follow the convention where the attribute's
+   * presence means `true` and its absence means `false`.
+   *
+   * @returns A {@link TabVisibility} object.
+   */
+  private resolveHiddenTabs(): TabVisibility {
+    return {
+      hideBuilderTab: this.hasAttribute('hide-builder-tab'),
+      hideRawTab: this.hasAttribute('hide-raw-tab'),
+      hideTemplateTab: this.hasAttribute('hide-template-tab'),
+      hideTemplateCreateTab: this.hasAttribute('hide-template-create-tab'),
+    };
+  }
+
   /** Builds the {@link EmbeddedConfig} from the current attribute values. */
   private buildConfig(): EmbeddedConfig {
     const policyContext = this.resolvePolicyContextAttr();
@@ -334,6 +361,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       theme: (this.getAttribute('theme') as EmbeddedThemePreset) ?? DEFAULT_THEME,
       onEvent: this.dispatchComponentEvent.bind(this),
       serviceId: this.resolveServiceId(),
+      hiddenTabs: this.resolveHiddenTabs(),
       ...(policyContext !== undefined && { policyContext }),
     };
   }
