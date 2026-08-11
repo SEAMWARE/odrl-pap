@@ -10,6 +10,8 @@
  * - Wraps children in `I18nProvider` and applies theme CSS custom
  *   properties on its own container (not `document.documentElement`).
  * - Supports template-based policy creation via a template selection tab.
+ * - Supports full template management (create/edit/delete) via a dedicated
+ *   tab, which can be disabled with the `hide-template-create-tab` attribute.
  * - Allows per-tab visibility control via `hiddenTabs` configuration.
  */
 import { useState, useEffect, useCallback, useRef, useMemo, type RefObject } from 'react';
@@ -29,6 +31,7 @@ import ValidationEditor from '../components/ValidationEditor';
 import ValidationResult from '../components/ValidationResult';
 import TemplateSelector from '../components/TemplateSelector';
 import TemplateFiller from '../components/TemplateFiller';
+import EmbeddedTemplateManager from './EmbeddedTemplateManager';
 import { I18nProvider, type DeepPartial } from '../i18n';
 import type { I18nStrings } from '../i18n';
 import { lightTheme, darkTheme, type ThemeConfig } from '../theme/defaultTheme';
@@ -45,6 +48,11 @@ const TAB_KEY_TEMPLATE = 'template';
 const TAB_KEY_BUILDER = 'builder';
 /** Tab key for the raw ODRL JSON editor tab. */
 const TAB_KEY_ODRL = 'odrl';
+/** Tab key for the template management (create/edit/delete) tab. */
+const TAB_KEY_MANAGE_TEMPLATES = 'manage-templates';
+
+/** Title for the template management tab. */
+const MANAGE_TEMPLATES_TAB_TITLE = 'Manage Templates';
 
 /** Default test request values for validation. */
 const DEFAULT_TEST_REQUEST: TestRequest = {
@@ -202,6 +210,15 @@ const EmbeddedApp = ({
 
   /** Whether the template tab should be visible. */
   const showTemplateTab = mode === 'create' && !hiddenTabs.hideTemplateTab && !templatesLoading && templates.length > 0;
+
+  /**
+   * Whether the template management tab should be visible.
+   *
+   * Independent of the editor `mode`: template authoring is orthogonal to
+   * whether a policy is being created or edited. Controlled by the
+   * `hide-template-create-tab` attribute.
+   */
+  const showManageTemplatesTab = !hiddenTabs.hideTemplateCreateTab;
 
   // --- Raw ODRL tab state ---
   /** Raw JSON text decoupled from the policy state for free-form editing. */
@@ -423,8 +440,9 @@ const EmbeddedApp = ({
             onSelect={(k) => {
               if (k && !createdFromTemplate) {
                 setActiveTab(k);
-              } else if (k === TAB_KEY_TEMPLATE) {
-                // Always allow switching to template tab even in read-only mode
+              } else if (k === TAB_KEY_TEMPLATE || k === TAB_KEY_MANAGE_TEMPLATES) {
+                // Always allow switching to the template and management tabs,
+                // even when the policy editor is locked in read-only mode.
                 setActiveTab(k);
               }
             }}
@@ -534,6 +552,13 @@ const EmbeddedApp = ({
                 {jsonError && (
                   <Form.Text className="text-danger">{jsonError}</Form.Text>
                 )}
+              </Tab>
+            )}
+
+            {/* Template management tab — create/edit/delete templates */}
+            {showManageTemplatesTab && (
+              <Tab eventKey={TAB_KEY_MANAGE_TEMPLATES} title={MANAGE_TEMPLATES_TAB_TITLE}>
+                <EmbeddedTemplateManager serviceId={serviceId} onEvent={onEvent} />
               </Tab>
             )}
           </Tabs>

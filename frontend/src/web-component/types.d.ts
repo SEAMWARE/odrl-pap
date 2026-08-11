@@ -141,6 +141,10 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | `locale`         | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
  * | `policy-context` | JSON-LD `@context` for new policies (JSON)    | `null`     |
  * | `service-id`     | Service ID for service-scoped policy ops       | `null`     |
+ * | `hide-builder-tab`         | Boolean — hides the visual policy builder tab   | absent |
+ * | `hide-raw-tab`             | Boolean — hides the raw ODRL JSON editor tab    | absent |
+ * | `hide-template-tab`        | Boolean — hides the template selection tab      | absent |
+ * | `hide-template-create-tab` | Boolean — hides the template management tab     | absent |
  *
  * ## JS Properties
  *
@@ -158,6 +162,8 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | `policy-updated`   | `{ policy: object, id: string }`            |
  * | `policy-validated` | `{ result: object }`                        |
  * | `editor-cancelled` | `{}`                                        |
+ * | `template-created` | `{ template: object, id: string }`          |
+ * | `template-updated` | `{ template: object, id: string }`          |
  */
 export declare class OdrlPolicyEditorElement extends HTMLElement {
   /** Attributes that trigger re-renders when changed. */
