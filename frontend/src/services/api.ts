@@ -87,3 +87,4 @@ export function configureApi(baseUrl: string, authToken?: string | null): void {
 
 export { OpenAPI, resolveApiBaseUrl };
 export type { GenericJsonInput, Mappings, OdrlPolicyJson, Policy, TestRequest, ValidationResponse };
+export type { Template, TemplateCreate, TemplatePlaceholder, TemplateList } from '../api';

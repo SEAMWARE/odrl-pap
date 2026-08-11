@@ -9,6 +9,9 @@ import type { PolicyPath } from '../models/PolicyPath';
 import type { Service } from '../models/Service';
 import type { ServiceCreate } from '../models/ServiceCreate';
 import type { ServiceList } from '../models/ServiceList';
+import type { Template } from '../models/Template';
+import type { TemplateCreate } from '../models/TemplateCreate';
+import type { TemplateList } from '../models/TemplateList';
 import type { Uid } from '../models/Uid';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -255,6 +258,135 @@ export class ServiceService {
             },
             errors: {
                 404: `No such policy exists`,
+            },
+        });
+    }
+    /**
+     * Create a new policy template under a service
+     * Creates a new policy template scoped to the specified service. The template contains an ODRL policy skeleton with {{PLACEHOLDER}} tokens.
+     *
+     * @param serviceId
+     * @param requestBody
+     * @returns Template Template created successfully
+     * @throws ApiError
+     */
+    public static createServiceTemplate(
+        serviceId: string,
+        requestBody: TemplateCreate,
+    ): CancelablePromise<Template> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/service/{service-id}/template',
+            path: {
+                'service-id': serviceId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                404: `No such service exists`,
+            },
+        });
+    }
+    /**
+     * List policy templates under a service
+     * Returns a paginated list of policy templates scoped to the specified service.
+     *
+     * @param serviceId
+     * @param page
+     * @param pageSize
+     * @returns TemplateList Successfully retrieved templates
+     * @throws ApiError
+     */
+    public static getServiceTemplates(
+        serviceId: string,
+        page?: number,
+        pageSize: number = 25,
+    ): CancelablePromise<TemplateList> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/service/{service-id}/template',
+            path: {
+                'service-id': serviceId,
+            },
+            query: {
+                'page': page,
+                'pageSize': pageSize,
+            },
+            errors: {
+                404: `No such service exists`,
+            },
+        });
+    }
+    /**
+     * Get a service-scoped policy template by ID
+     * @param serviceId
+     * @param templateId The unique identifier of the template
+     * @returns Template Successfully retrieved the template
+     * @throws ApiError
+     */
+    public static getServiceTemplateById(
+        serviceId: string,
+        templateId: string,
+    ): CancelablePromise<Template> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/service/{service-id}/template/{template-id}',
+            path: {
+                'service-id': serviceId,
+                'template-id': templateId,
+            },
+            errors: {
+                404: `No such template or service exists`,
+            },
+        });
+    }
+    /**
+     * Update a service-scoped policy template
+     * @param serviceId
+     * @param templateId The unique identifier of the template
+     * @param requestBody
+     * @returns Template Template updated successfully
+     * @throws ApiError
+     */
+    public static updateServiceTemplate(
+        serviceId: string,
+        templateId: string,
+        requestBody: TemplateCreate,
+    ): CancelablePromise<Template> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/service/{service-id}/template/{template-id}',
+            path: {
+                'service-id': serviceId,
+                'template-id': templateId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                404: `No such template or service exists`,
+            },
+        });
+    }
+    /**
+     * Delete a service-scoped policy template by ID
+     * @param serviceId
+     * @param templateId The unique identifier of the template
+     * @returns void
+     * @throws ApiError
+     */
+    public static deleteServiceTemplateById(
+        serviceId: string,
+        templateId: string,
+    ): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/service/{service-id}/template/{template-id}',
+            path: {
+                'service-id': serviceId,
+                'template-id': templateId,
+            },
+            errors: {
+                404: `No such template or service exists`,
             },
         });
     }

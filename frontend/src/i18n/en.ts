@@ -207,6 +207,43 @@ export const en = {
     lockedFieldTooltip: 'This field is locked by the template and cannot be changed.',
     lockedBadge: 'Locked',
   },
+
+  templateList: {
+    title: 'Templates',
+    newTemplate: 'New Template',
+    columnName: 'Name',
+    columnDescription: 'Description',
+    columnPlaceholders: 'Placeholders',
+    columnActions: 'Actions',
+    confirmDelete: 'Are you sure you want to delete this template?',
+    noTemplates: 'No templates found. Create one to get started.',
+    loadError: 'Could not load templates.',
+    serviceFilter: 'Filter by Service',
+    allGeneral: '(All general templates)',
+  },
+
+  templateEditor: {
+    editTitle: 'Edit Template',
+    newTitle: 'New Template',
+    metadataSection: 'Template Metadata',
+    nameLabel: 'Template Name',
+    namePlaceholder: 'e.g., Simple Access Policy',
+    descriptionLabel: 'Description',
+    descriptionPlaceholder: 'e.g., Grants read access to a specific resource',
+    odrlSection: 'ODRL Policy Skeleton',
+    odrlHelp: 'Enter the ODRL policy JSON with {{PLACEHOLDER}} tokens in place of values that should be filled in when creating policies from this template.',
+    placeholdersSection: 'Placeholder Definitions',
+    placeholdersHelp: 'Define each placeholder used in the ODRL skeleton and natural language description. Placeholders are auto-detected from the JSON above.',
+    naturalLanguageSection: 'Natural Language Description',
+    naturalLanguageHelp: 'Write a human-readable sentence describing this template. Use {{PLACEHOLDER_KEY}} to reference placeholders.',
+    naturalLanguagePlaceholder: 'e.g., Allow {{ACTION}} access to {{RESOURCE_ID}} for users with role {{ROLE}}',
+    preview: 'Preview',
+    jsonInvalid: 'Invalid JSON syntax',
+    nameRequired: 'Template name is required.',
+    serviceLabel: 'Service',
+    serviceNone: '(No service — general template)',
+    serviceTooltip: 'Optionally scope this template to a specific service.',
+  },
 } as const;
 
 /**
