@@ -45,12 +45,6 @@ export const PLACEHOLDER_TYPES: readonly PlaceholderType[] = [
  * @param text - The input string containing `{{KEY}}` tokens.
  * @returns An array of unique placeholder key strings (without braces).
  */
-/**
- * Extracts all unique placeholder keys from a text string.
- *
- * @param text - The input string containing `{{KEY}}` tokens.
- * @returns An array of unique placeholder key strings (without braces).
- */
 export function extractPlaceholderKeys(text: string): string[] {
   const keys = new Set<string>();
   let match: RegExpExecArray | null;

@@ -40,7 +40,9 @@ export default defineConfig(({ mode }) => {
         '/mappings': proxyConfig,
         '/policy': proxyConfig,
         '/service': proxyConfig,
-        '/template': proxyConfig,
+        // Match /template and /template/... but NOT /templates (SPA route).
+        // Vite uses http-proxy-middleware which treats ^-prefixed keys as regex.
+        '^/template(/|$)': proxyConfig,
         '/validate': proxyConfig,
       },
     },

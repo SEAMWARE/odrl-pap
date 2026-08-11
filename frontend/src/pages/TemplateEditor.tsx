@@ -29,6 +29,9 @@ const ODRL_TEXTAREA_ROWS = 15;
 /** Default number of rows for the natural language textarea. */
 const NATURAL_LANGUAGE_TEXTAREA_ROWS = 3;
 
+/** Debounce delay (ms) for placeholder extraction from text changes. */
+const PLACEHOLDER_SYNC_DEBOUNCE_MS = 500;
+
 /** Minimal ODRL skeleton for new templates. */
 const DEFAULT_ODRL_SKELETON: Record<string, unknown> = {
   '@context': { odrl: 'http://www.w3.org/ns/odrl/2/' },
@@ -150,28 +153,33 @@ const TemplateEditor = () => {
   );
 
   // Synchronize placeholders with detected keys from ODRL + NL text.
+  // Debounced so that intermediate keystrokes (e.g. while typing
+  // {{PLACEHOLDER}}) do not create and immediately destroy entries.
   // Adds entries for newly detected keys and removes entries whose
-  // keys no longer appear in either source (prevents stale entries
-  // accumulating while the user edits a placeholder token).
+  // keys no longer appear in either source.
   useEffect(() => {
-    const nlKeys = extractPlaceholderKeys(naturalLanguage);
-    const odrlKeys = extractPlaceholderKeys(odrlText);
-    const allKeys = new Set([...odrlKeys, ...nlKeys]);
-    setDetectedKeys(allKeys);
+    const timer = setTimeout(() => {
+      const nlKeys = extractPlaceholderKeys(naturalLanguage);
+      const odrlKeys = extractPlaceholderKeys(odrlText);
+      const allKeys = new Set([...odrlKeys, ...nlKeys]);
+      setDetectedKeys(allKeys);
 
-    setPlaceholders((prev) => {
-      const existingKeys = new Set(prev.map((p) => p.key));
-      const newKeys = [...allKeys].filter((k) => !existingKeys.has(k));
+      setPlaceholders((prev) => {
+        const existingKeys = new Set(prev.map((p) => p.key));
+        const newKeys = [...allKeys].filter((k) => !existingKeys.has(k));
 
-      // Remove placeholders whose keys are no longer detected
-      const filtered = prev.filter((p) => allKeys.has(p.key));
+        // Remove placeholders whose keys are no longer detected
+        const filtered = prev.filter((p) => allKeys.has(p.key));
 
-      if (newKeys.length === 0 && filtered.length === prev.length) return prev;
-      return [
-        ...filtered,
-        ...newKeys.map((k) => createEmptyPlaceholder(k)),
-      ];
-    });
+        if (newKeys.length === 0 && filtered.length === prev.length) return prev;
+        return [
+          ...filtered,
+          ...newKeys.map((k) => createEmptyPlaceholder(k)),
+        ];
+      });
+    }, PLACEHOLDER_SYNC_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
   }, [naturalLanguage, odrlText]);
 
   /**
