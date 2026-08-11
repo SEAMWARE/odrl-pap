@@ -17,6 +17,23 @@ export type EditorMode = 'create' | 'edit';
 export type EmbeddedThemePreset = 'light' | 'dark';
 
 /**
+ * Controls the visibility of individual editor tabs in the web component.
+ *
+ * Each property, when `true`, hides the corresponding tab.
+ * By default all tabs are visible (all values are `false`).
+ */
+export interface TabVisibility {
+  /** When `true`, hides the visual policy builder tab. */
+  hideBuilderTab: boolean;
+  /** When `true`, hides the raw ODRL JSON editor tab. */
+  hideRawTab: boolean;
+  /** When `true`, hides the template selection tab. */
+  hideTemplateTab: boolean;
+  /** When `true`, hides the template creation/management tab. */
+  hideTemplateCreateTab: boolean;
+}
+
+/**
  * Map of custom event names to their `detail` payload types.
  *
  * The Web Component host listens for these events on the custom element.
@@ -30,6 +47,10 @@ export interface EmbeddedEventMap {
   'policy-validated': { result: Record<string, unknown> };
   /** Fired when the user clicks Cancel. */
   'editor-cancelled': Record<string, never>;
+  /** Fired after a new template is created via the template editor. */
+  'template-created': { template: Record<string, unknown>; id: string };
+  /** Fired after an existing template is updated via the template editor. */
+  'template-updated': { template: Record<string, unknown>; id: string };
 }
 
 /** Callback signature for dispatching custom events to the host. */
@@ -70,6 +91,13 @@ export interface EmbeddedConfig {
    * endpoints (`POST /policy`).
    */
   serviceId: string | null;
+  /**
+   * Controls which editor tabs are hidden.
+   *
+   * Each property, when `true`, hides the corresponding tab.
+   * Defaults to all tabs visible.
+   */
+  hiddenTabs: TabVisibility;
 }
 
 /** Full context value including an `isEmbedded` flag. */
