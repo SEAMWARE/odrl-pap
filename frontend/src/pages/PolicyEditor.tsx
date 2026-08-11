@@ -1,8 +1,15 @@
 /**
  * Policy editor page.
  *
- * Provides tabs for visual policy building ("Policy Builder") and
- * raw ODRL JSON editing, plus a validation modal for testing policies.
+ * Provides tabs for template-based creation, visual policy building
+ * ("Policy Builder"), and raw ODRL JSON editing, plus a validation
+ * modal for testing policies.
+ *
+ * Tab order: Template | Policy Builder | Raw ODRL
+ *
+ * When a policy is created from a template, the Policy Builder and
+ * Raw ODRL tabs are disabled — the policy is read-only.
+ *
  * Supports two validation modes: HTTP Request and JSON Payload.
  * Test request data persists in session storage across modal open/close.
  */
@@ -11,8 +18,9 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Form, Button, Tabs, Tab, Modal, Alert, InputGroup, Badge, CloseButton } from 'react-bootstrap';
 import { PolicyService } from '../api/services/PolicyService';
 import { ServiceService } from '../api/services/ServiceService';
+import { TemplateService } from '../api/services/TemplateService';
 import { UiService } from '../api/services/UiService';
-import type { OdrlPolicyJson, Policy, ValidationResponse } from '../services/api';
+import type { OdrlPolicyJson, Policy, ValidationResponse, Template } from '../services/api';
 import type { ServiceList } from '../api/models/ServiceList';
 import { TestRequest } from '../api/models/TestRequest';
 import type { GenericJsonInput } from '../api/models/GenericJsonInput';
@@ -20,6 +28,8 @@ import type { ValidationMode } from '../components/ValidationEditor';
 import PolicyBuilder from '../components/PolicyBuilder';
 import ValidationEditor from '../components/ValidationEditor';
 import ValidationResult from '../components/ValidationResult';
+import TemplateSelector from '../components/TemplateSelector';
+import TemplateFiller from '../components/TemplateFiller';
 import { useI18n } from '../i18n';
 import { createNewPolicy } from '../constants/policyDefaults';
 
@@ -29,6 +39,13 @@ const SESSION_KEY_TEST_REQUEST = 'odrl-pap-test-request';
 const SESSION_KEY_JSON_INPUT = 'odrl-pap-json-input';
 /** Session storage key for persisting the last validation mode. */
 const SESSION_KEY_VALIDATION_MODE = 'odrl-pap-validation-mode';
+
+/** Tab key for the template selection tab. */
+const TAB_KEY_TEMPLATE = 'template';
+/** Tab key for the visual policy builder tab. */
+const TAB_KEY_BUILDER = 'builder';
+/** Tab key for the raw ODRL JSON editor tab. */
+const TAB_KEY_ODRL = 'odrl';
 
 /** Default test request values for the validation modal. */
 const DEFAULT_TEST_REQUEST: TestRequest = {
@@ -99,6 +116,10 @@ const persistState = (
 
 /**
  * Page component for creating and editing ODRL policies.
+ *
+ * When templates are available, the Template tab is shown first and
+ * becomes the default active tab for new policies. Editing existing
+ * policies defaults to the Policy Builder tab.
  */
 const PolicyEditor = () => {
   const { id } = useParams();
@@ -108,7 +129,21 @@ const PolicyEditor = () => {
   const t = strings.policyEditor;
 
   const [policy, setPolicy] = useState<OdrlPolicyJson>({});
-  const [activeTab, setActiveTab] = useState('builder');
+  const [activeTab, setActiveTab] = useState(TAB_KEY_BUILDER);
+
+  // --- Template state ---
+  /** Available templates fetched from the backend. */
+  const [templates, setTemplates] = useState<Template[]>([]);
+  /** Whether templates are currently loading. */
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  /** The currently selected template in the Template tab. */
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  /** Whether the policy was created from a template (disables other tabs). */
+  const [createdFromTemplate, setCreatedFromTemplate] = useState(false);
+  /** Whether a template-based policy creation is in progress. */
+  const [isCreatingFromTemplate, setIsCreatingFromTemplate] = useState(false);
+  /** Name of the template used to create the policy (for display). */
+  const [templateName, setTemplateName] = useState<string>('');
 
   // --- Service selection state ---
   /** List of available services fetched from the backend. */
@@ -160,6 +195,32 @@ const PolicyEditor = () => {
       });
   }, [t.serviceLoadError]);
 
+  // Fetch available templates on mount (only for new policies)
+  useEffect(() => {
+    if (id) {
+      // Editing an existing policy — no template tab
+      setTemplatesLoading(false);
+      return;
+    }
+
+    setTemplatesLoading(true);
+    TemplateService.getTemplates()
+      .then((list) => {
+        setTemplates(list);
+        // Default to template tab if templates are available
+        if (list.length > 0) {
+          setActiveTab(TAB_KEY_TEMPLATE);
+        }
+      })
+      .catch(() => {
+        // Silently fail — templates are optional
+        setTemplates([]);
+      })
+      .finally(() => {
+        setTemplatesLoading(false);
+      });
+  }, [id]);
+
   // Load existing policy or initialize a new one
   useEffect(() => {
     if (id) {
@@ -182,7 +243,7 @@ const PolicyEditor = () => {
   // Intentionally does NOT depend on `policy` so edits in the textarea
   // are never overwritten while the user is typing.
   useEffect(() => {
-    if (activeTab === 'odrl' && prevTabRef.current !== 'odrl') {
+    if (activeTab === TAB_KEY_ODRL && prevTabRef.current !== TAB_KEY_ODRL) {
       setRawText(JSON.stringify(policy, null, 2));
       setJsonError('');
     }
@@ -260,6 +321,41 @@ const PolicyEditor = () => {
       setJsonError('');
     }
   }, [policy]);
+
+  /**
+   * Handles policy creation from a filled template.
+   *
+   * Saves the generated ODRL JSON as a new policy and locks the editor
+   * to prevent further modifications (template-created policies are read-only).
+   *
+   * @param odrl - The ODRL policy JSON with placeholders replaced.
+   */
+  const handleCreateFromTemplate = useCallback((odrl: Record<string, unknown>) => {
+    setIsCreatingFromTemplate(true);
+
+    // Ensure the policy has a UID; generate one if the template did not include it.
+    if (!odrl['odrl:uid']) {
+      odrl['odrl:uid'] = crypto.randomUUID();
+    }
+
+    const requestBody = odrl as OdrlPolicyJson;
+
+    const savePromise = selectedServiceId
+      ? ServiceService.createServicePolicy(selectedServiceId, requestBody)
+      : PolicyService.createPolicy(requestBody);
+
+    savePromise
+      .then(() => {
+        setPolicy(requestBody);
+        setCreatedFromTemplate(true);
+        setTemplateName(selectedTemplate?.name ?? '');
+        navigate('/');
+      })
+      .catch(console.error)
+      .finally(() => {
+        setIsCreatingFromTemplate(false);
+      });
+  }, [selectedServiceId, selectedTemplate, navigate]);
 
   /**
    * Saves the policy (create or update).
@@ -347,9 +443,21 @@ const PolicyEditor = () => {
     setSelectedServiceId(value || null);
   };
 
+  /** Whether the template tab should be visible. */
+  const showTemplateTab = !id && !templatesLoading && templates.length > 0;
+
   return (
     <>
       <h1>{id ? t.editTitle : t.newTitle}</h1>
+
+      {/* Read-only banner for template-created policies */}
+      {createdFromTemplate && (
+        <Alert variant="info" className="d-flex align-items-center gap-2">
+          <Badge bg="info">{strings.templateFiller.createdFromTemplate}</Badge>
+          {templateName && <span>{templateName}</span>}
+          <span className="text-muted">&mdash; {t.templateCreated}</span>
+        </Alert>
+      )}
 
       {/* Service selection dropdown */}
       {!servicesLoading && !servicesError && (
@@ -380,13 +488,49 @@ const PolicyEditor = () => {
       <Tabs
         id="policy-editor-tabs"
         activeKey={activeTab}
-        onSelect={(k) => setActiveTab(k!)}
+        onSelect={(k) => {
+          if (k && !createdFromTemplate) {
+            setActiveTab(k);
+          } else if (k === TAB_KEY_TEMPLATE) {
+            // Always allow switching to template tab even in read-only mode
+            setActiveTab(k);
+          }
+        }}
         className="mb-3"
       >
-        <Tab eventKey="builder" title={t.tabBuilder}>
+        {/* Template tab — shown only for new policies when templates exist */}
+        {showTemplateTab && (
+          <Tab eventKey={TAB_KEY_TEMPLATE} title={t.tabTemplate}>
+            <TemplateSelector
+              templates={templates}
+              selectedTemplate={selectedTemplate}
+              onSelect={setSelectedTemplate}
+            />
+            {selectedTemplate && (
+              <div className="mt-4">
+                <hr />
+                <TemplateFiller
+                  template={selectedTemplate}
+                  onCreatePolicy={handleCreateFromTemplate}
+                  isCreating={isCreatingFromTemplate}
+                />
+              </div>
+            )}
+          </Tab>
+        )}
+
+        <Tab
+          eventKey={TAB_KEY_BUILDER}
+          title={t.tabBuilder}
+          disabled={createdFromTemplate}
+        >
           <PolicyBuilder policy={policy} setPolicy={setPolicy} />
         </Tab>
-        <Tab eventKey="odrl" title={t.tabRawOdrl}>
+        <Tab
+          eventKey={TAB_KEY_ODRL}
+          title={t.tabRawOdrl}
+          disabled={createdFromTemplate}
+        >
           {/* --- Context management --- */}
           <div className="mb-3 p-3 border rounded" style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
             <h6 className="mb-2">{t.contextTitle}</h6>
@@ -458,16 +602,22 @@ const PolicyEditor = () => {
           )}
         </Tab>
       </Tabs>
-      <hr />
-      <Button variant="primary" onClick={handleSave}>
-        {strings.common.save}
-      </Button>
-      <Button variant="secondary" className="ms-2" onClick={() => navigate('/')}>
-        {strings.common.cancel}
-      </Button>
-      <Button variant="info" className="ms-2" onClick={() => setShowValidation(true)}>
-        {t.validate}
-      </Button>
+
+      {/* Action buttons — hidden when in template-created read-only mode */}
+      {!createdFromTemplate && (
+        <>
+          <hr />
+          <Button variant="primary" onClick={handleSave}>
+            {strings.common.save}
+          </Button>
+          <Button variant="secondary" className="ms-2" onClick={() => navigate('/')}>
+            {strings.common.cancel}
+          </Button>
+          <Button variant="info" className="ms-2" onClick={() => setShowValidation(true)}>
+            {t.validate}
+          </Button>
+        </>
+      )}
 
       {/* Validation Modal */}
       <Modal
