@@ -92,7 +92,7 @@ const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
   return (
     <div>
       {placeholders.map((placeholder, index) => (
-        <Card key={index} className="mb-2">
+        <Card key={placeholder.key} className="mb-2">
           <Card.Body className="py-2 px-3">
             <div className="d-flex justify-content-between align-items-start mb-2">
               <strong className="text-muted small">
