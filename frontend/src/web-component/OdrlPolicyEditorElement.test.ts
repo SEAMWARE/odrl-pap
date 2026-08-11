@@ -157,6 +157,10 @@ describe('OdrlPolicyEditorElement', () => {
       'locale',
       'policy-context',
       'service-id',
+      'hide-builder-tab',
+      'hide-raw-tab',
+      'hide-template-tab',
+      'hide-template-create-tab',
     ]);
   });
 
