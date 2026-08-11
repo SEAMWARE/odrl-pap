@@ -332,6 +332,12 @@ const PolicyEditor = () => {
    */
   const handleCreateFromTemplate = useCallback((odrl: Record<string, unknown>) => {
     setIsCreatingFromTemplate(true);
+
+    // Ensure the policy has a UID; generate one if the template did not include it.
+    if (!odrl['odrl:uid']) {
+      odrl['odrl:uid'] = crypto.randomUUID();
+    }
+
     const requestBody = odrl as OdrlPolicyJson;
 
     const savePromise = selectedServiceId
