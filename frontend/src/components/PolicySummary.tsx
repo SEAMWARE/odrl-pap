@@ -31,15 +31,26 @@ const renderOperand = (operand: unknown, notSet: string): string => {
 };
 
 /**
+ * Renders an ODRL action as a display string, tolerating both the plain
+ * string form (`"odrl:read"`) and the object form (`{ "@id": "odrl:read" }`)
+ * emitted by templates. The `odrl:` prefix is stripped for readability.
+ */
+const renderAction = (action: unknown, notSet: string): string => {
+  if (!action) return notSet;
+  return renderOperand(action, notSet).replace('odrl:', '');
+};
+
+/**
  * Generates a human-readable summary of the policy permission.
  */
 function buildHumanSummary(
-  action: string | undefined,
+  action: unknown,
   target: unknown,
   assignee: unknown,
   notSet: string,
 ): string {
-  const actionStr = action ? action.replace('odrl:', '').toUpperCase() : notSet;
+  const rawAction = renderAction(action, notSet);
+  const actionStr = rawAction === notSet ? notSet : rawAction.toUpperCase();
   const targetStr = renderOperand(target, notSet);
   const assigneeStr = renderOperand(assignee, notSet);
   return `Allow ${actionStr} on ${targetStr} for ${assigneeStr}`;
@@ -71,7 +82,7 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
   const permission = (policy['odrl:permission'] || {}) as Record<string, unknown>;
   const target = permission['odrl:target'];
   const assignee = permission['odrl:assignee'];
-  const action = permission['odrl:action'] as string | undefined;
+  const action = permission['odrl:action'];
   const constraint = permission['odrl:constraint'] as Record<string, unknown> | unknown[] | undefined;
 
   const renderConstraintItem = (c: Record<string, unknown>, index: number) => (
@@ -193,7 +204,7 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
               <ListGroup.Item>{renderEntity(target, t.target)}</ListGroup.Item>
               <ListGroup.Item>{renderEntity(assignee, t.assignee)}</ListGroup.Item>
               <ListGroup.Item>
-                {t.action}: {action || notSet}
+                {t.action}: {renderAction(action, notSet)}
               </ListGroup.Item>
             </ListGroup>
             {renderConstraints()}
