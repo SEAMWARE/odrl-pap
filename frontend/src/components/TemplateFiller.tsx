@@ -16,7 +16,7 @@
  * - Booleans become JSON booleans
  * - Dates and strings remain JSON strings
  */
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Form, Button, Card, Alert } from 'react-bootstrap';
 import type { Template } from '../types/TemplateTypes';
 import { PLACEHOLDER_REGEX } from '../types/TemplateTypes';
@@ -29,6 +29,13 @@ interface TemplateFillerProps {
   template: Template;
   /** Callback invoked with the generated ODRL policy JSON when the user clicks "Create Policy". */
   onCreatePolicy: (odrl: Record<string, unknown>) => void;
+  /**
+   * Callback invoked whenever the filled ODRL policy changes (i.e. on every
+   * placeholder edit). Lets the host keep its working policy in sync so that
+   * actions like validation operate on the template-filled policy rather than
+   * a stale default.
+   */
+  onPolicyChange?: (odrl: Record<string, unknown>) => void;
   /** Whether the creation request is currently in progress. */
   isCreating?: boolean;
 }
@@ -111,6 +118,7 @@ function replacePlaceholders(
 const TemplateFiller: React.FC<TemplateFillerProps> = ({
   template,
   onCreatePolicy,
+  onPolicyChange,
   isCreating = false,
 }) => {
   const { strings } = useI18n();
@@ -148,19 +156,29 @@ const TemplateFiller: React.FC<TemplateFillerProps> = ({
   }, [template.placeholders, values]);
 
   /**
+   * The ODRL policy produced by substituting the current placeholder values
+   * into the template skeleton. Recomputed whenever the values change.
+   */
+  const filledOdrl = useMemo(
+    () =>
+      replacePlaceholders(template.odrl, values, placeholderTypes) as Record<string, unknown>,
+    [template.odrl, values, placeholderTypes],
+  );
+
+  // Keep the host's working policy in sync with the current template fill so
+  // that validation (and any other host action) operates on this policy.
+  useEffect(() => {
+    onPolicyChange?.(filledOdrl);
+  }, [filledOdrl, onPolicyChange]);
+
+  /**
    * Handles the "Create Policy" button click.
    *
-   * Replaces all placeholder tokens in the template ODRL with the
-   * user-entered values (with type coercion) and invokes the callback.
+   * Sends the ODRL policy built from the user-entered values to the callback.
    */
   const handleCreate = useCallback(() => {
-    const odrl = replacePlaceholders(
-      template.odrl,
-      values,
-      placeholderTypes,
-    ) as Record<string, unknown>;
-    onCreatePolicy(odrl);
-  }, [template.odrl, values, placeholderTypes, onCreatePolicy]);
+    onCreatePolicy(filledOdrl);
+  }, [filledOdrl, onCreatePolicy]);
 
   /**
    * Renders the appropriate input field for a placeholder based on its type.

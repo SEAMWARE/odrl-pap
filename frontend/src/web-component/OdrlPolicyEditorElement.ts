@@ -84,6 +84,41 @@ const DEFAULT_MODE: EditorMode = 'create';
 const DEFAULT_THEME: EmbeddedThemePreset = 'light';
 const DEFAULT_LOCALE = 'en';
 
+/** CSS class of the div the React tree is mounted into. */
+const CONTAINER_CLASS = 'odrl-wc-container';
+
+/**
+ * Rewrites a stylesheet authored for the light DOM so it works inside a
+ * shadow root.
+ *
+ * Bootstrap and the theme stylesheet declare their CSS custom properties on
+ * `:root` and their base typography/background on `body`. Neither selector
+ * matches inside a shadow tree — the shadow root is a `DocumentFragment`
+ * (not the `:root` element) and there is no `<body>` — so every
+ * `var(--bs-*)` / `var(--odrl-*)` reference would resolve to nothing and the
+ * UI would render unstyled (invisible inputs, borderless tabs, white-on-white
+ * badges).
+ *
+ * Rescoping `:root` to `:host` declares the variables on the shadow host,
+ * from where custom properties inherit into the entire shadow tree. A base
+ * surface rule for the mount container replaces what the (now non-matching)
+ * `body` rule used to provide.
+ *
+ * @param css - The concatenated Bootstrap + theme CSS text.
+ * @returns The rescoped CSS, safe to inject into a shadow root.
+ */
+function scopeCssForShadowDom(css: string): string {
+  const rescoped = css.replace(/:root\b/g, ':host');
+  const surface = `
+:host { display: block; }
+.${CONTAINER_CLASS} {
+  font-family: var(--odrl-font-family);
+  color: var(--odrl-text-color);
+  background-color: var(--odrl-bg-color);
+}`;
+  return `${rescoped}\n${surface}`;
+}
+
 /**
  * `<odrl-policy-editor>` custom element.
  *
@@ -261,14 +296,16 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       this.attachShadow({ mode: 'open' });
     }
 
-    // Inject Bootstrap + theme CSS into the shadow root
+    // Inject Bootstrap + theme CSS into the shadow root. The stylesheets are
+    // rescoped from `:root`/`body` to `:host`/container so their custom
+    // properties resolve inside the shadow tree (see scopeCssForShadowDom).
     const style = document.createElement('style');
-    style.textContent = `${bootstrapCss}\n${themeCss}`;
+    style.textContent = scopeCssForShadowDom(`${bootstrapCss}\n${themeCss}`);
     this.shadowRoot!.appendChild(style);
 
     // Create the React mount container
     this.container = document.createElement('div');
-    this.container.setAttribute('class', 'odrl-wc-container');
+    this.container.setAttribute('class', CONTAINER_CLASS);
     this.shadowRoot!.appendChild(this.container);
 
     // Create React root and render

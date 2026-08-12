@@ -335,9 +335,12 @@ const EmbeddedApp = ({
     const requestBody = odrl as OdrlPolicyJson;
     const effectiveId = (odrl['odrl:uid'] as string) ?? '';
 
+    // Store the policy under its `odrl:uid` (PUT /policy/{id}) rather than via
+    // POST /policy, which would assign a server-generated id the host cannot
+    // resolve. This keeps the emitted `id` retrievable via GET /policy/{id}.
     const savePromise = serviceId
-      ? ServiceService.createServicePolicy(serviceId, requestBody)
-      : PolicyService.createPolicy(requestBody);
+      ? ServiceService.createServicePolicyWithId(serviceId, effectiveId, requestBody)
+      : PolicyService.createPolicyWithId(effectiveId, requestBody);
 
     savePromise
       .then(() => {
@@ -360,29 +363,41 @@ const EmbeddedApp = ({
    */
   const handleSave = useCallback(() => {
     setSaveError('');
-    const uid = (policy as Record<string, unknown>)['odrl:uid'] as string | undefined;
-    const effectiveId = policyId ?? uid ?? '';
 
-    let savePromise;
-    if (serviceId) {
-      savePromise =
-        mode === 'edit' && policyId
-          ? ServiceService.createServicePolicyWithId(serviceId, policyId, policy)
-          : ServiceService.createServicePolicy(serviceId, policy);
-    } else {
-      savePromise =
-        mode === 'edit' && policyId
-          ? PolicyService.createPolicyWithId(policyId, policy)
-          : PolicyService.createPolicy(policy);
+    // Ensure the policy carries a UID so it can be stored under — and later
+    // retrieved by — that id. Creating via plain POST /policy would let the
+    // backend assign a generated id that the host cannot resolve through
+    // GET /policy/{id}, producing a 404 on the follow-up fetch.
+    const body = { ...(policy as Record<string, unknown>) };
+    if (!body['odrl:uid']) {
+      body['odrl:uid'] = crypto.randomUUID();
     }
+    const policyToSave = body as OdrlPolicyJson;
+    const effectiveId = policyId ?? (body['odrl:uid'] as string);
+
+    // Both create and edit use the id-scoped endpoint (PUT /policy/{id}),
+    // which "creates or overwrites", so the stored id always matches the
+    // emitted id.
+    const savePromise = serviceId
+      ? ServiceService.createServicePolicyWithId(serviceId, effectiveId, policyToSave)
+      : PolicyService.createPolicyWithId(effectiveId, policyToSave);
 
     savePromise
       .then(() => {
         const eventType = mode === 'edit' ? 'policy-updated' : 'policy-created';
-        onEvent(eventType, { policy, id: effectiveId });
+        onEvent(eventType, { policy: policyToSave, id: effectiveId });
       })
       .catch((err: Error) => setSaveError(err.message));
   }, [policy, mode, policyId, onEvent, serviceId]);
+
+  /**
+   * Keeps the working policy in sync with the template being filled in, so
+   * that validation and other actions operate on the template-derived policy
+   * rather than the default empty one.
+   */
+  const handleTemplatePolicyChange = useCallback((odrl: Record<string, unknown>) => {
+    setPolicy(odrl as OdrlPolicyJson);
+  }, []);
 
   /** Cancels editing and notifies the host. */
   const handleCancel = useCallback(() => {
@@ -462,6 +477,7 @@ const EmbeddedApp = ({
                     <TemplateFiller
                       template={selectedTemplate}
                       onCreatePolicy={handleCreateFromTemplate}
+                      onPolicyChange={handleTemplatePolicyChange}
                       isCreating={isCreatingFromTemplate}
                     />
                   </div>

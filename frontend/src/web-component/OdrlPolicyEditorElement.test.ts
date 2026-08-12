@@ -37,13 +37,14 @@ vi.mock('../services/api', () => ({
   configureApi: (...args: unknown[]) => mockConfigureApi(...args),
 }));
 
-// Mock CSS imports to avoid Vite-specific `?inline` handling in tests
+// Mock CSS imports to avoid Vite-specific `?inline` handling in tests.
+// Include `:root`/`body` selectors so the shadow-DOM rescoping can be asserted.
 vi.mock('bootstrap/dist/css/bootstrap.min.css?inline', () => ({
-  default: '/* bootstrap-mock */',
+  default: ':root{--bs-body-bg:#fff;}/* bootstrap-mock */',
 }));
 
 vi.mock('../theme/theme.css?inline', () => ({
-  default: '/* theme-mock */',
+  default: ':root{--odrl-bg-color:#FFFFFF;}body{color:var(--odrl-text-color);}/* theme-mock */',
 }));
 
 describe('OdrlPolicyEditorElement', () => {
@@ -93,6 +94,18 @@ describe('OdrlPolicyEditorElement', () => {
     // Style should contain our mocked CSS
     expect(styles[0].textContent).toContain('bootstrap-mock');
     expect(styles[0].textContent).toContain('theme-mock');
+  });
+
+  it('rescopes :root to :host so custom properties resolve inside the shadow tree', () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    const css = el.shadowRoot!.querySelector('style')!.textContent!;
+    // :root would not match inside a shadow tree; it must be rescoped to :host.
+    expect(css).not.toMatch(/:root\b/);
+    expect(css).toContain(':host{--bs-body-bg:#fff;}');
+    expect(css).toContain(':host{--odrl-bg-color:#FFFFFF;}');
+    // A base surface rule is added for the mount container.
+    expect(css).toContain('.odrl-wc-container');
   });
 
   it('creates a container div inside the shadow root', () => {
