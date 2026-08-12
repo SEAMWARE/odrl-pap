@@ -156,14 +156,34 @@ const TemplateFiller: React.FC<TemplateFillerProps> = ({
   }, [template.placeholders, values]);
 
   /**
+   * A stable UID for the policy generated from this template. Kept constant
+   * while the same template is selected so the same id is used for validation
+   * and for the eventual create request.
+   */
+  // `template` is a dependency on purpose: a fresh UID is minted whenever a
+  // different template is selected, even though it is not read in the body.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const generatedUid = useMemo(() => crypto.randomUUID(), [template]);
+
+  /**
    * The ODRL policy produced by substituting the current placeholder values
    * into the template skeleton. Recomputed whenever the values change.
+   *
+   * A UID is added when the template skeleton does not define one, so the
+   * resulting policy is valid for validation and creation (the backend
+   * requires `odrl:uid`).
    */
-  const filledOdrl = useMemo(
-    () =>
-      replacePlaceholders(template.odrl, values, placeholderTypes) as Record<string, unknown>,
-    [template.odrl, values, placeholderTypes],
-  );
+  const filledOdrl = useMemo(() => {
+    const odrl = replacePlaceholders(
+      template.odrl,
+      values,
+      placeholderTypes,
+    ) as Record<string, unknown>;
+    if (!odrl['odrl:uid']) {
+      odrl['odrl:uid'] = generatedUid;
+    }
+    return odrl;
+  }, [template.odrl, values, placeholderTypes, generatedUid]);
 
   // Keep the host's working policy in sync with the current template fill so
   // that validation (and any other host action) operates on this policy.

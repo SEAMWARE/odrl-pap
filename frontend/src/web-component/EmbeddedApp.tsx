@@ -579,8 +579,10 @@ const EmbeddedApp = ({
             )}
           </Tabs>
 
-          {/* Action buttons — hidden when in template-created read-only mode */}
-          {!createdFromTemplate && (
+          {/* Policy action buttons — shown only while editing a policy.
+              Hidden in template-created read-only mode and on the template
+              management tab, where policy save/validate is not applicable. */}
+          {!createdFromTemplate && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (
             <div className="d-flex gap-2 mt-3 mb-3">
               <Button variant="primary" onClick={handleSave}>
                 Save
@@ -604,7 +606,7 @@ const EmbeddedApp = ({
           )}
 
           {/* Inline validation panel (no modal — avoids portal issues in Shadow DOM) */}
-          {showValidation && (
+          {showValidation && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (
             <div className="border rounded p-3 mt-3" data-testid="validation-panel">
               <h5>Validate Policy</h5>
 
