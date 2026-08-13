@@ -11,8 +11,11 @@ import { useState, useEffect } from 'react';
 import { useI18n } from '../i18n';
 import NamespacedDropdown from './NamespacedDropdown';
 
+/** Default parent property that holds the constraint(s). */
+const DEFAULT_PROPERTY_KEY = 'odrl:constraint';
+
 interface ConstraintBuilderProps {
-  /** Parent object containing the `odrl:constraint` field. */
+  /** Parent object containing the constraint field (see {@link ConstraintBuilderProps.propertyKey}). */
   parent: Record<string, unknown>;
   /** Callback to update the parent object. */
   setParent: (newParent: Record<string, unknown>) => void;
@@ -20,6 +23,12 @@ interface ConstraintBuilderProps {
   mappings: Mappings;
   /** When `true`, all constraint controls are disabled (set by template mode). */
   locked?: boolean;
+  /**
+   * The parent property that holds the constraint(s). Defaults to
+   * `odrl:constraint`. Party/asset collections store their constraints under
+   * `odrl:refinement`, so those editors pass that key instead.
+   */
+  propertyKey?: string;
 }
 
 /** Represents a single constraint's data shape. */
@@ -44,7 +53,13 @@ function getRightOperandType(constraint: ConstraintData): 'named' | 'literal' {
  * Interactive constraint builder with namespace-grouped dropdowns and
  * clear logical-grouping indicators.
  */
-const ConstraintBuilder = ({ parent, setParent, mappings, locked = false }: ConstraintBuilderProps) => {
+const ConstraintBuilder = ({
+  parent,
+  setParent,
+  mappings,
+  locked = false,
+  propertyKey = DEFAULT_PROPERTY_KEY,
+}: ConstraintBuilderProps) => {
   const { strings } = useI18n();
   const t = strings.constraintBuilder;
 
@@ -52,7 +67,7 @@ const ConstraintBuilder = ({ parent, setParent, mappings, locked = false }: Cons
   const [logicalType, setLogicalType] = useState('and');
 
   /** The parent's raw constraint value, extracted for dependency tracking. */
-  const parentConstraint = parent['odrl:constraint'];
+  const parentConstraint = parent[propertyKey];
 
   // Sync internal state from parent constraint
   useEffect(() => {
@@ -73,6 +88,12 @@ const ConstraintBuilder = ({ parent, setParent, mappings, locked = false }: Cons
       } else if (Array.isArray(constraint)) {
         setLogicalType('and');
         setInternalConstraints(constraint);
+      } else if (typeof constraint === 'object') {
+        // A single constraint object (ODRL allows a lone constraint/refinement
+        // rather than an array). Templates commonly emit this form; load it as
+        // a one-element list so it becomes editable instead of being dropped.
+        setLogicalType('and');
+        setInternalConstraints([constraint as ConstraintData]);
       }
     }
   }, [parentConstraint]);
@@ -80,14 +101,14 @@ const ConstraintBuilder = ({ parent, setParent, mappings, locked = false }: Cons
   // Propagate changes back to parent
   useEffect(() => {
     if (logicalType === 'and') {
-      setParent({ ...parent, 'odrl:constraint': internalConstraints });
+      setParent({ ...parent, [propertyKey]: internalConstraints });
     } else {
       const logicalKey = `odrl:${logicalType}`;
       const logicalConstraint = {
         '@type': 'odrl:LogicalConstraint',
         [logicalKey]: internalConstraints,
       };
-      setParent({ ...parent, 'odrl:constraint': logicalConstraint });
+      setParent({ ...parent, [propertyKey]: logicalConstraint });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [internalConstraints, logicalType]);

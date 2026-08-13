@@ -98,13 +98,26 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
     </ListGroup.Item>
   );
 
-  const renderRefinements = (refinements: unknown[]) => {
-    if (!refinements || refinements.length === 0) return null;
+  /**
+   * Normalizes an ODRL `odrl:refinement` value into an array of constraint
+   * items. ODRL allows a refinement to be either a single constraint object
+   * or an array of them; templates commonly emit the single-object form, so
+   * both must be handled to avoid calling `.map` on a non-array.
+   */
+  const toRefinementArray = (refinement: unknown): Record<string, unknown>[] => {
+    if (!refinement) return [];
+    if (Array.isArray(refinement)) return refinement as Record<string, unknown>[];
+    return [refinement as Record<string, unknown>];
+  };
+
+  const renderRefinements = (refinement: unknown) => {
+    const refinements = toRefinementArray(refinement);
+    if (refinements.length === 0) return null;
     return (
       <div className="mt-2 ms-4">
         <h6>{t.refinements}:</h6>
         <ListGroup as="ol" numbered>
-          {(refinements as Record<string, unknown>[]).map(renderConstraintItem)}
+          {refinements.map(renderConstraintItem)}
         </ListGroup>
       </div>
     );
@@ -118,7 +131,7 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
       return (
         <>
           {name}: {obj['@type'] as string}
-          {renderRefinements(obj['odrl:refinement'] as unknown[])}
+          {renderRefinements(obj['odrl:refinement'])}
         </>
       );
     }

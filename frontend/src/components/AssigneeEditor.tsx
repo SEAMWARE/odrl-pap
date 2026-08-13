@@ -165,6 +165,7 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings, locked = false }: Ass
               parent={assignee as Record<string, unknown>}
               setParent={setAssignee as (v: Record<string, unknown>) => void}
               mappings={mappings}
+              propertyKey="odrl:refinement"
             />
           </Card.Body>
         </Card>
