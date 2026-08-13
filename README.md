@@ -8,6 +8,7 @@ It uses the following architecture:
 ![architecture](./doc/odrl-pap.jpg)
 
 - [API](#api)
+- [Frontend / UI](#frontend--ui)
 - [Enforcement](#enforcement)
 - [Translation](#translation)
     - [mapping.json](#the-mappingjson)
@@ -32,6 +33,16 @@ The ODRL-PAP offers two APIS
       All
       request have to be evaluated against the `main` policy.
     * the `data`-bundle: Contains additional data to be taken into account for the evaluation.
+
+## Frontend / UI
+
+The ODRL-PAP ships with a web-based policy editor for creating and managing
+policies — and reusable policy templates — without writing ODRL by hand. It runs
+either as a standalone SPA or as an embeddable `<odrl-policy-editor>` web
+component.
+
+* Setup, build, embedding and configuration: [frontend/README.md](./frontend/README.md)
+* End-user guide (creating policies from templates, managing templates): [frontend/docs/USAGE.md](./frontend/docs/USAGE.md)
 
 ## Enforcement
 

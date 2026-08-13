@@ -15,10 +15,15 @@ The editor can be used in two ways:
    with Shadow DOM style isolation and zero framework dependencies on the
    host page.
 
+> **New to the policy editor?** See the **[User Guide](./docs/USAGE.md)** for a
+> screenshot-based walkthrough of creating policies from templates and managing
+> templates.
+
 ---
 
 ## Table of Contents
 
+- [User Guide](./docs/USAGE.md)
 - [Installation](#installation)
 - [Quick Integration](#quick-integration)
 - [Docker](#docker)
