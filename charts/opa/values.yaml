@@ -1,8 +1,12 @@
 deployment:
   image:
     repository: openpolicyagent/opa
-    # -- tag of the image to be used
-    tag: 0.63.0
+    # -- tag of the image to be used.
+    # Use the multi-arch `-static` variant: the plain `0.63.0` tag is a
+    # single-architecture (amd64-only) image, so `it-opa` cannot start on the
+    # native arm64 CI runner (deployment stays "0 of 1 available"). The
+    # `-static` tag publishes both linux/amd64 and linux/arm64.
+    tag: 0.63.0-static
     # -- specification of the image pull policy
     pullPolicy: IfNotPresent
   logLevel: DEBUG
