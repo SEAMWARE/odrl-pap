@@ -97,6 +97,18 @@ public class PersistentTemplateRepository implements TemplateRepository {
     }
 
     @Override
+    public Optional<Template> getGeneralTemplate(String id) {
+        return TemplateEntity.findGeneralByTemplateId(id)
+                .map(this::toApiModel);
+    }
+
+    @Override
+    public Optional<Template> getServiceTemplate(String serviceId, String id) {
+        return TemplateEntity.findByServiceIdAndTemplateId(serviceId, id)
+                .map(this::toApiModel);
+    }
+
+    @Override
     public List<Template> getTemplates(int page, int pageSize) {
         PanacheQuery<TemplateEntity> query = TemplateEntity.find(
                 "serviceEntity is null", Sort.ascending(DEFAULT_SORT));
@@ -118,6 +130,24 @@ public class PersistentTemplateRepository implements TemplateRepository {
         log.debug("Try to delete template {}", id);
         TemplateEntity.findByTemplateId(id)
                 .ifPresent(PanacheEntityBase::delete);
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteGeneralTemplate(String id) {
+        log.debug("Try to delete general template {}", id);
+        Optional<TemplateEntity> entity = TemplateEntity.findGeneralByTemplateId(id);
+        entity.ifPresent(PanacheEntityBase::delete);
+        return entity.isPresent();
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteServiceTemplate(String serviceId, String id) {
+        log.debug("Try to delete template {} scoped to service {}", id, serviceId);
+        Optional<TemplateEntity> entity = TemplateEntity.findByServiceIdAndTemplateId(serviceId, id);
+        entity.ifPresent(PanacheEntityBase::delete);
+        return entity.isPresent();
     }
 
     // -------------------------------------------------------------------------

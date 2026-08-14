@@ -163,7 +163,9 @@ const EmbeddedApp = ({
   /** Whether a template-based policy creation is in progress. */
   const [isCreatingFromTemplate, setIsCreatingFromTemplate] = useState(false);
 
-  // Fetch available templates on mount (only for create mode and when template tab is visible)
+  // Fetch available templates for create mode when the template tab is visible.
+  // Scoped to the configured service (if any) and re-run when it changes, so a
+  // service-scoped template can be used to create a policy.
   useEffect(() => {
     if (mode === 'edit' || hiddenTabs.hideTemplateTab) {
       setTemplatesLoading(false);
@@ -171,7 +173,13 @@ const EmbeddedApp = ({
     }
 
     setTemplatesLoading(true);
-    TemplateService.getTemplates()
+    setSelectedTemplate(null);
+
+    const fetchPromise = serviceId
+      ? ServiceService.getServiceTemplates(serviceId)
+      : TemplateService.getTemplates();
+
+    fetchPromise
       .then((list) => {
         setTemplates(list);
       })
@@ -182,7 +190,7 @@ const EmbeddedApp = ({
       .finally(() => {
         setTemplatesLoading(false);
       });
-  }, [mode, hiddenTabs.hideTemplateTab]);
+  }, [mode, hiddenTabs.hideTemplateTab, serviceId]);
 
   // --- Determine the default active tab based on visibility ---
   /**

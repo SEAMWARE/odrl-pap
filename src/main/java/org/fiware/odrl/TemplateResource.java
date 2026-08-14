@@ -84,7 +84,9 @@ public class TemplateResource implements TemplateApi {
      */
     @Override
     public Response deleteTemplateById(String templateId) {
-        templateRepository.deleteTemplate(templateId);
+        // Scope the deletion to general templates so this endpoint cannot delete
+        // a service-scoped template that GET /template would not even list.
+        templateRepository.deleteGeneralTemplate(templateId);
         return Response.noContent().build();
     }
 
@@ -96,7 +98,7 @@ public class TemplateResource implements TemplateApi {
      */
     @Override
     public Response getTemplateById(String templateId) {
-        return templateRepository.getTemplate(templateId)
+        return templateRepository.getGeneralTemplate(templateId)
                 .map(Response::ok)
                 .map(Response.ResponseBuilder::build)
                 .orElse(Response.status(HttpStatus.SC_NOT_FOUND).build());
@@ -131,7 +133,9 @@ public class TemplateResource implements TemplateApi {
      */
     @Override
     public Response updateTemplate(String templateId, TemplateCreate templateCreate) {
-        if (templateRepository.getTemplate(templateId).isEmpty()) {
+        // Only general templates may be updated here; a service-scoped template
+        // with the same id must not be reachable through this endpoint.
+        if (templateRepository.getGeneralTemplate(templateId).isEmpty()) {
             return Response.status(HttpStatus.SC_NOT_FOUND).build();
         }
 

@@ -195,7 +195,8 @@ const PolicyEditor = () => {
       });
   }, [t.serviceLoadError]);
 
-  // Fetch available templates on mount (only for new policies)
+  // Fetch available templates for new policies, scoped to the selected service.
+  // Re-runs when the service changes so service-scoped templates become usable.
   useEffect(() => {
     if (id) {
       // Editing an existing policy — no template tab
@@ -204,7 +205,14 @@ const PolicyEditor = () => {
     }
 
     setTemplatesLoading(true);
-    TemplateService.getTemplates()
+    // A stale selection from a different service must not linger.
+    setSelectedTemplate(null);
+
+    const fetchPromise = selectedServiceId
+      ? ServiceService.getServiceTemplates(selectedServiceId)
+      : TemplateService.getTemplates();
+
+    fetchPromise
       .then((list) => {
         setTemplates(list);
         // Default to template tab if templates are available
@@ -219,7 +227,7 @@ const PolicyEditor = () => {
       .finally(() => {
         setTemplatesLoading(false);
       });
-  }, [id]);
+  }, [id, selectedServiceId]);
 
   // Load existing policy or initialize a new one
   useEffect(() => {

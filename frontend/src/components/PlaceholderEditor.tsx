@@ -5,9 +5,69 @@
  * controls to add, remove, and configure each placeholder's key,
  * display name, description, data type, and optional dropdown values.
  */
+import { useState, useEffect } from 'react';
 import { Form, Button, Row, Col, Card, CloseButton } from 'react-bootstrap';
 import type { TemplatePlaceholder } from '../api/models/TemplatePlaceholder';
 import { PLACEHOLDER_TYPES, createEmptyPlaceholder } from '../types/TemplateTypes';
+
+/** Separator used between dropdown option values in the options input. */
+const OPTIONS_SEPARATOR = ',';
+
+/**
+ * Parses a separator-delimited string into a trimmed, non-empty options array.
+ *
+ * @param text - The raw options text (e.g. "ADMIN, DATA_ANALYST").
+ * @returns The parsed list of option values.
+ */
+function parseOptions(text: string): string[] {
+  return text
+    .split(OPTIONS_SEPARATOR)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/** Props for the {@link OptionsInput} component. */
+interface OptionsInputProps {
+  /** The committed option values for this placeholder. */
+  options: string[];
+  /** Index of the owning placeholder, used for the accessible label. */
+  index: number;
+  /** Called with the parsed options when editing is committed (on blur). */
+  onCommit: (options: string[]) => void;
+}
+
+/**
+ * Free-text input for a placeholder's dropdown options.
+ *
+ * Keeps the raw text in local state while the user types — so intermediate
+ * states like a trailing comma are preserved — and only parses/commits the
+ * value on blur. Parsing on every keystroke would drop the just-typed
+ * separator and prevent entering more than one option by hand.
+ *
+ * @param props - Component properties.
+ */
+const OptionsInput: React.FC<OptionsInputProps> = ({ options, index, onCommit }) => {
+  const committed = options.join(`${OPTIONS_SEPARATOR} `);
+  const [text, setText] = useState(committed);
+
+  // Re-sync when the committed value changes by content (e.g. after blur
+  // normalisation), without clobbering in-progress typing.
+  useEffect(() => {
+    setText(committed);
+  }, [committed]);
+
+  return (
+    <Form.Control
+      size="sm"
+      type="text"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => onCommit(parseOptions(text))}
+      placeholder="e.g., value1, value2, value3"
+      aria-label={`Placeholder options ${index + 1}`}
+    />
+  );
+};
 
 /** Props for the {@link PlaceholderEditor} component. */
 interface PlaceholderEditorProps {
@@ -58,20 +118,6 @@ const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
       updated[index] = { ...updated[index], [field]: value };
     }
     onChange(updated);
-  };
-
-  /**
-   * Parses a comma-separated string into an options array.
-   *
-   * @param index - Index into the placeholders array.
-   * @param text - Comma-separated text input.
-   */
-  const handleOptionsChange = (index: number, text: string) => {
-    const options = text
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    handleFieldChange(index, 'options', options);
   };
 
   /** Adds a new empty placeholder to the list. */
@@ -174,13 +220,10 @@ const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
               <Col md={6}>
                 <Form.Group controlId={`ph-options-${index}`}>
                   <Form.Label className="small mb-0">Options (comma-separated, optional)</Form.Label>
-                  <Form.Control
-                    size="sm"
-                    type="text"
-                    value={(placeholder.options ?? []).join(', ')}
-                    onChange={(e) => handleOptionsChange(index, e.target.value)}
-                    placeholder="e.g., value1, value2, value3"
-                    aria-label={`Placeholder options ${index + 1}`}
+                  <OptionsInput
+                    options={placeholder.options ?? []}
+                    index={index}
+                    onCommit={(opts) => handleFieldChange(index, 'options', opts)}
                   />
                   <Form.Text className="text-muted" style={{ fontSize: '0.75rem' }}>
                     If provided, renders as a dropdown. Leave empty for free-form input.

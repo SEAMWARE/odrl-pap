@@ -136,6 +136,24 @@ const TemplateFiller: React.FC<TemplateFillerProps> = ({
     return types;
   }, [template.placeholders]);
 
+  // Seed boolean placeholders with an explicit `false` default. Booleans render
+  // as an (initially off) switch and `allFilled` treats them as always filled,
+  // so without this their value would stay `undefined` and the raw `{{KEY}}`
+  // token would leak into the generated policy. Existing user input is kept.
+  useEffect(() => {
+    setValues((prev) => {
+      const seeded = { ...prev };
+      let changed = false;
+      for (const ph of template.placeholders) {
+        if (ph.type === 'boolean' && seeded[ph.key] === undefined) {
+          seeded[ph.key] = BOOLEAN_FALSE;
+          changed = true;
+        }
+      }
+      return changed ? seeded : prev;
+    });
+  }, [template.placeholders]);
+
   /**
    * Updates a single placeholder value.
    *
@@ -192,13 +210,26 @@ const TemplateFiller: React.FC<TemplateFillerProps> = ({
   }, [filledOdrl, onPolicyChange]);
 
   /**
+   * Whether the generated policy still contains unresolved `{{...}}` tokens.
+   *
+   * Acts as a safety net: even if a value is missed, the policy is never
+   * submitted with a literal placeholder token in place of a real value.
+   */
+  const hasUnresolvedPlaceholders = useMemo(
+    () => JSON.stringify(filledOdrl).includes('{{'),
+    [filledOdrl],
+  );
+
+  /**
    * Handles the "Create Policy" button click.
    *
-   * Sends the ODRL policy built from the user-entered values to the callback.
+   * Sends the ODRL policy built from the user-entered values to the callback,
+   * unless it still contains unresolved placeholder tokens.
    */
   const handleCreate = useCallback(() => {
+    if (hasUnresolvedPlaceholders) return;
     onCreatePolicy(filledOdrl);
-  }, [filledOdrl, onCreatePolicy]);
+  }, [filledOdrl, onCreatePolicy, hasUnresolvedPlaceholders]);
 
   /**
    * Renders the appropriate input field for a placeholder based on its type.
@@ -309,7 +340,7 @@ const TemplateFiller: React.FC<TemplateFillerProps> = ({
       <Button
         variant="primary"
         onClick={handleCreate}
-        disabled={!allFilled || isCreating}
+        disabled={!allFilled || hasUnresolvedPlaceholders || isCreating}
         className="mt-3"
       >
         {isCreating ? strings.common.loading : t.createPolicy}

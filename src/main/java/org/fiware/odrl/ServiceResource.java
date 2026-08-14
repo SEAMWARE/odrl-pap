@@ -218,7 +218,9 @@ public class ServiceResource extends ApiResource implements ServiceApi {
     public Response deleteServiceTemplateById(String serviceId, String templateId) {
         return checkNotFound(serviceId)
                 .orElseGet(() -> {
-                    templateRepository.deleteTemplate(templateId);
+                    // Only delete when the template is owned by this service, so a
+                    // request under service-b cannot delete service-a's template.
+                    templateRepository.deleteServiceTemplate(serviceId, templateId);
                     return Response.noContent().build();
                 });
     }
@@ -233,7 +235,7 @@ public class ServiceResource extends ApiResource implements ServiceApi {
     @Override
     public Response getServiceTemplateById(String serviceId, String templateId) {
         return checkNotFound(serviceId)
-                .orElseGet(() -> templateRepository.getTemplate(templateId)
+                .orElseGet(() -> templateRepository.getServiceTemplate(serviceId, templateId)
                         .map(Response::ok)
                         .map(Response.ResponseBuilder::build)
                         .orElse(Response.status(HttpStatus.SC_NOT_FOUND).build()));
@@ -278,7 +280,8 @@ public class ServiceResource extends ApiResource implements ServiceApi {
             return notFound.get();
         }
 
-        if (templateRepository.getTemplate(templateId).isEmpty()) {
+        // Only a template owned by this service may be updated here.
+        if (templateRepository.getServiceTemplate(serviceId, templateId).isEmpty()) {
             return Response.status(HttpStatus.SC_NOT_FOUND).build();
         }
 

@@ -72,6 +72,36 @@ public class TemplateEntity extends PanacheEntity {
     }
 
     /**
+     * Find a general (service-unscoped) template by its identifier.
+     *
+     * <p>Only matches templates whose {@code serviceEntity} is {@code null}, so
+     * that the general {@code /template} endpoints cannot reach service-scoped
+     * templates.</p>
+     *
+     * @param templateId the template identifier to search for
+     * @return an {@link Optional} containing the matching general template, or empty if none
+     */
+    public static Optional<TemplateEntity> findGeneralByTemplateId(String templateId) {
+        return Optional.ofNullable(
+                find("templateId = ?1 and serviceEntity is null", templateId).firstResult());
+    }
+
+    /**
+     * Find a template by its identifier, scoped to a specific service.
+     *
+     * <p>Only matches templates owned by the given service, preventing
+     * cross-service access through the {@code /service/{id}/template} endpoints.</p>
+     *
+     * @param serviceId  the owning service identifier
+     * @param templateId the template identifier to search for
+     * @return an {@link Optional} containing the matching template, or empty if none
+     */
+    public static Optional<TemplateEntity> findByServiceIdAndTemplateId(String serviceId, String templateId) {
+        return Optional.ofNullable(
+                find("serviceEntity.serviceId = ?1 and templateId = ?2", serviceId, templateId).firstResult());
+    }
+
+    /**
      * Return all general (service-unscoped) templates.
      *
      * @return list of template entities where {@code serviceEntity} is {@code null}

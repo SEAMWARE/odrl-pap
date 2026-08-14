@@ -14,6 +14,7 @@ import org.fiware.odrl.persistence.RepositoryTestProfile;
 import org.fiware.odrl.persistence.ServiceEntity;
 import org.fiware.odrl.persistence.ServiceRepository;
 import org.fiware.odrl.persistence.TemplateEntity;
+import org.fiware.odrl.persistence.TemplateRepository;
 import org.openapi.quarkus.odrl_yaml.model.ServiceCreate;
 import org.openapi.quarkus.odrl_yaml.model.Template;
 import org.openapi.quarkus.odrl_yaml.model.TemplateCreate;
@@ -63,6 +64,9 @@ public class TemplateApiTest {
 
     @Inject
     ServiceRepository serviceRepository;
+
+    @Inject
+    TemplateRepository templateRepository;
 
     @Inject
     ObjectMapper objectMapper;
@@ -587,6 +591,89 @@ public class TemplateApiTest {
             assertTrue(serviceTemplates.isEmpty(),
                     "Service should not see general templates");
         }
+
+        @Test
+        @DisplayName("Getting a template through another service returns 404")
+        void getServiceTemplateById_crossService_returns404() {
+            serviceRepository.createService("service-a");
+            serviceRepository.createService("service-b");
+            Template ownedByA = createServiceTemplateAndAssert("service-a", buildSimpleAccessTemplate());
+
+            Response response = serviceResource.getServiceTemplateById("service-b", ownedByA.getId());
+            assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus(),
+                    "A template owned by service-a must not be readable through service-b");
+        }
+
+        @Test
+        @DisplayName("Updating a template through another service returns 404 and does not overwrite it")
+        void updateServiceTemplate_crossService_returns404_andDoesNotOverwrite() {
+            serviceRepository.createService("service-a");
+            serviceRepository.createService("service-b");
+            TemplateCreate original = buildSimpleAccessTemplate();
+            original.setName("Owned by A");
+            Template ownedByA = createServiceTemplateAndAssert("service-a", original);
+
+            TemplateCreate overwrite = buildDateConstrainedTemplate();
+            overwrite.setName("Hijacked by B");
+            Response response = serviceResource.updateServiceTemplate("service-b", ownedByA.getId(), overwrite);
+            assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus(),
+                    "A template owned by service-a must not be updatable through service-b");
+
+            // The original template must be untouched.
+            Template stillA = serviceResource.getServiceTemplateById("service-a", ownedByA.getId())
+                    .readEntity(Template.class);
+            assertEquals("Owned by A", stillA.getName(),
+                    "Cross-service update must not overwrite the template");
+        }
+
+        @Test
+        @DisplayName("Deleting a template through another service does not delete it")
+        void deleteServiceTemplateById_crossService_doesNotDelete() {
+            serviceRepository.createService("service-a");
+            serviceRepository.createService("service-b");
+            Template ownedByA = createServiceTemplateAndAssert("service-a", buildSimpleAccessTemplate());
+
+            serviceResource.deleteServiceTemplateById("service-b", ownedByA.getId());
+
+            assertEquals(HttpStatus.SC_OK,
+                    serviceResource.getServiceTemplateById("service-a", ownedByA.getId()).getStatus(),
+                    "A template owned by service-a must survive a delete issued under service-b");
+        }
+
+        @Test
+        @DisplayName("General endpoints cannot read a service-scoped template")
+        void getTemplateById_serviceScoped_returns404() {
+            serviceRepository.createService("scoped-svc");
+            Template scoped = createServiceTemplateAndAssert("scoped-svc", buildSimpleAccessTemplate());
+
+            Response response = templateResource.getTemplateById(scoped.getId());
+            assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus(),
+                    "GET /template/{id} must not return a service-scoped template");
+        }
+
+        @Test
+        @DisplayName("General endpoints cannot update a service-scoped template")
+        void updateTemplate_serviceScoped_returns404() {
+            serviceRepository.createService("scoped-svc");
+            Template scoped = createServiceTemplateAndAssert("scoped-svc", buildSimpleAccessTemplate());
+
+            Response response = templateResource.updateTemplate(scoped.getId(), buildDateConstrainedTemplate());
+            assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus(),
+                    "PUT /template/{id} must not update a service-scoped template");
+        }
+
+        @Test
+        @DisplayName("General endpoints cannot delete a service-scoped template")
+        void deleteTemplateById_serviceScoped_doesNotDelete() {
+            serviceRepository.createService("scoped-svc");
+            Template scoped = createServiceTemplateAndAssert("scoped-svc", buildSimpleAccessTemplate());
+
+            templateResource.deleteTemplateById(scoped.getId());
+
+            assertEquals(HttpStatus.SC_OK,
+                    serviceResource.getServiceTemplateById("scoped-svc", scoped.getId()).getStatus(),
+                    "DELETE /template/{id} must not delete a service-scoped template");
+        }
     }
 
     // =========================================================================
@@ -609,9 +696,10 @@ public class TemplateApiTest {
             // Delete the service
             serviceResource.deleteService(serviceId);
 
-            // Verify the template is gone (use general get since service is gone)
-            Response response = templateResource.getTemplateById(templateId);
-            assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus(),
+            // Verify the template row is truly gone. A scope-agnostic repository
+            // lookup is used here rather than the general GET endpoint, which now
+            // (correctly) 404s for any service-scoped id regardless of cascade.
+            assertTrue(templateRepository.getTemplate(templateId).isEmpty(),
                     "Template should be cascade-deleted when its service is deleted");
         }
 
@@ -627,12 +715,10 @@ public class TemplateApiTest {
             // Delete the service
             serviceResource.deleteService(serviceId);
 
-            // Both templates should be gone
-            assertEquals(HttpStatus.SC_NOT_FOUND,
-                    templateResource.getTemplateById(t1.getId()).getStatus(),
+            // Both template rows should be truly gone (scope-agnostic lookup).
+            assertTrue(templateRepository.getTemplate(t1.getId()).isEmpty(),
                     "First template should be cascade-deleted");
-            assertEquals(HttpStatus.SC_NOT_FOUND,
-                    templateResource.getTemplateById(t2.getId()).getStatus(),
+            assertTrue(templateRepository.getTemplate(t2.getId()).isEmpty(),
                     "Second template should be cascade-deleted");
         }
     }

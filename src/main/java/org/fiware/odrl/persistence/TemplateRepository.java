@@ -59,12 +59,35 @@ public interface TemplateRepository {
     Template updateTemplate(String id, TemplateCreate templateCreate);
 
     /**
-     * Retrieve a template by its identifier.
+     * Retrieve a template by its identifier, regardless of service scope.
+     *
+     * <p>Intended for internal use (e.g. id-uniqueness checks). Endpoints must
+     * use the scope-aware {@link #getGeneralTemplate(String)} or
+     * {@link #getServiceTemplate(String, String)} to avoid cross-scope access.</p>
      *
      * @param id the template identifier
      * @return an {@link Optional} containing the template, or empty if not found
      */
     Optional<Template> getTemplate(String id);
+
+    /**
+     * Retrieve a general (service-unscoped) template by its identifier.
+     *
+     * @param id the template identifier
+     * @return an {@link Optional} containing the template, or empty if no general
+     *         template with that id exists
+     */
+    Optional<Template> getGeneralTemplate(String id);
+
+    /**
+     * Retrieve a template by its identifier, scoped to a specific service.
+     *
+     * @param serviceId the owning service identifier
+     * @param id        the template identifier
+     * @return an {@link Optional} containing the template, or empty if no template
+     *         with that id is owned by the given service
+     */
+    Optional<Template> getServiceTemplate(String serviceId, String id);
 
     /**
      * List general (service-unscoped) templates with pagination.
@@ -91,4 +114,27 @@ public interface TemplateRepository {
      * @param id the template identifier
      */
     void deleteTemplate(String id);
+
+    /**
+     * Delete a general (service-unscoped) template by its identifier.
+     *
+     * <p>Service-scoped templates are never touched, so the general endpoint
+     * cannot delete a template owned by a service.</p>
+     *
+     * @param id the template identifier
+     * @return {@code true} if a matching general template was deleted, {@code false} otherwise
+     */
+    boolean deleteGeneralTemplate(String id);
+
+    /**
+     * Delete a template by its identifier, scoped to a specific service.
+     *
+     * <p>Only deletes the template if it is owned by the given service, so one
+     * service cannot delete another service's (or a general) template.</p>
+     *
+     * @param serviceId the owning service identifier
+     * @param id        the template identifier
+     * @return {@code true} if a matching service-scoped template was deleted, {@code false} otherwise
+     */
+    boolean deleteServiceTemplate(String serviceId, String id);
 }

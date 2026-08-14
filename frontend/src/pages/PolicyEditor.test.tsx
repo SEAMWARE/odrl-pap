@@ -32,6 +32,7 @@ vi.mock('../api/services/ServiceService', () => ({
     createServicePolicy: vi.fn(),
     createServicePolicyWithId: vi.fn(),
     getServicePolicyById: vi.fn(),
+    getServiceTemplates: vi.fn(),
   },
 }));
 
@@ -155,6 +156,8 @@ describe('PolicyEditor', () => {
     vi.mocked(ServiceService.createServicePolicy).mockReset();
     vi.mocked(ServiceService.createServicePolicyWithId).mockReset();
     vi.mocked(ServiceService.getServicePolicyById).mockReset();
+    vi.mocked(ServiceService.getServiceTemplates).mockReset();
+    vi.mocked(ServiceService.getServiceTemplates).mockResolvedValue([]);
     vi.mocked(UiService.getMappings).mockReset();
     vi.mocked(UiService.validatePolicy).mockReset();
     // Default: mappings load successfully
@@ -425,6 +428,15 @@ describe('PolicyEditor', () => {
 
       const dropdown = screen.getByLabelText('Service') as HTMLSelectElement;
       expect(dropdown.value).toBe('service-alpha');
+    });
+
+    it('fetches templates scoped to the selected service', async () => {
+      renderCreateModeWithService('service-alpha');
+
+      // The service-scoped template endpoint must be used, not the general one.
+      await waitFor(() => {
+        expect(ServiceService.getServiceTemplates).toHaveBeenCalledWith('service-alpha');
+      });
     });
 
     it('loads policy via service endpoint when serviceId query param is present in edit mode', async () => {
