@@ -80,14 +80,16 @@ public class TemplateResource implements TemplateApi {
      * Deletes a general policy template by its identifier.
      *
      * @param templateId the unique identifier of the template to delete
-     * @return HTTP 204 on success
+     * @return HTTP 204 on success, or HTTP 404 if no general template with that id exists
      */
     @Override
     public Response deleteTemplateById(String templateId) {
         // Scope the deletion to general templates so this endpoint cannot delete
         // a service-scoped template that GET /template would not even list.
-        templateRepository.deleteGeneralTemplate(templateId);
-        return Response.noContent().build();
+        boolean deleted = templateRepository.deleteGeneralTemplate(templateId);
+        return deleted
+                ? Response.noContent().build()
+                : Response.status(HttpStatus.SC_NOT_FOUND).build();
     }
 
     /**
@@ -159,7 +161,7 @@ public class TemplateResource implements TemplateApi {
      *
      * <p>Checks performed:</p>
      * <ol>
-     *   <li>The ODRL field must be valid JSON (serialisable by Jackson)</li>
+     *   <li>The ODRL field must be valid JSON (serializable by Jackson)</li>
      *   <li>Placeholder keys must be unique — no duplicates allowed</li>
      *   <li>Every placeholder key must appear at least once as a {@code {{KEY}}}
      *       token in the ODRL JSON string or the natural language text</li>
@@ -171,38 +173,58 @@ public class TemplateResource implements TemplateApi {
     static List<String> validateTemplate(TemplateCreate templateCreate) {
         java.util.ArrayList<String> errors = new java.util.ArrayList<>();
 
-        // 1. Check that placeholders are provided
+        // 1. Required fields (mirror the OpenAPI schema's `required` list, which
+        //    Quarkus does not enforce on the request body on its own).
+        if (templateCreate.getName() == null || templateCreate.getName().isBlank()) {
+            errors.add("Template name is required");
+        }
+        if (templateCreate.getOdrl() == null) {
+            errors.add("An ODRL skeleton is required");
+        }
+
+        // 2. Check that placeholders are provided
         if (templateCreate.getPlaceholders() == null || templateCreate.getPlaceholders().isEmpty()) {
             errors.add("At least one placeholder is required");
             return errors;
         }
 
-        // 2. Check for duplicate placeholder keys
-        Set<String> seenKeys = new HashSet<>();
+        // 3. Check for duplicate / blank placeholder keys
+        Set<String> definedKeys = new HashSet<>();
         for (TemplatePlaceholder placeholder : templateCreate.getPlaceholders()) {
             if (placeholder.getKey() == null || placeholder.getKey().isBlank()) {
                 errors.add("Placeholder key must not be null or blank");
                 continue;
             }
-            if (!seenKeys.add(placeholder.getKey())) {
+            if (!definedKeys.add(placeholder.getKey())) {
                 errors.add(String.format("Duplicate placeholder key: %s", placeholder.getKey()));
             }
         }
 
-        // 3. Build the searchable text from ODRL JSON + natural language
-        String odrlText = odrlToString(templateCreate.getOdrl());
+        // 4. Detect the {{KEY}} tokens actually present, using the SAME pattern the
+        //    frontend substitutes with ([A-Z_][A-Z0-9_]*). A lowercase or otherwise
+        //    non-matching key is therefore never detected here, and so is reported
+        //    below rather than silently leaving a literal token in the policy.
         String naturalLanguage = templateCreate.getNaturalLanguage() != null
                 ? templateCreate.getNaturalLanguage()
                 : "";
-        String searchableText = odrlText + " " + naturalLanguage;
+        Set<String> referencedKeys =
+                extractPlaceholderKeys(odrlToString(templateCreate.getOdrl()) + " " + naturalLanguage);
 
-        // 4. Verify every placeholder key appears in the searchable text
-        for (String key : seenKeys) {
-            String token = "{{" + key + "}}";
-            if (!searchableText.contains(token)) {
+        // 5. Every defined placeholder must be referenced by a matching {{KEY}} token.
+        for (String key : definedKeys) {
+            if (!referencedKeys.contains(key)) {
                 errors.add(String.format(
                         "Placeholder key '%s' is not referenced as {{%s}} in the ODRL JSON or natural language text",
                         key, key));
+            }
+        }
+
+        // 6. Every {{KEY}} token must have a matching placeholder definition, so a
+        //    stray token cannot end up unresolved in a created policy.
+        for (String token : referencedKeys) {
+            if (!definedKeys.contains(token)) {
+                errors.add(String.format(
+                        "Token {{%s}} has no matching placeholder definition", token));
             }
         }
 
@@ -221,10 +243,10 @@ public class TemplateResource implements TemplateApi {
             return "";
         }
         try {
-            // Use a temporary ObjectMapper for static serialisation
+            // Use a temporary ObjectMapper for static serialization
             return new ObjectMapper().writeValueAsString(odrl);
         } catch (JsonProcessingException e) {
-            // Should not happen since the map was already deserialised by Jackson
+            // Should not happen since the map was already deserialized by Jackson
             return odrl.toString();
         }
     }

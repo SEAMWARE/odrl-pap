@@ -47,9 +47,12 @@ This is the quickest way to create a valid policy.
 
 ### 1. Open the Create Policy screen
 
-Open **Create Policy**. Across the top you will see four tabs — **Template**,
-**Policy Builder**, **Raw ODRL**, and **Manage Templates**. The **Template** tab
-is selected by default when templates are available.
+Open **Create Policy**. Across the top you will see the **Template**, **Policy
+Builder**, and **Raw ODRL** tabs; the **Template** tab is selected by default
+when templates are available. When the editor is embedded in a host application
+(via the web component), an extra **Manage Templates** tab is also shown — see
+[Managing templates](#managing-templates). In the standalone app, templates are
+managed on a separate **Templates** page instead.
 
 ![The Create Policy screen with the Template tab selected, showing the available templates](./images/create_policy_template_selection.png)
 

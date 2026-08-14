@@ -12,7 +12,7 @@ import { I18nProvider } from '../i18n';
 import { clearMappingsCache } from '../hooks/useMappings';
 import { UiService } from '../api/services/UiService';
 import type { Mappings, OdrlPolicyJson } from '../api';
-import type { PolicyTemplate } from '../types';
+import type { FieldTemplate } from '../types';
 
 // Mock UiService so we control the mappings response
 vi.mock('../api/services/UiService', () => ({
@@ -263,7 +263,7 @@ describe('PolicyBuilder', () => {
 });
 
 /** Template fixture for template-mode tests. */
-const TEMPLATE_WITH_LOCKED_ACTION: PolicyTemplate = {
+const TEMPLATE_WITH_LOCKED_ACTION: FieldTemplate = {
   id: 'test-locked-action',
   name: 'Locked Action Template',
   description: 'A test template with the action field locked',
@@ -303,7 +303,7 @@ describe('PolicyBuilder with template', () => {
       <PolicyBuilder
         policy={EMPTY_POLICY}
         setPolicy={() => {}}
-        template={TEMPLATE_WITH_LOCKED_ACTION}
+        fieldTemplate={TEMPLATE_WITH_LOCKED_ACTION}
       />,
     );
 
@@ -323,7 +323,7 @@ describe('PolicyBuilder with template', () => {
       <PolicyBuilder
         policy={EMPTY_POLICY}
         setPolicy={() => {}}
-        template={TEMPLATE_WITH_LOCKED_ACTION}
+        fieldTemplate={TEMPLATE_WITH_LOCKED_ACTION}
       />,
     );
 
@@ -343,7 +343,7 @@ describe('PolicyBuilder with template', () => {
       <PolicyBuilder
         policy={EMPTY_POLICY}
         setPolicy={() => {}}
-        template={TEMPLATE_WITH_LOCKED_ACTION}
+        fieldTemplate={TEMPLATE_WITH_LOCKED_ACTION}
       />,
     );
 
@@ -362,7 +362,7 @@ describe('PolicyBuilder with template', () => {
       <PolicyBuilder
         policy={EMPTY_POLICY}
         setPolicy={() => {}}
-        template={TEMPLATE_WITH_LOCKED_ACTION}
+        fieldTemplate={TEMPLATE_WITH_LOCKED_ACTION}
       />,
     );
 
@@ -383,7 +383,7 @@ describe('PolicyBuilder with template', () => {
       <PolicyBuilder
         policy={EMPTY_POLICY}
         setPolicy={() => {}}
-        template={TEMPLATE_WITH_LOCKED_ACTION}
+        fieldTemplate={TEMPLATE_WITH_LOCKED_ACTION}
       />,
     );
 
@@ -404,7 +404,7 @@ describe('PolicyBuilder with template', () => {
       <PolicyBuilder
         policy={EMPTY_POLICY}
         setPolicy={setPolicy}
-        template={TEMPLATE_WITH_LOCKED_ACTION}
+        fieldTemplate={TEMPLATE_WITH_LOCKED_ACTION}
       />,
     );
 

@@ -6,44 +6,13 @@
  * partial string overrides that fall back to English defaults.
  */
 import { useMemo, type ReactNode } from 'react';
-import { en, type I18nStrings } from './en';
+import { type I18nStrings } from './en';
 import { I18nContext } from './context';
+import { resolveStrings, type DeepPartial } from './resolve';
 
-/** Recursive partial type allowing consumers to override only specific keys. */
-export type DeepPartial<T> = {
-  [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
-};
-
-/**
- * Deep-merges a partial override object into a base object.
- * Keys present in `override` replace those in `base`; missing keys
- * fall back to `base` values.
- */
-function deepMerge<T extends Record<string, unknown>>(
-  base: T,
-  override: DeepPartial<T>,
-): T {
-  const result = { ...base };
-  for (const key of Object.keys(override) as Array<keyof T>) {
-    const overrideVal = override[key];
-    if (
-      overrideVal !== undefined &&
-      typeof overrideVal === 'object' &&
-      overrideVal !== null &&
-      !Array.isArray(overrideVal) &&
-      typeof base[key] === 'object' &&
-      base[key] !== null
-    ) {
-      result[key] = deepMerge(
-        base[key] as Record<string, unknown>,
-        overrideVal as DeepPartial<Record<string, unknown>>,
-      ) as T[keyof T];
-    } else if (overrideVal !== undefined) {
-      result[key] = overrideVal as T[keyof T];
-    }
-  }
-  return result;
-}
+// Re-exported for backwards compatibility with modules that import the type
+// from this file (the runtime helper now lives in ./resolve).
+export type { DeepPartial } from './resolve';
 
 /** Value exposed by the i18n context (re-imported from context.ts). */
 type I18nContextValue = import('./context').I18nContextValue;
@@ -73,7 +42,7 @@ export const I18nProvider = ({
   children,
 }: I18nProviderProps) => {
   const merged = useMemo<I18nStrings>(
-    () => (overrides ? deepMerge(en, overrides) : en),
+    () => resolveStrings(overrides),
     [overrides],
   );
 

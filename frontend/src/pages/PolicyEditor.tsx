@@ -177,6 +177,8 @@ const PolicyEditor = () => {
   const [validationMode, setValidationMode] = useState<ValidationMode>(persisted.mode);
   const [validationResult, setValidationResult] = useState<ValidationResponse | null>(null);
   const [validationError, setValidationError] = useState('');
+  /** Error surfaced when saving a policy (including template-based creation). */
+  const [saveError, setSaveError] = useState('');
   const [isValidating, setIsValidating] = useState(false);
 
   // Fetch available services on mount
@@ -354,16 +356,19 @@ const PolicyEditor = () => {
 
     savePromise
       .then(() => {
+        // Stay on the page (do NOT navigate) so the read-only, template-created
+        // mode — banner, disabled tabs, hidden action row — is actually shown,
+        // matching the embedded editor's behaviour.
         setPolicy(requestBody);
         setCreatedFromTemplate(true);
         setTemplateName(selectedTemplate?.name ?? '');
-        navigate('/');
+        setSaveError('');
       })
-      .catch(console.error)
+      .catch((err: Error) => setSaveError(err.message))
       .finally(() => {
         setIsCreatingFromTemplate(false);
       });
-  }, [selectedServiceId, selectedTemplate, navigate]);
+  }, [selectedServiceId, selectedTemplate]);
 
   /**
    * Saves the policy (create or update).
@@ -518,8 +523,10 @@ const PolicyEditor = () => {
               <div className="mt-4">
                 <hr />
                 <TemplateFiller
+                  key={selectedTemplate.id}
                   template={selectedTemplate}
                   onCreatePolicy={handleCreateFromTemplate}
+                  onPolicyChange={setPolicy}
                   isCreating={isCreatingFromTemplate}
                 />
               </div>
@@ -625,6 +632,12 @@ const PolicyEditor = () => {
             {t.validate}
           </Button>
         </>
+      )}
+
+      {saveError && (
+        <Alert variant="danger" className="mt-3" dismissible onClose={() => setSaveError('')}>
+          {saveError}
+        </Alert>
       )}
 
       {/* Validation Modal */}

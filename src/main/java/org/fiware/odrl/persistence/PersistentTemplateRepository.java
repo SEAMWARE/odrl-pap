@@ -28,7 +28,7 @@ import java.util.Optional;
  * pagination, and service-scoping via the {@code serviceEntity}
  * relationship on {@link TemplateEntity}.</p>
  *
- * <p>The ODRL skeleton and placeholder definitions are stored as serialised
+ * <p>The ODRL skeleton and placeholder definitions are stored as serialized
  * JSON strings in {@code TEXT} columns. Conversion between the API model
  * types and the raw JSON is handled via Jackson {@link ObjectMapper}.</p>
  */
@@ -39,10 +39,10 @@ public class PersistentTemplateRepository implements TemplateRepository {
     /** Column used for default ordering in paginated queries. */
     private static final String DEFAULT_SORT = "id";
 
-    /** Jackson type reference for deserialising the ODRL skeleton map. */
+    /** Jackson type reference for deserializing the ODRL skeleton map. */
     private static final TypeReference<Map<String, Object>> MAP_TYPE_REF = new TypeReference<>() {};
 
-    /** Jackson type reference for deserialising the placeholder list. */
+    /** Jackson type reference for deserializing the placeholder list. */
     private static final TypeReference<List<TemplatePlaceholder>> PLACEHOLDER_LIST_TYPE_REF = new TypeReference<>() {};
 
     @Inject
@@ -62,9 +62,9 @@ public class PersistentTemplateRepository implements TemplateRepository {
         entity.setTemplateId(id);
         entity.setName(templateCreate.getName());
         entity.setDescription(templateCreate.getDescription());
-        entity.setOdrl(serialiseMap(templateCreate.getOdrl()));
+        entity.setOdrl(serializeMap(templateCreate.getOdrl()));
         entity.setNaturalLanguage(templateCreate.getNaturalLanguage());
-        entity.setPlaceholders(serialisePlaceholders(templateCreate.getPlaceholders()));
+        entity.setPlaceholders(serializePlaceholders(templateCreate.getPlaceholders()));
         managedService.ifPresent(entity::setServiceEntity);
 
         entity.persist();
@@ -81,9 +81,9 @@ public class PersistentTemplateRepository implements TemplateRepository {
 
         entity.setName(templateCreate.getName());
         entity.setDescription(templateCreate.getDescription());
-        entity.setOdrl(serialiseMap(templateCreate.getOdrl()));
+        entity.setOdrl(serializeMap(templateCreate.getOdrl()));
         entity.setNaturalLanguage(templateCreate.getNaturalLanguage());
-        entity.setPlaceholders(serialisePlaceholders(templateCreate.getPlaceholders()));
+        entity.setPlaceholders(serializePlaceholders(templateCreate.getPlaceholders()));
 
         entity.persist();
         log.debug("Updated template with id {}", id);
@@ -179,77 +179,77 @@ public class PersistentTemplateRepository implements TemplateRepository {
         template.setId(entity.getTemplateId());
         template.setName(entity.getName());
         template.setDescription(entity.getDescription());
-        template.setOdrl(deserialiseMap(entity.getOdrl()));
+        template.setOdrl(deserializeMap(entity.getOdrl()));
         template.setNaturalLanguage(entity.getNaturalLanguage());
-        template.setPlaceholders(deserialisePlaceholders(entity.getPlaceholders()));
+        template.setPlaceholders(deserializePlaceholders(entity.getPlaceholders()));
         return template;
     }
 
     /**
-     * Serialise a map to a JSON string for storage.
+     * Serialize a map to a JSON string for storage.
      *
-     * @param map the map to serialise (may be {@code null})
+     * @param map the map to serialize (may be {@code null})
      * @return the JSON string, or {@code null} if the input is {@code null}
      */
-    private String serialiseMap(Map<String, Object> map) {
+    private String serializeMap(Map<String, Object> map) {
         if (map == null) {
             return null;
         }
         try {
             return objectMapper.writeValueAsString(map);
         } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to serialise ODRL map to JSON", e);
+            throw new IllegalArgumentException("Failed to serialize ODRL map to JSON", e);
         }
     }
 
     /**
-     * Deserialise a JSON string back into a map.
+     * Deserialize a JSON string back into a map.
      *
      * @param json the JSON string (may be {@code null})
-     * @return the deserialised map, or an empty map if input is {@code null}
+     * @return the deserialized map, or an empty map if input is {@code null}
      */
-    private Map<String, Object> deserialiseMap(String json) {
+    private Map<String, Object> deserializeMap(String json) {
         if (json == null) {
             return Collections.emptyMap();
         }
         try {
             return objectMapper.readValue(json, MAP_TYPE_REF);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to deserialise ODRL JSON from database", e);
+            throw new IllegalStateException("Failed to deserialize ODRL JSON from database", e);
         }
     }
 
     /**
-     * Serialise a list of placeholder definitions to a JSON string for storage.
+     * Serialize a list of placeholder definitions to a JSON string for storage.
      *
      * @param placeholders the placeholder list (may be {@code null})
      * @return the JSON string, or {@code null} if the input is {@code null}
      */
-    private String serialisePlaceholders(List<TemplatePlaceholder> placeholders) {
+    private String serializePlaceholders(List<TemplatePlaceholder> placeholders) {
         if (placeholders == null) {
             return null;
         }
         try {
             return objectMapper.writeValueAsString(placeholders);
         } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to serialise placeholders to JSON", e);
+            throw new IllegalArgumentException("Failed to serialize placeholders to JSON", e);
         }
     }
 
     /**
-     * Deserialise a JSON string back into a list of placeholder definitions.
+     * Deserialize a JSON string back into a list of placeholder definitions.
      *
      * @param json the JSON string (may be {@code null})
-     * @return the deserialised list, or an empty list if input is {@code null}
+     * @return the deserialized list, or an empty list if input is {@code null}
      */
-    private List<TemplatePlaceholder> deserialisePlaceholders(String json) {
+    private List<TemplatePlaceholder> deserializePlaceholders(String json) {
         if (json == null) {
             return Collections.emptyList();
         }
         try {
             return objectMapper.readValue(json, PLACEHOLDER_LIST_TYPE_REF);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to deserialise placeholders JSON from database", e);
+            throw new IllegalStateException("Failed to deserialize placeholders JSON from database", e);
         }
     }
 }

@@ -239,7 +239,7 @@ public class TemplateResourceTest {
     }
 
     @Test
-    @DisplayName("Null ODRL with placeholder only in natural language should pass")
+    @DisplayName("Null ODRL is rejected — the skeleton is a required field")
     void testValidateTemplate_nullOdrl() {
         TemplateCreate tc = new TemplateCreate();
         tc.setName("Test");
@@ -248,8 +248,10 @@ public class TemplateResourceTest {
         tc.setPlaceholders(List.of(createPlaceholder("ROLE", "Role", "string")));
 
         List<String> errors = TemplateResource.validateTemplate(tc);
-        assertTrue(errors.isEmpty(),
-                "Null ODRL with placeholder in natural language should be valid, got: " + errors);
+        assertFalse(errors.isEmpty(),
+                "Null ODRL must be rejected as a missing required field");
+        assertTrue(errors.stream().anyMatch(e -> e.contains("ODRL skeleton is required")),
+                "Expected a required-ODRL error, got: " + errors);
     }
 
     @Test
@@ -264,6 +266,48 @@ public class TemplateResourceTest {
         List<String> errors = TemplateResource.validateTemplate(tc);
         assertTrue(errors.isEmpty(),
                 "Null natural language with placeholder in ODRL should be valid, got: " + errors);
+    }
+
+    @Test
+    @DisplayName("Lowercase placeholder key is rejected — the frontend never substitutes it")
+    void testValidateTemplate_lowercaseKey() {
+        TemplateCreate tc = new TemplateCreate();
+        tc.setName("Test");
+        // The token matches the key literally, but not the [A-Z_][A-Z0-9_]* pattern.
+        tc.setOdrl(Map.of("odrl:target", "{{resource_id}}"));
+        tc.setPlaceholders(List.of(createPlaceholder("resource_id", "Resource", "string")));
+
+        List<String> errors = TemplateResource.validateTemplate(tc);
+        assertFalse(errors.isEmpty(), "A lowercase key must be rejected");
+        assertTrue(errors.stream().anyMatch(e -> e.contains("resource_id") && e.contains("not referenced")),
+                "Error should flag the un-substitutable lowercase key, got: " + errors);
+    }
+
+    @Test
+    @DisplayName("A {{TOKEN}} without a placeholder definition is rejected")
+    void testValidateTemplate_undefinedToken() {
+        TemplateCreate tc = new TemplateCreate();
+        tc.setName("Test");
+        tc.setOdrl(Map.of("odrl:target", "{{DEFINED}}", "odrl:assignee", "{{UNDEFINED}}"));
+        tc.setPlaceholders(List.of(createPlaceholder("DEFINED", "Defined", "string")));
+
+        List<String> errors = TemplateResource.validateTemplate(tc);
+        assertFalse(errors.isEmpty(), "An undefined token must be rejected");
+        assertTrue(errors.stream().anyMatch(e -> e.contains("UNDEFINED") && e.contains("no matching placeholder")),
+                "Error should flag the token with no placeholder definition, got: " + errors);
+    }
+
+    @Test
+    @DisplayName("Missing name is rejected — name is a required field")
+    void testValidateTemplate_missingName() {
+        TemplateCreate tc = new TemplateCreate();
+        tc.setName(null);
+        tc.setOdrl(Map.of("odrl:target", "{{TARGET_ID}}"));
+        tc.setPlaceholders(List.of(createPlaceholder("TARGET_ID", "Target", "string")));
+
+        List<String> errors = TemplateResource.validateTemplate(tc);
+        assertTrue(errors.stream().anyMatch(e -> e.contains("name is required")),
+                "Expected a required-name error, got: " + errors);
     }
 
     // -------------------------------------------------------------------------

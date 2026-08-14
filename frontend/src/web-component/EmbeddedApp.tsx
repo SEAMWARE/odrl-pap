@@ -22,7 +22,7 @@ import { TemplateService } from '../api/services/TemplateService';
 import { UiService } from '../api/services/UiService';
 import type { OdrlPolicyJson, ValidationResponse, Template } from '../services/api';
 import { configureApi } from '../services/api';
-import type { PolicyTemplate } from '../types';
+import type { FieldTemplate } from '../types';
 import { TestRequest } from '../api/models/TestRequest';
 import type { GenericJsonInput } from '../api/models/GenericJsonInput';
 import type { ValidationMode } from '../components/ValidationEditor';
@@ -32,7 +32,7 @@ import ValidationResult from '../components/ValidationResult';
 import TemplateSelector from '../components/TemplateSelector';
 import TemplateFiller from '../components/TemplateFiller';
 import EmbeddedTemplateManager from './EmbeddedTemplateManager';
-import { I18nProvider, type DeepPartial } from '../i18n';
+import { I18nProvider, resolveStrings, type DeepPartial } from '../i18n';
 import type { I18nStrings } from '../i18n';
 import { lightTheme, darkTheme, type ThemeConfig } from '../theme/defaultTheme';
 import {
@@ -50,9 +50,6 @@ const TAB_KEY_BUILDER = 'builder';
 const TAB_KEY_ODRL = 'odrl';
 /** Tab key for the template management (create/edit/delete) tab. */
 const TAB_KEY_MANAGE_TEMPLATES = 'manage-templates';
-
-/** Title for the template management tab. */
-const MANAGE_TEMPLATES_TAB_TITLE = 'Manage Templates';
 
 /** Default test request values for validation. */
 const DEFAULT_TEST_REQUEST: TestRequest = {
@@ -98,8 +95,8 @@ export interface EmbeddedAppProps {
    * should be applied (typically the shadow-DOM container div).
    */
   containerRef?: RefObject<HTMLDivElement | null>;
-  /** Optional policy template for pre-filling and constraining the editor. */
-  template?: PolicyTemplate;
+  /** Optional field template for pre-filling and constraining the builder form. */
+  fieldTemplate?: FieldTemplate;
 }
 
 /**
@@ -114,9 +111,13 @@ const EmbeddedApp = ({
   i18nOverrides,
   themeOverrides,
   containerRef,
-  template,
+  fieldTemplate,
 }: EmbeddedAppProps) => {
   const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext, serviceId, hiddenTabs } = config;
+
+  // EmbeddedApp renders the I18nProvider itself, so it cannot read strings via
+  // useI18n(); it resolves them directly for the (translatable) tab titles.
+  const tabStrings = useMemo(() => resolveStrings(i18nOverrides).policyEditor, [i18nOverrides]);
 
   // --- API configuration ---
   useEffect(() => {
@@ -192,31 +193,7 @@ const EmbeddedApp = ({
       });
   }, [mode, hiddenTabs.hideTemplateTab, serviceId]);
 
-  // --- Determine the default active tab based on visibility ---
-  /**
-   * Computes the default tab key based on which tabs are visible.
-   * Priority: template (if available) > builder > odrl.
-   */
-  const defaultTab = useMemo(() => {
-    // For create mode with templates available, prefer template tab
-    if (mode === 'create' && !hiddenTabs.hideTemplateTab && templates.length > 0) {
-      return TAB_KEY_TEMPLATE;
-    }
-    if (!hiddenTabs.hideBuilderTab) return TAB_KEY_BUILDER;
-    if (!hiddenTabs.hideRawTab) return TAB_KEY_ODRL;
-    // Fallback: at least one tab should be visible; use builder
-    return TAB_KEY_BUILDER;
-  }, [hiddenTabs, mode, templates.length]);
-
-  // --- Editor tab state ---
-  const [activeTab, setActiveTab] = useState(TAB_KEY_BUILDER);
-
-  // Update active tab when default changes (e.g., after templates load)
-  useEffect(() => {
-    setActiveTab(defaultTab);
-  }, [defaultTab]);
-
-  /** Whether the template tab should be visible. */
+  /** Whether the template selection tab should be visible. */
   const showTemplateTab = mode === 'create' && !hiddenTabs.hideTemplateTab && !templatesLoading && templates.length > 0;
 
   /**
@@ -227,6 +204,56 @@ const EmbeddedApp = ({
    * `hide-template-create-tab` attribute.
    */
   const showManageTemplatesTab = !hiddenTabs.hideTemplateCreateTab;
+
+  // --- Determine the default active tab based on visibility ---
+  /**
+   * Computes the default tab key, choosing only among tabs that are actually
+   * rendered. Priority: template (when available) > builder > raw > manage.
+   */
+  const defaultTab = useMemo(() => {
+    if (mode === 'create' && !hiddenTabs.hideTemplateTab && templates.length > 0) {
+      return TAB_KEY_TEMPLATE;
+    }
+    if (!hiddenTabs.hideBuilderTab) return TAB_KEY_BUILDER;
+    if (!hiddenTabs.hideRawTab) return TAB_KEY_ODRL;
+    if (!hiddenTabs.hideTemplateCreateTab) return TAB_KEY_MANAGE_TEMPLATES;
+    // Nothing is visible (all tabs hidden) — fall back to the builder key.
+    return TAB_KEY_BUILDER;
+  }, [hiddenTabs, mode, templates.length]);
+
+  /** Returns whether the tab with the given key is currently rendered. */
+  const isTabVisible = useCallback(
+    (key: string): boolean => {
+      switch (key) {
+        case TAB_KEY_TEMPLATE:
+          return showTemplateTab;
+        case TAB_KEY_BUILDER:
+          return !hiddenTabs.hideBuilderTab;
+        case TAB_KEY_ODRL:
+          return !hiddenTabs.hideRawTab;
+        case TAB_KEY_MANAGE_TEMPLATES:
+          return showManageTemplatesTab;
+        default:
+          return false;
+      }
+    },
+    [showTemplateTab, showManageTemplatesTab, hiddenTabs.hideBuilderTab, hiddenTabs.hideRawTab],
+  );
+
+  // --- Editor tab state ---
+  const [activeTab, setActiveTab] = useState(TAB_KEY_BUILDER);
+  /** True once the user has manually chosen a tab. */
+  const userSelectedTabRef = useRef(false);
+
+  // Follow the computed default until the user picks a tab; afterwards only move
+  // them if their current tab has become hidden. This stops the async template
+  // fetch (which changes `defaultTab` once templates resolve) from yanking the
+  // user off a tab — e.g. an in-progress Manage Templates form — mid-edit.
+  useEffect(() => {
+    setActiveTab((current) =>
+      userSelectedTabRef.current && isTabVisible(current) ? current : defaultTab,
+    );
+  }, [defaultTab, isTabVisible]);
 
   // --- Raw ODRL tab state ---
   /** Raw JSON text decoupled from the policy state for free-form editing. */
@@ -461,11 +488,11 @@ const EmbeddedApp = ({
             id="embedded-editor-tabs"
             activeKey={activeTab}
             onSelect={(k) => {
-              if (k && !createdFromTemplate) {
-                setActiveTab(k);
-              } else if (k === TAB_KEY_TEMPLATE || k === TAB_KEY_MANAGE_TEMPLATES) {
-                // Always allow switching to the template and management tabs,
-                // even when the policy editor is locked in read-only mode.
+              if (!k) return;
+              // The template and management tabs stay switchable even when the
+              // policy editor is locked in read-only (template-created) mode.
+              if (!createdFromTemplate || k === TAB_KEY_TEMPLATE || k === TAB_KEY_MANAGE_TEMPLATES) {
+                userSelectedTabRef.current = true;
                 setActiveTab(k);
               }
             }}
@@ -473,7 +500,7 @@ const EmbeddedApp = ({
           >
             {/* Template tab — shown only for create mode when templates exist and tab is not hidden */}
             {showTemplateTab && (
-              <Tab eventKey={TAB_KEY_TEMPLATE} title="Template">
+              <Tab eventKey={TAB_KEY_TEMPLATE} title={tabStrings.tabTemplate}>
                 <TemplateSelector
                   templates={templates}
                   selectedTemplate={selectedTemplate}
@@ -483,6 +510,7 @@ const EmbeddedApp = ({
                   <div className="mt-4">
                     <hr />
                     <TemplateFiller
+                      key={selectedTemplate.id}
                       template={selectedTemplate}
                       onCreatePolicy={handleCreateFromTemplate}
                       onPolicyChange={handleTemplatePolicyChange}
@@ -496,16 +524,16 @@ const EmbeddedApp = ({
             {!hiddenTabs.hideBuilderTab && (
               <Tab
                 eventKey={TAB_KEY_BUILDER}
-                title="Policy Builder"
+                title={tabStrings.tabBuilder}
                 disabled={createdFromTemplate}
               >
-                <PolicyBuilder policy={policy} setPolicy={setPolicy} template={template} />
+                <PolicyBuilder policy={policy} setPolicy={setPolicy} fieldTemplate={fieldTemplate} />
               </Tab>
             )}
             {!hiddenTabs.hideRawTab && (
               <Tab
                 eventKey={TAB_KEY_ODRL}
-                title="Raw ODRL"
+                title={tabStrings.tabRawOdrl}
                 disabled={createdFromTemplate}
               >
                 {/* --- Context management --- */}
@@ -581,7 +609,7 @@ const EmbeddedApp = ({
 
             {/* Template management tab — create/edit/delete templates */}
             {showManageTemplatesTab && (
-              <Tab eventKey={TAB_KEY_MANAGE_TEMPLATES} title={MANAGE_TEMPLATES_TAB_TITLE}>
+              <Tab eventKey={TAB_KEY_MANAGE_TEMPLATES} title={tabStrings.tabManageTemplates}>
                 <EmbeddedTemplateManager serviceId={serviceId} onEvent={onEvent} />
               </Tab>
             )}

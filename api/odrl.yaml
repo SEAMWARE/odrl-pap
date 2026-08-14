@@ -404,6 +404,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Template'
+        '400':
+          description: >
+            Validation failed — e.g. a missing required field (name/odrl),
+            duplicate placeholder keys, or a placeholder/token mismatch.
+          content:
+            text/plain:
+              schema:
+                type: string
     get:
       tags:
         - Template
@@ -458,6 +466,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Template'
+        '400':
+          description: >
+            Validation failed — e.g. a missing required field (name/odrl),
+            duplicate placeholder keys, or a placeholder/token mismatch.
+          content:
+            text/plain:
+              schema:
+                type: string
         '404':
           description: No such template exists
     delete:
@@ -497,6 +513,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Template'
+        '400':
+          description: >
+            Validation failed — e.g. a missing required field (name/odrl),
+            duplicate placeholder keys, or a placeholder/token mismatch.
+          content:
+            text/plain:
+              schema:
+                type: string
         '404':
           description: No such service exists
     get:
@@ -558,6 +582,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Template'
+        '400':
+          description: >
+            Validation failed — e.g. a missing required field (name/odrl),
+            duplicate placeholder keys, or a placeholder/token mismatch.
+          content:
+            text/plain:
+              schema:
+                type: string
         '404':
           description: No such template or service exists
     delete:

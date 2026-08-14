@@ -37,7 +37,7 @@
  *
  * - `i18nStrings` — partial i18n override object (deep-merged with defaults)
  * - `themeConfig` — partial ThemeConfig override merged on top of the preset
- * - `template` — a {@link PolicyTemplate} object to pre-fill and constrain the editor
+ * - `fieldTemplate` — a {@link FieldTemplate} object to pre-fill and constrain the editor
  * - `policyContext` — custom JSON-LD `@context` object/string for new policies
  * - `serviceId` — service ID string for service-scoped policy operations
  *
@@ -67,7 +67,7 @@ import type { EmbeddedConfig, EditorMode, EmbeddedThemePreset, TabVisibility } f
 import type { DeepPartial } from '../i18n/I18nContext';
 import type { I18nStrings } from '../i18n/en';
 import type { ThemeConfig } from '../theme/defaultTheme';
-import type { PolicyTemplate } from '../types';
+import type { FieldTemplate } from '../types';
 
 // Bootstrap CSS imported as a string for shadow-DOM injection.
 // The `?inline` suffix tells Vite to return the CSS text, not inject it
@@ -152,8 +152,8 @@ export class OdrlPolicyEditorElement extends HTMLElement {
   /** Partial theme overrides set via JS property. */
   private _themeConfig: Partial<ThemeConfig> | undefined;
 
-  /** Policy template set via JS property. */
-  private _template: PolicyTemplate | undefined;
+  /** Field template set via JS property. */
+  private _fieldTemplate: FieldTemplate | undefined;
 
   /** Custom JSON-LD `@context` set via JS property. */
   private _policyContext: Record<string, string> | string | undefined;
@@ -202,15 +202,16 @@ export class OdrlPolicyEditorElement extends HTMLElement {
   }
 
   /**
-   * Sets a policy template (JS property, not HTML attribute).
+   * Sets a field template (JS property, not HTML attribute).
    *
-   * When set, the editor pre-fills the form from the template skeleton
-   * and locks fields listed in `lockedFields`.
+   * When set, the editor pre-fills the form from the template skeleton and
+   * locks fields listed in `lockedFields`. This is distinct from the stored,
+   * placeholder-based templates managed through the template tabs.
    *
    * @example
    * ```js
    * const editor = document.querySelector('odrl-policy-editor');
-   * editor.template = {
+   * editor.fieldTemplate = {
    *   id: 'dome-access',
    *   name: 'DOME Marketplace Access',
    *   description: 'Grants access to a DOME resource',
@@ -221,14 +222,14 @@ export class OdrlPolicyEditorElement extends HTMLElement {
    * };
    * ```
    */
-  set template(value: PolicyTemplate | undefined) {
-    this._template = value;
+  set fieldTemplate(value: FieldTemplate | undefined) {
+    this._fieldTemplate = value;
     this.renderReact();
   }
 
-  /** Returns the current policy template, or `undefined` if none is set. */
-  get template(): PolicyTemplate | undefined {
-    return this._template;
+  /** Returns the current field template, or `undefined` if none is set. */
+  get fieldTemplate(): FieldTemplate | undefined {
+    return this._fieldTemplate;
   }
 
   /**
@@ -370,19 +371,37 @@ export class OdrlPolicyEditorElement extends HTMLElement {
   }
 
   /**
-   * Resolves tab visibility from the `hide-*-tab` boolean attributes.
+   * Reads a boolean HTML attribute.
    *
-   * Boolean HTML attributes follow the convention where the attribute's
-   * presence means `true` and its absence means `false`.
+   * The attribute's presence normally means `true`, but an explicit value of
+   * `"false"` or `"0"` (case-insensitive) is treated as `false`. This makes the
+   * component safe with framework hosts that render the attribute for a falsy
+   * binding — e.g. Angular `[attr.hide-template-tab]="false"` and Vue
+   * `:hide-template-tab="false"` both emit `hide-template-tab="false"`, which
+   * would otherwise hide the tab and leave the editor blank.
+   *
+   * @param name - The attribute name.
+   * @returns `true` when the attribute is present and not explicitly false.
+   */
+  private readBooleanAttribute(name: string): boolean {
+    if (!this.hasAttribute(name)) {
+      return false;
+    }
+    const value = (this.getAttribute(name) ?? '').trim().toLowerCase();
+    return value !== 'false' && value !== '0';
+  }
+
+  /**
+   * Resolves tab visibility from the `hide-*-tab` boolean attributes.
    *
    * @returns A {@link TabVisibility} object.
    */
   private resolveHiddenTabs(): TabVisibility {
     return {
-      hideBuilderTab: this.hasAttribute('hide-builder-tab'),
-      hideRawTab: this.hasAttribute('hide-raw-tab'),
-      hideTemplateTab: this.hasAttribute('hide-template-tab'),
-      hideTemplateCreateTab: this.hasAttribute('hide-template-create-tab'),
+      hideBuilderTab: this.readBooleanAttribute('hide-builder-tab'),
+      hideRawTab: this.readBooleanAttribute('hide-raw-tab'),
+      hideTemplateTab: this.readBooleanAttribute('hide-template-tab'),
+      hideTemplateCreateTab: this.readBooleanAttribute('hide-template-create-tab'),
     };
   }
 
@@ -453,7 +472,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
           i18nOverrides: this._i18nStrings,
           themeOverrides: this._themeConfig,
           containerRef: this.containerRef,
-          template: this._template,
+          fieldTemplate: this._fieldTemplate,
         }),
       );
     });

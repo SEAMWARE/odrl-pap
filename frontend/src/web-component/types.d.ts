@@ -150,7 +150,7 @@ export const TAG_NAME: 'odrl-policy-editor';
  *
  * - `i18nStrings` — partial i18n override object (deep-merged with defaults)
  * - `themeConfig` — partial ThemeConfig override merged on top of the preset
- * - `template` — a PolicyTemplate object to pre-fill and constrain the editor
+ * - `fieldTemplate` — a FieldTemplate object to pre-fill and constrain the editor
  * - `policyContext` — custom JSON-LD `@context` object/string for new policies
  * - `serviceId` — service ID string for service-scoped policy operations
  *
@@ -190,11 +190,14 @@ export declare class OdrlPolicyEditorElement extends HTMLElement {
   themeConfig: Record<string, string> | undefined;
 
   /**
-   * Policy template to pre-fill and constrain the editor.
+   * Field template to pre-fill and constrain the builder form.
+   *
+   * A client-side skeleton with editable/locked fields — distinct from the
+   * stored, placeholder-based templates managed through the template tabs.
    *
    * @example
    * ```js
-   * editor.template = {
+   * editor.fieldTemplate = {
    *   id: 'dome-access',
    *   name: 'DOME Marketplace Access',
    *   skeleton: { '@context': '...', '@type': 'odrl:Agreement', ... },
@@ -203,7 +206,7 @@ export declare class OdrlPolicyEditorElement extends HTMLElement {
    * };
    * ```
    */
-  template: Record<string, unknown> | undefined;
+  fieldTemplate: Record<string, unknown> | undefined;
 
   /**
    * Custom JSON-LD `@context` for new policies.

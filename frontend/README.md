@@ -367,7 +367,7 @@ JavaScript properties on the element:
 |---------------|------------------------------|------------------------------------------------------|
 | `i18nStrings` | `DeepPartial<I18nStrings>`   | Partial i18n overrides (deep-merged with defaults)   |
 | `themeConfig` | `Partial<ThemeConfig>`       | Partial theme CSS custom property overrides           |
-| `template`    | `PolicyTemplate`             | Pre-fills the form and optionally locks fields        |
+| `fieldTemplate` | `FieldTemplate`            | Pre-fills the builder form and optionally locks fields (client-side; distinct from stored templates) |
 | `policyContext` | `Record<string, string>`   | Default `@context` for new policies (takes precedence over attribute) |
 | `serviceId`   | `string`                     | Service scope for policy/template operations (takes precedence over attribute) |
 
@@ -386,8 +386,9 @@ editor.themeConfig = {
   'odrl-secondary-color': '#e8710a',
 };
 
-// Pre-fill and constrain the editor with a template
-editor.template = {
+// Pre-fill and constrain the builder form with a field template
+// (distinct from the stored, placeholder-based templates in the template tabs)
+editor.fieldTemplate = {
   id: 'dome-access',
   name: 'DOME Marketplace Access',
   description: 'Grants access to a DOME resource',

@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { Form, Button, Row, Col, Card, CloseButton } from 'react-bootstrap';
 import type { TemplatePlaceholder } from '../api/models/TemplatePlaceholder';
 import { PLACEHOLDER_TYPES, createEmptyPlaceholder } from '../types/TemplateTypes';
+import { useI18n } from '../i18n';
 
 /** Separator used between dropdown option values in the options input. */
 const OPTIONS_SEPARATOR = ',';
@@ -47,6 +48,8 @@ interface OptionsInputProps {
  * @param props - Component properties.
  */
 const OptionsInput: React.FC<OptionsInputProps> = ({ options, index, onCommit }) => {
+  const { strings } = useI18n();
+  const t = strings.placeholderEditor;
   const committed = options.join(`${OPTIONS_SEPARATOR} `);
   const [text, setText] = useState(committed);
 
@@ -63,8 +66,8 @@ const OptionsInput: React.FC<OptionsInputProps> = ({ options, index, onCommit })
       value={text}
       onChange={(e) => setText(e.target.value)}
       onBlur={() => onCommit(parseOptions(text))}
-      placeholder="e.g., value1, value2, value3"
-      aria-label={`Placeholder options ${index + 1}`}
+      placeholder={t.optionsPlaceholder}
+      aria-label={`${t.optionsLabel} ${index + 1}`}
     />
   );
 };
@@ -75,17 +78,18 @@ interface PlaceholderEditorProps {
   placeholders: TemplatePlaceholder[];
   /** Callback to update the entire placeholders array. */
   onChange: (placeholders: TemplatePlaceholder[]) => void;
-  /** Set of placeholder keys auto-detected from the ODRL skeleton. */
+  /** Set of placeholder keys auto-detected from the ODRL skeleton / description. */
   detectedKeys?: Set<string>;
 }
 
 /**
  * Editable list of template placeholder definitions.
  *
- * Each placeholder row provides inputs for key, display name,
- * description, type selection, and optional comma-separated
- * dropdown values. Auto-detected keys from the ODRL skeleton
- * are shown with a visual indicator.
+ * Each placeholder row provides inputs for key, display name, description,
+ * type selection, and optional comma-separated dropdown values. Keys that are
+ * referenced by a `{{TOKEN}}` are flagged "auto-detected"; keys that are not
+ * are flagged "unused" so the author can spot orphaned definitions without the
+ * editor silently deleting them.
  *
  * @param props - Component properties.
  */
@@ -94,6 +98,9 @@ const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
   onChange,
   detectedKeys = new Set(),
 }) => {
+  const { strings } = useI18n();
+  const t = strings.placeholderEditor;
+
   /**
    * Updates a single field of a placeholder at the given index.
    *
@@ -137,106 +144,117 @@ const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
 
   return (
     <div>
-      {placeholders.map((placeholder, index) => (
-        <Card key={placeholder.key} className="mb-2">
-          <Card.Body className="py-2 px-3">
-            <div className="d-flex justify-content-between align-items-start mb-2">
-              <strong className="text-muted small">
-                Placeholder #{index + 1}
-                {detectedKeys.has(placeholder.key) && (
-                  <span className="badge bg-success ms-2" title="Auto-detected from ODRL skeleton">
-                    auto-detected
-                  </span>
-                )}
-              </strong>
-              <CloseButton
-                onClick={() => handleRemove(index)}
-                aria-label={`Remove placeholder ${placeholder.key}`}
-              />
-            </div>
+      {placeholders.map((placeholder, index) => {
+        const isDetected = detectedKeys.has(placeholder.key);
+        const isUnused = placeholder.key.length > 0 && !isDetected;
+        return (
+          // Keyed by index (not `placeholder.key`) so editing the Key field does
+          // not unmount/remount the card and steal focus after each keystroke.
+          <Card key={index} className="mb-2">
+            <Card.Body className="py-2 px-3">
+              <div className="d-flex justify-content-between align-items-start mb-2">
+                <strong className="text-muted small">
+                  {t.cardLabel} #{index + 1}
+                  {isDetected && (
+                    <span className="badge bg-success ms-2" title={t.autoDetectedTooltip}>
+                      {t.autoDetectedBadge}
+                    </span>
+                  )}
+                  {isUnused && (
+                    <span className="badge bg-warning text-dark ms-2" title={t.unusedTooltip}>
+                      {t.unusedBadge}
+                    </span>
+                  )}
+                </strong>
+                <CloseButton
+                  onClick={() => handleRemove(index)}
+                  aria-label={`${t.removePlaceholder} ${placeholder.key}`}
+                />
+              </div>
 
-            <Row className="g-2 mb-2">
-              <Col md={4}>
-                <Form.Group controlId={`ph-key-${index}`}>
-                  <Form.Label className="small mb-0">Key</Form.Label>
-                  <Form.Control
-                    size="sm"
-                    type="text"
-                    value={placeholder.key}
-                    onChange={(e) =>
-                      handleFieldChange(index, 'key', e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))
-                    }
-                    placeholder="e.g., RESOURCE_ID"
-                    aria-label={`Placeholder key ${index + 1}`}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group controlId={`ph-name-${index}`}>
-                  <Form.Label className="small mb-0">Display Name</Form.Label>
-                  <Form.Control
-                    size="sm"
-                    type="text"
-                    value={placeholder.name}
-                    onChange={(e) => handleFieldChange(index, 'name', e.target.value)}
-                    placeholder="e.g., Resource ID"
-                    aria-label={`Placeholder name ${index + 1}`}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group controlId={`ph-type-${index}`}>
-                  <Form.Label className="small mb-0">Type</Form.Label>
-                  <Form.Select
-                    size="sm"
-                    value={placeholder.type}
-                    onChange={(e) => handleFieldChange(index, 'type', e.target.value)}
-                    aria-label={`Placeholder type ${index + 1}`}
-                  >
-                    {PLACEHOLDER_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
+              <Row className="g-2 mb-2">
+                <Col md={4}>
+                  <Form.Group controlId={`ph-key-${index}`}>
+                    <Form.Label className="small mb-0">{t.keyLabel}</Form.Label>
+                    <Form.Control
+                      size="sm"
+                      type="text"
+                      value={placeholder.key}
+                      onChange={(e) =>
+                        handleFieldChange(index, 'key', e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ''))
+                      }
+                      placeholder={t.keyPlaceholder}
+                      aria-label={`${t.keyLabel} ${index + 1}`}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={4}>
+                  <Form.Group controlId={`ph-name-${index}`}>
+                    <Form.Label className="small mb-0">{t.displayNameLabel}</Form.Label>
+                    <Form.Control
+                      size="sm"
+                      type="text"
+                      value={placeholder.name}
+                      onChange={(e) => handleFieldChange(index, 'name', e.target.value)}
+                      placeholder={t.displayNamePlaceholder}
+                      aria-label={`${t.displayNameLabel} ${index + 1}`}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={4}>
+                  <Form.Group controlId={`ph-type-${index}`}>
+                    <Form.Label className="small mb-0">{t.typeLabel}</Form.Label>
+                    <Form.Select
+                      size="sm"
+                      value={placeholder.type}
+                      onChange={(e) => handleFieldChange(index, 'type', e.target.value)}
+                      aria-label={`${t.typeLabel} ${index + 1}`}
+                    >
+                      {PLACEHOLDER_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
 
-            <Row className="g-2">
-              <Col md={6}>
-                <Form.Group controlId={`ph-desc-${index}`}>
-                  <Form.Label className="small mb-0">Description</Form.Label>
-                  <Form.Control
-                    size="sm"
-                    type="text"
-                    value={placeholder.description ?? ''}
-                    onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
-                    placeholder="Help text for the user"
-                    aria-label={`Placeholder description ${index + 1}`}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group controlId={`ph-options-${index}`}>
-                  <Form.Label className="small mb-0">Options (comma-separated, optional)</Form.Label>
-                  <OptionsInput
-                    options={placeholder.options ?? []}
-                    index={index}
-                    onCommit={(opts) => handleFieldChange(index, 'options', opts)}
-                  />
-                  <Form.Text className="text-muted" style={{ fontSize: '0.75rem' }}>
-                    If provided, renders as a dropdown. Leave empty for free-form input.
-                  </Form.Text>
-                </Form.Group>
-              </Col>
-            </Row>
-          </Card.Body>
-        </Card>
-      ))}
+              <Row className="g-2">
+                <Col md={6}>
+                  <Form.Group controlId={`ph-desc-${index}`}>
+                    <Form.Label className="small mb-0">{t.descriptionLabel}</Form.Label>
+                    <Form.Control
+                      size="sm"
+                      type="text"
+                      value={placeholder.description ?? ''}
+                      onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
+                      placeholder={t.descriptionPlaceholder}
+                      aria-label={`${t.descriptionLabel} ${index + 1}`}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group controlId={`ph-options-${index}`}>
+                    <Form.Label className="small mb-0">{t.optionsLabel}</Form.Label>
+                    <OptionsInput
+                      options={placeholder.options ?? []}
+                      index={index}
+                      onCommit={(opts) => handleFieldChange(index, 'options', opts)}
+                    />
+                    <Form.Text className="text-muted" style={{ fontSize: '0.75rem' }}>
+                      {t.optionsHelp}
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        );
+      })}
 
       <Button variant="outline-primary" size="sm" onClick={handleAdd}>
-        + Add Placeholder
+        {t.addPlaceholder}
       </Button>
     </div>
   );

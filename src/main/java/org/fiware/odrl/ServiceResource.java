@@ -207,12 +207,12 @@ public class ServiceResource extends ApiResource implements ServiceApi {
     /**
      * Deletes a service-scoped policy template by its identifier.
      *
-     * <p>If the service does not exist, returns HTTP 404. Otherwise deletes the
-     * template (no-op if the template does not exist) and returns HTTP 204.</p>
+     * <p>Returns HTTP 404 if the service does not exist or if the template is
+     * not owned by it; otherwise deletes the template and returns HTTP 204.</p>
      *
      * @param serviceId  the service the template belongs to
      * @param templateId the unique identifier of the template to delete
-     * @return HTTP 204 on success, or HTTP 404 if the service does not exist
+     * @return HTTP 204 on success, or HTTP 404 if the service or template does not exist
      */
     @Override
     public Response deleteServiceTemplateById(String serviceId, String templateId) {
@@ -220,8 +220,10 @@ public class ServiceResource extends ApiResource implements ServiceApi {
                 .orElseGet(() -> {
                     // Only delete when the template is owned by this service, so a
                     // request under service-b cannot delete service-a's template.
-                    templateRepository.deleteServiceTemplate(serviceId, templateId);
-                    return Response.noContent().build();
+                    boolean deleted = templateRepository.deleteServiceTemplate(serviceId, templateId);
+                    return deleted
+                            ? Response.noContent().build()
+                            : Response.status(HttpStatus.SC_NOT_FOUND).build();
                 });
     }
 

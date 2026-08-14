@@ -11,7 +11,7 @@
  * template and any surrounding chrome (page titles, service selectors,
  * navigation) are the responsibility of the parent.
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Form, Button, Alert, Card, Row, Col } from 'react-bootstrap';
 import { TemplateService } from '../api/services/TemplateService';
 import { ServiceService } from '../api/services/ServiceService';
@@ -133,11 +133,21 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   const [placeholders, setPlaceholders] = useState<TemplatePlaceholder[]>(
     initialTemplate?.placeholders ?? [],
   );
-  /** Keys auto-detected from the ODRL skeleton and natural language text. */
-  const [detectedKeys, setDetectedKeys] = useState<Set<string>>(new Set());
-
-  // --- Natural language state ---
+  // --- Natural language state (declared early so detectedKeys can read it) ---
   const [naturalLanguage, setNaturalLanguage] = useState(initialTemplate?.naturalLanguage ?? '');
+
+  /**
+   * Keys referenced by a `{{TOKEN}}` in the ODRL skeleton or natural language.
+   *
+   * Derived synchronously (not via the debounced effect) so the editor's
+   * "auto-detected" / "unused" badges are always accurate on the current text —
+   * including immediately on load — while the debounce below governs only the
+   * *creation* of new placeholder entries.
+   */
+  const detectedKeys = useMemo(
+    () => new Set([...extractPlaceholderKeys(odrlText), ...extractPlaceholderKeys(naturalLanguage)]),
+    [odrlText, naturalLanguage],
+  );
 
   // --- Form state ---
   const [saving, setSaving] = useState(false);
@@ -165,32 +175,27 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     [t.jsonInvalid],
   );
 
-  // Synchronize placeholders with detected keys from ODRL + NL text.
-  // Debounced so that intermediate keystrokes (e.g. while typing
-  // {{PLACEHOLDER}}) do not create and immediately destroy entries.
-  // Adds entries for newly detected keys and removes entries whose keys no
-  // longer appear in either source.
+  // Create a placeholder entry for each newly detected key.
+  //
+  // Debounced so that the intermediate keystrokes of typing a `{{PLACEHOLDER}}`
+  // token do not spawn entries — only the completed token, once, after the user
+  // pauses. It ONLY adds; it never removes. Removing on each change would delete
+  // a placeholder (with its name, type and options) the instant its key stops
+  // matching a token — e.g. one added via "+ Add Placeholder", or mid-rename.
+  // Keys not currently detected are instead flagged "unused" in the editor,
+  // leaving the user in control of deletion.
   useEffect(() => {
     const timer = setTimeout(() => {
-      const nlKeys = extractPlaceholderKeys(naturalLanguage);
-      const odrlKeys = extractPlaceholderKeys(odrlText);
-      const allKeys = new Set([...odrlKeys, ...nlKeys]);
-      setDetectedKeys(allKeys);
-
       setPlaceholders((prev) => {
         const existingKeys = new Set(prev.map((p) => p.key));
-        const newKeys = [...allKeys].filter((k) => !existingKeys.has(k));
-
-        // Remove placeholders whose keys are no longer detected.
-        const filtered = prev.filter((p) => allKeys.has(p.key));
-
-        if (newKeys.length === 0 && filtered.length === prev.length) return prev;
-        return [...filtered, ...newKeys.map((k) => createEmptyPlaceholder(k))];
+        const newKeys = [...detectedKeys].filter((k) => !existingKeys.has(k));
+        if (newKeys.length === 0) return prev;
+        return [...prev, ...newKeys.map((k) => createEmptyPlaceholder(k))];
       });
     }, PLACEHOLDER_SYNC_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [naturalLanguage, odrlText]);
+  }, [detectedKeys]);
 
   /**
    * Validates and saves the template (create or update), then notifies the

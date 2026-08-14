@@ -6,7 +6,7 @@
  * placeholder auto-detection, and cancel handling.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { I18nProvider } from '../i18n';
 import TemplateForm from './TemplateForm';
@@ -147,5 +147,36 @@ describe('TemplateForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a placeholder once per token and never duplicates it on further edits', () => {
+    vi.useFakeTimers();
+    try {
+      renderForm(<TemplateForm onSaved={vi.fn()} onCancel={vi.fn()} />);
+      const odrlArea = screen.getByLabelText('ODRL Policy Skeleton');
+
+      // Type a completed token, then let the 500ms debounce elapse.
+      fireEvent.change(odrlArea, { target: { value: '{"odrl:target":"{{FOO}}"}' } });
+      act(() => vi.advanceTimersByTime(600));
+      expect(screen.getAllByDisplayValue('FOO')).toHaveLength(1);
+
+      // A further edit that still contains {{FOO}} must NOT spawn a second entry.
+      fireEvent.change(odrlArea, { target: { value: '{"odrl:target":"{{FOO}}","x":"y"}' } });
+      act(() => vi.advanceTimersByTime(600));
+      expect(screen.getAllByDisplayValue('FOO')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('flags a button-added placeholder that is not referenced as "unused"', async () => {
+    renderForm(<TemplateForm onSaved={vi.fn()} onCancel={vi.fn()} />);
+
+    // The default skeleton references no tokens, so a manually added placeholder
+    // is unused from the start.
+    await userEvent.click(screen.getByRole('button', { name: '+ Add Placeholder' }));
+
+    expect(screen.getByText('unused')).toBeInTheDocument();
+    expect(screen.queryByText('auto-detected')).not.toBeInTheDocument();
   });
 });

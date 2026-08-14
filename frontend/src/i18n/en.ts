@@ -179,6 +179,7 @@ export const en = {
     tabTemplate: 'Template',
     tabBuilder: 'Policy Builder',
     tabRawOdrl: 'Raw ODRL',
+    tabManageTemplates: 'Manage Templates',
     validate: 'Validate',
     jsonValid: 'Valid JSON',
     jsonInvalid: 'Invalid JSON',
@@ -196,7 +197,6 @@ export const en = {
     serviceLoadError: 'Could not load services.',
     serviceTooltip: 'Optionally assign this policy to an existing service. If no service is selected, the policy is created as a standalone policy.',
     templateCreated: 'This policy was created from a template and cannot be further edited.',
-    templateLoadError: 'Could not load templates.',
   },
 
   namespacedDropdown: {
@@ -266,6 +266,26 @@ export const en = {
     serviceLabel: 'Service',
     serviceNone: '(No service — general template)',
     serviceTooltip: 'Optionally scope this template to a specific service.',
+  },
+
+  placeholderEditor: {
+    cardLabel: 'Placeholder',
+    autoDetectedBadge: 'auto-detected',
+    autoDetectedTooltip: 'Auto-detected from the ODRL skeleton or description',
+    unusedBadge: 'unused',
+    unusedTooltip: 'Not referenced by any {{TOKEN}} in the ODRL skeleton or description',
+    keyLabel: 'Key',
+    keyPlaceholder: 'e.g., RESOURCE_ID',
+    displayNameLabel: 'Display Name',
+    displayNamePlaceholder: 'e.g., Resource ID',
+    typeLabel: 'Type',
+    descriptionLabel: 'Description',
+    descriptionPlaceholder: 'Help text for the user',
+    optionsLabel: 'Options (comma-separated, optional)',
+    optionsPlaceholder: 'e.g., value1, value2, value3',
+    optionsHelp: 'If provided, renders as a dropdown. Leave empty for free-form input.',
+    addPlaceholder: '+ Add Placeholder',
+    removePlaceholder: 'Remove placeholder',
   },
 } as const;
 

@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import lombok.Data;
+import lombok.ToString;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,7 +20,7 @@ import java.util.Optional;
  * may optionally be scoped to a {@link ServiceEntity}; general (unscoped)
  * templates have a {@code null} service reference.</p>
  *
- * <p>The {@code odrl} and {@code placeholders} fields store serialised JSON
+ * <p>The {@code odrl} and {@code placeholders} fields store serialized JSON
  * text and are mapped to {@code TEXT} columns so they can hold arbitrarily
  * large payloads.</p>
  */
@@ -40,7 +41,7 @@ public class TemplateEntity extends PanacheEntity {
     /** Human-readable description of what the template does. */
     private String description;
 
-    /** ODRL policy skeleton stored as a serialised JSON string. */
+    /** ODRL policy skeleton stored as a serialized JSON string. */
     @Column(columnDefinition = "TEXT")
     private String odrl;
 
@@ -48,7 +49,7 @@ public class TemplateEntity extends PanacheEntity {
     @Column(columnDefinition = "TEXT")
     private String naturalLanguage;
 
-    /** Placeholder definitions stored as a serialised JSON array string. */
+    /** Placeholder definitions stored as a serialized JSON array string. */
     @Column(columnDefinition = "TEXT")
     private String placeholders;
 
@@ -59,6 +60,7 @@ public class TemplateEntity extends PanacheEntity {
      */
     @ManyToOne(optional = true)
     @JoinColumn(name = "serviceId")
+    @ToString.Exclude
     private ServiceEntity serviceEntity;
 
     /**

@@ -29,8 +29,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -213,11 +215,11 @@ public class TemplateApiTest {
         }
 
         @Test
-        @DisplayName("Delete non-existent template returns 204 (no-op)")
-        void deleteTemplate_nonExistent_returns204() {
+        @DisplayName("Delete non-existent template returns 404")
+        void deleteTemplate_nonExistent_returns404() {
             Response response = templateResource.deleteTemplateById("nonexistent");
-            assertEquals(HttpStatus.SC_NO_CONTENT, response.getStatus(),
-                    "Deleting a non-existent template should still return 204");
+            assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus(),
+                    "Deleting a non-existent template should return 404");
         }
 
         @Test
@@ -269,39 +271,41 @@ public class TemplateApiTest {
     class PaginationTests {
 
         @Test
-        @DisplayName("Pagination returns correct page sizes for general templates")
+        @DisplayName("Pagination returns correct page sizes and distinct rows for general templates")
         void paginateGeneralTemplates() {
-            // Create multiple templates
+            // Create multiple templates, tracking their ids.
+            Set<String> createdIds = new HashSet<>();
             for (int i = 0; i < PAGINATION_TEMPLATE_COUNT; i++) {
                 TemplateCreate tc = buildSimpleAccessTemplate();
                 tc.setName("Template " + i);
-                createAndAssertTemplate(tc);
+                createdIds.add(createAndAssertTemplate(tc).getId());
             }
 
-            // First page
-            Response firstPage = templateResource.getTemplates(0, SMALL_PAGE_SIZE);
-            List<Template> page0 = readTemplateList(firstPage);
-            assertEquals(SMALL_PAGE_SIZE, page0.size(),
-                    "First page should have exactly " + SMALL_PAGE_SIZE + " items");
+            List<Template> page0 = readTemplateList(templateResource.getTemplates(0, SMALL_PAGE_SIZE));
+            List<Template> page1 = readTemplateList(templateResource.getTemplates(1, SMALL_PAGE_SIZE));
+            List<Template> page2 = readTemplateList(templateResource.getTemplates(2, SMALL_PAGE_SIZE));
 
-            // Second page
-            Response secondPage = templateResource.getTemplates(1, SMALL_PAGE_SIZE);
-            List<Template> page1 = readTemplateList(secondPage);
-            assertEquals(SMALL_PAGE_SIZE, page1.size(),
-                    "Second page should have exactly " + SMALL_PAGE_SIZE + " items");
-
-            // Third page (partial — only 1 remaining)
+            assertEquals(SMALL_PAGE_SIZE, page0.size(), "First page size");
+            assertEquals(SMALL_PAGE_SIZE, page1.size(), "Second page size");
             int expectedLastPageSize = PAGINATION_TEMPLATE_COUNT - (2 * SMALL_PAGE_SIZE);
-            Response thirdPage = templateResource.getTemplates(2, SMALL_PAGE_SIZE);
-            List<Template> page2 = readTemplateList(thirdPage);
-            assertEquals(expectedLastPageSize, page2.size(),
-                    "Third page should have " + expectedLastPageSize + " item(s)");
+            assertEquals(expectedLastPageSize, page2.size(), "Third (partial) page size");
+
+            // The pages must contain DISTINCT rows that together cover every
+            // created template exactly once — a page that repeats rows (e.g. a
+            // paging bug always returning page 0) would fail this.
+            List<String> pagedIds = new ArrayList<>();
+            page0.forEach(t -> pagedIds.add(t.getId()));
+            page1.forEach(t -> pagedIds.add(t.getId()));
+            page2.forEach(t -> pagedIds.add(t.getId()));
+            assertEquals(PAGINATION_TEMPLATE_COUNT, pagedIds.size(), "Total rows across pages");
+            assertEquals(PAGINATION_TEMPLATE_COUNT, Set.copyOf(pagedIds).size(),
+                    "All paged ids must be distinct (no row appears on two pages)");
+            assertEquals(createdIds, Set.copyOf(pagedIds),
+                    "Paged ids must cover exactly the created templates");
 
             // Beyond last page
-            Response emptyPage = templateResource.getTemplates(3, SMALL_PAGE_SIZE);
-            List<Template> page3 = readTemplateList(emptyPage);
-            assertTrue(page3.isEmpty(),
-                    "Page beyond available data should be empty");
+            List<Template> page3 = readTemplateList(templateResource.getTemplates(3, SMALL_PAGE_SIZE));
+            assertTrue(page3.isEmpty(), "Page beyond available data should be empty");
         }
 
         @Test
@@ -633,7 +637,9 @@ public class TemplateApiTest {
             serviceRepository.createService("service-b");
             Template ownedByA = createServiceTemplateAndAssert("service-a", buildSimpleAccessTemplate());
 
-            serviceResource.deleteServiceTemplateById("service-b", ownedByA.getId());
+            Response deleteResponse = serviceResource.deleteServiceTemplateById("service-b", ownedByA.getId());
+            assertEquals(HttpStatus.SC_NOT_FOUND, deleteResponse.getStatus(),
+                    "Deleting another service's template must report 404");
 
             assertEquals(HttpStatus.SC_OK,
                     serviceResource.getServiceTemplateById("service-a", ownedByA.getId()).getStatus(),
@@ -668,7 +674,9 @@ public class TemplateApiTest {
             serviceRepository.createService("scoped-svc");
             Template scoped = createServiceTemplateAndAssert("scoped-svc", buildSimpleAccessTemplate());
 
-            templateResource.deleteTemplateById(scoped.getId());
+            Response deleteResponse = templateResource.deleteTemplateById(scoped.getId());
+            assertEquals(HttpStatus.SC_NOT_FOUND, deleteResponse.getStatus(),
+                    "DELETE /template/{id} must report 404 for a service-scoped id");
 
             assertEquals(HttpStatus.SC_OK,
                     serviceResource.getServiceTemplateById("scoped-svc", scoped.getId()).getStatus(),
