@@ -1,8 +1,8 @@
 deployment:
   image:
     repository: openpolicyagent/opa
-    # -- tag of the image to be used
-    tag: 0.63.0
+    # -- tag of the image to be used.
+    tag: 1.19.0
     # -- specification of the image pull policy
     pullPolicy: IfNotPresent
   logLevel: DEBUG

@@ -1,0 +1,40 @@
+{
+  "name": "Role-Based Access Policy",
+  "description": "A template for granting access based on a user role with a maximum count constraint",
+  "odrl": {
+    "@context": "http://www.w3.org/ns/odrl.jsonld",
+    "@type": "odrl:Set",
+    "odrl:permission": {
+      "odrl:target": "{{RESOURCE_ID}}",
+      "odrl:action": "odrl:read",
+      "odrl:assignee": "{{ROLE}}",
+      "odrl:constraint": {
+        "odrl:leftOperand": "odrl:count",
+        "odrl:operator": "odrl:lteq",
+        "odrl:rightOperand": "{{MAX_COUNT}}"
+      }
+    }
+  },
+  "naturalLanguage": "Allow {{ROLE}} to read {{RESOURCE_ID}} up to {{MAX_COUNT}} times",
+  "placeholders": [
+    {
+      "key": "RESOURCE_ID",
+      "name": "Resource",
+      "description": "The target resource URI",
+      "type": "string"
+    },
+    {
+      "key": "ROLE",
+      "name": "User Role",
+      "description": "The role that receives access",
+      "type": "string",
+      "options": ["admin", "editor", "viewer"]
+    },
+    {
+      "key": "MAX_COUNT",
+      "name": "Maximum Access Count",
+      "description": "The maximum number of times the resource can be accessed",
+      "type": "number"
+    }
+  ]
+}

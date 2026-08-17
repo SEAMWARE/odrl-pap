@@ -5,20 +5,18 @@ import org.fiware.odrl.rego.PolicyWrapper;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author <a href="https://github.com/wistefan">Stefan Wiedemann</a>
  */
 public interface PolicyRepository {
 
-    Random RANDOM = new Random();
-
     static String generatePolicyId() {
         int leftLimit = 97; // letter 'a'
         int rightLimit = 122; // letter 'z'
         int targetStringLength = 10;
-        return RANDOM.ints(leftLimit, rightLimit + 1)
+        return ThreadLocalRandom.current().ints(leftLimit, rightLimit + 1)
                 .limit(targetStringLength)
                 .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
                 .toString();

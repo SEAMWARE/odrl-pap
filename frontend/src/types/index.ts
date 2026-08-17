@@ -3,11 +3,11 @@
  *
  * @example
  * ```ts
- * import { PolicyTemplate, TemplateField } from '../types';
+ * import { FieldTemplate, TemplateField } from '../types';
  * ```
  */
 export type {
-  PolicyTemplate,
+  FieldTemplate,
   TemplateField,
   TemplateFieldType,
-} from './PolicyTemplate';
+} from './FieldTemplate';

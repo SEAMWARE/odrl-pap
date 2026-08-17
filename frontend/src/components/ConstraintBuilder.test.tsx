@@ -416,3 +416,59 @@ describe('ConstraintBuilder', () => {
     expect(groupingSelect).toHaveValue('or');
   });
 });
+
+describe('ConstraintBuilder propertyKey', () => {
+  let setParent: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    setParent = vi.fn();
+  });
+
+  it('writes to a custom property key (odrl:refinement)', async () => {
+    const user = userEvent.setup();
+
+    renderWithI18n(
+      <ConstraintBuilder
+        parent={{ '@type': 'odrl:PartyCollection' }}
+        setParent={setParent}
+        mappings={MOCK_MAPPINGS}
+        propertyKey="odrl:refinement"
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /add constraint/i }));
+
+    const lastCall = setParent.mock.calls[setParent.mock.calls.length - 1][0];
+    // The collection type is preserved and refinement is written, not constraint.
+    expect(lastCall['@type']).toBe('odrl:PartyCollection');
+    expect(Array.isArray(lastCall['odrl:refinement'])).toBe(true);
+    expect(lastCall['odrl:constraint']).toBeUndefined();
+  });
+
+  it('loads a single-object refinement as an editable constraint card', () => {
+    const parentWithSingleRefinement = {
+      '@type': 'odrl:PartyCollection',
+      'odrl:source': 'urn:user',
+      'odrl:refinement': {
+        '@type': 'odrl:Constraint',
+        'odrl:leftOperand': { '@id': 'dome-op:role' },
+        'odrl:operator': { '@id': 'odrl:eq' },
+        'odrl:rightOperand': { '@value': 'ADMIN', '@type': 'xsd:string' },
+      },
+    };
+
+    renderWithI18n(
+      <ConstraintBuilder
+        parent={parentWithSingleRefinement}
+        setParent={setParent}
+        mappings={MOCK_MAPPINGS}
+        propertyKey="odrl:refinement"
+      />,
+    );
+
+    // A single constraint card is rendered (numbered "1") with the operand
+    // preselected — proving the single-object refinement is now editable.
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
+  });
+});

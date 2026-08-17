@@ -1,15 +1,16 @@
 /**
- * Type definitions for the policy template extensibility architecture.
+ * Type definitions for a **field template** — a client-side skeleton that
+ * pre-fills the visual {@link PolicyBuilder} and marks individual fields as
+ * editable or locked.
  *
- * These interfaces define the contract for future policy templates —
- * pre-defined policy skeletons that users can fill in rather than
- * building from scratch. No actual templates are provided here; only
- * the structural types and helpers needed so that a future iteration
- * can plug templates in seamlessly.
+ * This is distinct from the server-side {@link import('../api/models/Template').Template}
+ * (a stored template with `{{PLACEHOLDER}}` tokens managed via the template API).
+ * A `FieldTemplate` is passed in by the host — e.g. the web component's
+ * `fieldTemplate` JS property — to constrain the form; it is never persisted.
  *
  * @example
  * ```ts
- * const template: PolicyTemplate = {
+ * const fieldTemplate: FieldTemplate = {
  *   id: 'dome-marketplace-access',
  *   name: 'DOME Marketplace Access',
  *   description: 'Grants access to a DOME marketplace resource',
@@ -72,7 +73,7 @@ export interface TemplateField {
  * to complete. This reduces errors and speeds up policy creation
  * for common use cases.
  */
-export interface PolicyTemplate {
+export interface FieldTemplate {
   /** Unique identifier for the template. */
   id: string;
   /** Human-readable template name (displayed in the UI). */

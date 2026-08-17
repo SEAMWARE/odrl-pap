@@ -1,7 +1,7 @@
 /**
  * Hook for template-aware policy editing.
  *
- * When a {@link PolicyTemplate} is provided, this hook exposes helpers
+ * When a {@link FieldTemplate} is provided, this hook exposes helpers
  * that the policy builder uses to determine which fields are locked,
  * which are editable, and what metadata (label, description) to show
  * for each editable field.
@@ -12,7 +12,7 @@
  *
  * @example
  * ```tsx
- * const { isTemplateMode, isFieldLocked, getFieldMeta } = useTemplateMode(template);
+ * const { isTemplateMode, isFieldLocked, getFieldMeta } = useTemplateMode(fieldTemplate);
  *
  * if (isFieldLocked('odrl:permission.odrl:action')) {
  *   // render a read-only badge instead of a dropdown
@@ -20,15 +20,15 @@
  * ```
  */
 import { useMemo } from 'react';
-import type { PolicyTemplate, TemplateField } from '../types';
+import type { FieldTemplate, TemplateField } from '../types';
 
 /** Return value of the {@link useTemplateMode} hook. */
 export interface TemplateModeResult {
   /** `true` when a template is active, `false` in freeform mode. */
   isTemplateMode: boolean;
 
-  /** The active template, or `undefined` in freeform mode. */
-  template: PolicyTemplate | undefined;
+  /** The active field template, or `undefined` in freeform mode. */
+  fieldTemplate: FieldTemplate | undefined;
 
   /**
    * Returns `true` if the field at the given dot-separated path is
@@ -57,29 +57,29 @@ export interface TemplateModeResult {
 /**
  * Provides template-mode awareness for the policy builder.
  *
- * @param template - The active policy template, or `undefined` for
+ * @param fieldTemplate - The active field template, or `undefined` for
  *   freeform editing.
  * @returns Helpers for checking field lock state and reading field metadata.
  */
 export function useTemplateMode(
-  template: PolicyTemplate | undefined,
+  fieldTemplate: FieldTemplate | undefined,
 ): TemplateModeResult {
-  const isTemplateMode = template !== undefined;
+  const isTemplateMode = fieldTemplate !== undefined;
 
   /** Set of locked field paths for O(1) lookup. */
   const lockedSet = useMemo<Set<string>>(
-    () => new Set(template?.lockedFields ?? []),
-    [template?.lockedFields],
+    () => new Set(fieldTemplate?.lockedFields ?? []),
+    [fieldTemplate?.lockedFields],
   );
 
   /** Map of editable field paths to their metadata for O(1) lookup. */
   const editableMap = useMemo<Map<string, TemplateField>>(() => {
     const map = new Map<string, TemplateField>();
-    for (const field of template?.editableFields ?? []) {
+    for (const field of fieldTemplate?.editableFields ?? []) {
       map.set(field.path, field);
     }
     return map;
-  }, [template?.editableFields]);
+  }, [fieldTemplate?.editableFields]);
 
   const isFieldLocked = useMemo(
     () => (path: string): boolean => {
@@ -107,7 +107,7 @@ export function useTemplateMode(
 
   return {
     isTemplateMode,
-    template,
+    fieldTemplate,
     isFieldLocked,
     isFieldEditable,
     getFieldMeta,

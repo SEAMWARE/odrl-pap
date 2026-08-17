@@ -185,6 +185,7 @@ const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEdi
               parent={target as Record<string, unknown>}
               setParent={setTarget as (v: Record<string, unknown>) => void}
               mappings={mappings}
+              propertyKey="odrl:refinement"
             />
           </Card.Body>
         </Card>

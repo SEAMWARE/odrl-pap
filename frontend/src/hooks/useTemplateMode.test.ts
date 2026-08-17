@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useTemplateMode } from './useTemplateMode';
-import type { PolicyTemplate, TemplateField } from '../types';
+import type { FieldTemplate, TemplateField } from '../types';
 
 /** Reusable editable field fixture. */
 const EDITABLE_TARGET: TemplateField = {
@@ -34,7 +34,7 @@ const LOCKED_ACTION_PATH = 'odrl:permission.odrl:action';
 const LOCKED_ASSIGNEE_PATH = 'odrl:permission.odrl:assignee';
 
 /** A sample template used across multiple tests. */
-const SAMPLE_TEMPLATE: PolicyTemplate = {
+const SAMPLE_TEMPLATE: FieldTemplate = {
   id: 'test-template',
   name: 'Test Template',
   description: 'A template for unit testing',
@@ -60,7 +60,7 @@ describe('useTemplateMode', () => {
 
     it('returns template as undefined', () => {
       const { result } = renderHook(() => useTemplateMode(undefined));
-      expect(result.current.template).toBeUndefined();
+      expect(result.current.fieldTemplate).toBeUndefined();
     });
 
     it('isFieldLocked returns false for any path', () => {
@@ -90,7 +90,7 @@ describe('useTemplateMode', () => {
 
     it('returns the provided template', () => {
       const { result } = renderHook(() => useTemplateMode(SAMPLE_TEMPLATE));
-      expect(result.current.template).toBe(SAMPLE_TEMPLATE);
+      expect(result.current.fieldTemplate).toBe(SAMPLE_TEMPLATE);
     });
 
     it('isFieldLocked returns true for locked paths', () => {
@@ -135,7 +135,7 @@ describe('useTemplateMode', () => {
   });
 
   describe('template with empty arrays', () => {
-    const EMPTY_TEMPLATE: PolicyTemplate = {
+    const EMPTY_TEMPLATE: FieldTemplate = {
       id: 'empty',
       name: 'Empty',
       description: '',

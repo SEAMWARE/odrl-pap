@@ -10,5 +10,6 @@
  * ```
  */
 export { en, type I18nStrings } from './en';
-export { I18nProvider, type DeepPartial } from './I18nContext';
+export { I18nProvider } from './I18nContext';
+export { resolveStrings, type DeepPartial } from './resolve';
 export { useI18n } from './useI18n';

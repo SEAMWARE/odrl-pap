@@ -6,7 +6,7 @@
  * includes contextual help text. Dropdown items are grouped by namespace
  * via the shared NamespacedDropdown component.
  *
- * Supports an optional **template mode**: when a {@link PolicyTemplate}
+ * Supports an optional **template mode**: when a {@link FieldTemplate}
  * is provided, the form is pre-filled from the template skeleton and
  * fields listed in `lockedFields` are visually disabled.
  *
@@ -23,7 +23,7 @@ import { Form, Row, Col, Card, Spinner, Alert, Button, Badge } from 'react-boots
 import { useMappings } from '../hooks/useMappings';
 import { useTemplateMode } from '../hooks/useTemplateMode';
 import { useI18n } from '../i18n';
-import type { PolicyTemplate } from '../types';
+import type { FieldTemplate } from '../types';
 import type { OdrlPolicyJson } from '../services/api';
 import ConstraintBuilder from './ConstraintBuilder';
 import TargetEditor from './TargetEditor';
@@ -48,8 +48,8 @@ interface PolicyBuilderProps {
   policy: OdrlPolicyJson;
   /** Callback to update the policy when the user makes changes. */
   setPolicy: (policy: OdrlPolicyJson) => void;
-  /** Optional template to pre-fill and constrain the policy form. */
-  template?: PolicyTemplate;
+  /** Optional field template to pre-fill and constrain the policy form. */
+  fieldTemplate?: FieldTemplate;
 }
 
 /**
@@ -112,12 +112,12 @@ const SectionHeader = ({
  * Visual policy builder with guided steps, namespace-grouped dropdowns,
  * contextual help, loading/error states, and optional template support.
  */
-const PolicyBuilder = ({ policy, setPolicy, template }: PolicyBuilderProps) => {
+const PolicyBuilder = ({ policy, setPolicy, fieldTemplate }: PolicyBuilderProps) => {
   const { mappings, loading, error, retry } = useMappings();
   const { strings } = useI18n();
   const t = strings.policyBuilder;
   const tt = strings.templateMode;
-  const { isTemplateMode, isFieldLocked, getFieldMeta } = useTemplateMode(template);
+  const { isTemplateMode, isFieldLocked, getFieldMeta } = useTemplateMode(fieldTemplate);
 
   /**
    * Tracks whether the template skeleton has been applied to prevent
@@ -125,17 +125,17 @@ const PolicyBuilder = ({ policy, setPolicy, template }: PolicyBuilderProps) => {
    */
   const skeletonAppliedRef = useRef(false);
 
-  // Pre-fill the policy from the template skeleton on first mount
+  // Pre-fill the policy from the field-template skeleton on first mount
   useEffect(() => {
-    if (isTemplateMode && template && !skeletonAppliedRef.current) {
+    if (isTemplateMode && fieldTemplate && !skeletonAppliedRef.current) {
       skeletonAppliedRef.current = true;
       const skeletonPolicy: OdrlPolicyJson = {
-        ...template.skeleton,
+        ...fieldTemplate.skeleton,
         'odrl:uid': (policy as Record<string, unknown>)['odrl:uid'] as string ?? crypto.randomUUID(),
       } as OdrlPolicyJson;
       setPolicy(skeletonPolicy);
     }
-  }, [isTemplateMode, template, setPolicy, policy]);
+  }, [isTemplateMode, fieldTemplate, setPolicy, policy]);
 
   /** Updates a single field inside `odrl:permission`. */
   const handlePermissionChange = (field: string, value: unknown) => {
@@ -194,7 +194,7 @@ const PolicyBuilder = ({ policy, setPolicy, template }: PolicyBuilderProps) => {
       <Col lg={8}>
         <div className="d-flex flex-column gap-3">
           {/* Template banner */}
-          {isTemplateMode && template && (
+          {isTemplateMode && fieldTemplate && (
             <Alert variant="info" className="d-flex align-items-start gap-2 mb-0" data-testid="template-banner">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -208,10 +208,10 @@ const PolicyBuilder = ({ policy, setPolicy, template }: PolicyBuilderProps) => {
                 <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z" />
               </svg>
               <div>
-                <strong>{tt.banner.replace('{name}', template.name)}</strong>
-                {template.description && (
+                <strong>{tt.banner.replace('{name}', fieldTemplate.name)}</strong>
+                {fieldTemplate.description && (
                   <div className="text-muted small mt-1">
-                    {tt.bannerDescription.replace('{description}', template.description)}
+                    {tt.bannerDescription.replace('{description}', fieldTemplate.description)}
                   </div>
                 )}
               </div>

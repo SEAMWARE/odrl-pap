@@ -31,4 +31,5 @@ export type {
   EditorMode,
   EmbeddedThemePreset,
   OnEventCallback,
+  TabVisibility,
 } from './EmbeddedContext';

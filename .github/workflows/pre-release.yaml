@@ -78,6 +78,15 @@ jobs:
         run: |
           mvn integration-test -Pk8s-it  -DskipTests -Dquarkus.container-image.tag=${{ needs.generate-version.outputs.version }}-arm64 -Dquarkus.container-image.registry="${{ env.REGISTRY }}" -Dquarkus.container-image.group="${{ env.REPOSITORY }}" -Dhelm.version=3.17.3
 
+      - name: Dump cluster diagnostics on failure
+        if: failure()
+        run: |
+          docker exec k3s-maven-plugin kubectl get pods -A -o wide || true
+          docker exec k3s-maven-plugin kubectl get events -A --sort-by=.lastTimestamp || true
+          docker exec k3s-maven-plugin kubectl describe deployment it-opa || true
+          docker exec k3s-maven-plugin kubectl describe pods --selector=app.kubernetes.io/instance=it-opa || true
+          docker exec k3s-maven-plugin kubectl logs deployment/it-opa --all-containers --tail=200 || true
+
       - name: Push
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap:${{ needs.generate-version.outputs.version }}-arm64
