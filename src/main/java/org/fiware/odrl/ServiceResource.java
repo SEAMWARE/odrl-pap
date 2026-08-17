@@ -2,6 +2,7 @@ package org.fiware.odrl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,7 @@ import org.fiware.odrl.mapping.*;
 import org.fiware.odrl.persistence.PolicyRepository;
 import org.fiware.odrl.persistence.ServiceEntity;
 import org.fiware.odrl.persistence.ServiceRepository;
+import org.fiware.odrl.persistence.TemplateRepository;
 import org.fiware.odrl.verification.TypeVerifier;
 import org.openapi.quarkus.odrl_yaml.api.ServiceApi;
 import org.openapi.quarkus.odrl_yaml.model.*;
@@ -19,6 +21,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * JAX-RS resource handling service-level operations including service CRUD,
+ * service-scoped policy management, and service-scoped template management.
+ * Implements the generated {@link ServiceApi} interface from the OpenAPI specification.
+ */
 @Slf4j
 public class ServiceResource extends ApiResource implements ServiceApi {
 
@@ -28,7 +35,10 @@ public class ServiceResource extends ApiResource implements ServiceApi {
     private static final String DATA_PACKAGE = "data";
     private static final String METHODS_PACKAGE = "methods";
     private static final int DEFAULT_PAGE_SIZE = 25;
+    private static final int DEFAULT_PAGE = 0;
 
+    @Inject
+    TemplateRepository templateRepository;
 
     protected ServiceResource(ObjectMapper objectMapper, JsonLdHandler jsonLdHandler, OdrlMapper odrlMapper, MappingConfiguration mappingConfiguration, PolicyRepository policyRepository, ServiceRepository serviceRepository, Instance<TypeVerifier> typeVerifiers, LeftOperandMapper leftOperandMapper, ConstraintMapper constraintMapper, OperatorMapper operatorMapper, RightOperandMapper rightOperandMapper) {
         super(objectMapper, jsonLdHandler, odrlMapper, mappingConfiguration, policyRepository, serviceRepository, typeVerifiers, leftOperandMapper, constraintMapper, operatorMapper, rightOperandMapper);
@@ -159,5 +169,132 @@ public class ServiceResource extends ApiResource implements ServiceApi {
         if (List.of(POLICY_PACKAGE, DATA_PACKAGE, METHODS_PACKAGE).contains(serviceId)) {
             throw new IllegalArgumentException(String.format("%s cannot be used as service id.", serviceId));
         }
+    }
+
+    // --- Service-scoped template operations ---
+
+    /**
+     * Creates a new policy template scoped to the specified service.
+     *
+     * <p>Validates that the service exists and that placeholder definitions
+     * are consistent before persisting. Returns HTTP 201 on success.</p>
+     *
+     * @param serviceId      the service to scope the template to
+     * @param templateCreate the template creation payload
+     * @return HTTP 201 with the created {@link Template}, HTTP 404 if service not found,
+     *         or HTTP 400 on validation failure
+     */
+    @Override
+    public Response createServiceTemplate(String serviceId, TemplateCreate templateCreate) {
+        Optional<ServiceEntity> serviceOpt = serviceRepository.getService(serviceId);
+        if (serviceOpt.isEmpty()) {
+            return Response.status(HttpStatus.SC_NOT_FOUND)
+                    .entity(String.format("Service %s does not exist.", serviceId))
+                    .build();
+        }
+
+        java.util.List<String> validationErrors = TemplateResource.validateTemplate(templateCreate);
+        if (!validationErrors.isEmpty()) {
+            return Response.status(HttpStatus.SC_BAD_REQUEST)
+                    .entity(String.join("; ", validationErrors))
+                    .build();
+        }
+
+        Template template = templateRepository.createTemplate(templateCreate, serviceOpt);
+        return Response.status(HttpStatus.SC_CREATED).entity(template).build();
+    }
+
+    /**
+     * Deletes a service-scoped policy template by its identifier.
+     *
+     * <p>Returns HTTP 404 if the service does not exist or if the template is
+     * not owned by it; otherwise deletes the template and returns HTTP 204.</p>
+     *
+     * @param serviceId  the service the template belongs to
+     * @param templateId the unique identifier of the template to delete
+     * @return HTTP 204 on success, or HTTP 404 if the service or template does not exist
+     */
+    @Override
+    public Response deleteServiceTemplateById(String serviceId, String templateId) {
+        return checkNotFound(serviceId)
+                .orElseGet(() -> {
+                    // Only delete when the template is owned by this service, so a
+                    // request under service-b cannot delete service-a's template.
+                    boolean deleted = templateRepository.deleteServiceTemplate(serviceId, templateId);
+                    return deleted
+                            ? Response.noContent().build()
+                            : Response.status(HttpStatus.SC_NOT_FOUND).build();
+                });
+    }
+
+    /**
+     * Retrieves a service-scoped policy template by its identifier.
+     *
+     * @param serviceId  the service the template belongs to
+     * @param templateId the unique identifier of the template
+     * @return HTTP 200 with the {@link Template}, or HTTP 404 if service or template not found
+     */
+    @Override
+    public Response getServiceTemplateById(String serviceId, String templateId) {
+        return checkNotFound(serviceId)
+                .orElseGet(() -> templateRepository.getServiceTemplate(serviceId, templateId)
+                        .map(Response::ok)
+                        .map(Response.ResponseBuilder::build)
+                        .orElse(Response.status(HttpStatus.SC_NOT_FOUND).build()));
+    }
+
+    /**
+     * Lists policy templates scoped to the specified service with pagination.
+     *
+     * @param serviceId the service to list templates for
+     * @param page      zero-based page index (defaults to 0)
+     * @param pageSize  number of templates per page (defaults to 25)
+     * @return HTTP 200 with a list of {@link Template} objects, or HTTP 404 if service not found
+     */
+    @Override
+    public Response getServiceTemplates(String serviceId, Integer page, Integer pageSize) {
+        return checkNotFound(serviceId)
+                .orElseGet(() -> {
+                    java.util.List<Template> templates = templateRepository.getTemplatesByServiceId(
+                            serviceId,
+                            Optional.ofNullable(page).orElse(DEFAULT_PAGE),
+                            Optional.ofNullable(pageSize).orElse(DEFAULT_PAGE_SIZE));
+                    return Response.ok(templates).build();
+                });
+    }
+
+    /**
+     * Updates a service-scoped policy template.
+     *
+     * <p>Validates that the service and template exist and that placeholder
+     * definitions are consistent before updating.</p>
+     *
+     * @param serviceId      the service the template belongs to
+     * @param templateId     the unique identifier of the template to update
+     * @param templateCreate the updated template payload
+     * @return HTTP 200 with the updated {@link Template}, HTTP 404 if service or template not found,
+     *         or HTTP 400 on validation failure
+     */
+    @Override
+    public Response updateServiceTemplate(String serviceId, String templateId, TemplateCreate templateCreate) {
+        Optional<Response> notFound = checkNotFound(serviceId);
+        if (notFound.isPresent()) {
+            return notFound.get();
+        }
+
+        // Only a template owned by this service may be updated here.
+        if (templateRepository.getServiceTemplate(serviceId, templateId).isEmpty()) {
+            return Response.status(HttpStatus.SC_NOT_FOUND).build();
+        }
+
+        java.util.List<String> validationErrors = TemplateResource.validateTemplate(templateCreate);
+        if (!validationErrors.isEmpty()) {
+            return Response.status(HttpStatus.SC_BAD_REQUEST)
+                    .entity(String.join("; ", validationErrors))
+                    .build();
+        }
+
+        Template updated = templateRepository.updateTemplate(templateId, templateCreate);
+        return Response.ok(updated).build();
     }
 }

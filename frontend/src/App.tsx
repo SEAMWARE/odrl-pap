@@ -11,6 +11,8 @@ import { ThemeProvider } from './theme/ThemeContext';
 import Layout from './components/Layout';
 import PolicyList from './pages/PolicyList';
 import PolicyEditor from './pages/PolicyEditor';
+import TemplateList from './pages/TemplateList';
+import TemplateEditor from './pages/TemplateEditor';
 
 /**
  * Application root with i18n and theme context providers.
@@ -25,6 +27,9 @@ function App() {
               <Route index element={<PolicyList />} />
               <Route path="new" element={<PolicyEditor />} />
               <Route path="edit/:id" element={<PolicyEditor />} />
+              <Route path="templates" element={<TemplateList />} />
+              <Route path="templates/new" element={<TemplateEditor />} />
+              <Route path="templates/edit/:id" element={<TemplateEditor />} />
             </Route>
           </Routes>
         </Router>

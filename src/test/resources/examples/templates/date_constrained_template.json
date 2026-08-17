@@ -1,0 +1,32 @@
+{
+  "name": "Date-Constrained Access Policy",
+  "description": "A template for granting access to a resource within a date range",
+  "odrl": {
+    "@context": "http://www.w3.org/ns/odrl.jsonld",
+    "@type": "odrl:Set",
+    "odrl:permission": {
+      "odrl:target": "{{RESOURCE_ID}}",
+      "odrl:action": "odrl:use",
+      "odrl:constraint": {
+        "odrl:leftOperand": "odrl:dateTime",
+        "odrl:operator": "odrl:lteq",
+        "odrl:rightOperand": "{{EXPIRY_DATE}}"
+      }
+    }
+  },
+  "naturalLanguage": "Allow use of {{RESOURCE_ID}} until {{EXPIRY_DATE}}",
+  "placeholders": [
+    {
+      "key": "RESOURCE_ID",
+      "name": "Resource Identifier",
+      "description": "The URI of the resource to grant access to",
+      "type": "string"
+    },
+    {
+      "key": "EXPIRY_DATE",
+      "name": "Expiry Date",
+      "description": "The date after which access is no longer permitted",
+      "type": "xsd:date"
+    }
+  ]
+}

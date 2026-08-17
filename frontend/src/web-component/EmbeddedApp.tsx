@@ -9,22 +9,30 @@
  *   navigating between pages.
  * - Wraps children in `I18nProvider` and applies theme CSS custom
  *   properties on its own container (not `document.documentElement`).
+ * - Supports template-based policy creation via a template selection tab.
+ * - Supports full template management (create/edit/delete) via a dedicated
+ *   tab, which can be disabled with the `hide-template-create-tab` attribute.
+ * - Allows per-tab visibility control via `hiddenTabs` configuration.
  */
-import { useState, useEffect, useCallback, useRef, type RefObject } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, type RefObject } from 'react';
 import { Form, Button, Tabs, Tab, Alert, InputGroup, Badge, CloseButton } from 'react-bootstrap';
 import { PolicyService } from '../api/services/PolicyService';
 import { ServiceService } from '../api/services/ServiceService';
+import { TemplateService } from '../api/services/TemplateService';
 import { UiService } from '../api/services/UiService';
-import type { OdrlPolicyJson, ValidationResponse } from '../services/api';
+import type { OdrlPolicyJson, ValidationResponse, Template } from '../services/api';
 import { configureApi } from '../services/api';
-import type { PolicyTemplate } from '../types';
+import type { FieldTemplate } from '../types';
 import { TestRequest } from '../api/models/TestRequest';
 import type { GenericJsonInput } from '../api/models/GenericJsonInput';
 import type { ValidationMode } from '../components/ValidationEditor';
 import PolicyBuilder from '../components/PolicyBuilder';
 import ValidationEditor from '../components/ValidationEditor';
 import ValidationResult from '../components/ValidationResult';
-import { I18nProvider, type DeepPartial } from '../i18n';
+import TemplateSelector from '../components/TemplateSelector';
+import TemplateFiller from '../components/TemplateFiller';
+import EmbeddedTemplateManager from './EmbeddedTemplateManager';
+import { I18nProvider, resolveStrings, type DeepPartial } from '../i18n';
 import type { I18nStrings } from '../i18n';
 import { lightTheme, darkTheme, type ThemeConfig } from '../theme/defaultTheme';
 import {
@@ -33,6 +41,15 @@ import {
   type EmbeddedThemePreset,
 } from './EmbeddedContext';
 import { createNewPolicy } from '../constants/policyDefaults';
+
+/** Tab key for the template selection tab. */
+const TAB_KEY_TEMPLATE = 'template';
+/** Tab key for the visual policy builder tab. */
+const TAB_KEY_BUILDER = 'builder';
+/** Tab key for the raw ODRL JSON editor tab. */
+const TAB_KEY_ODRL = 'odrl';
+/** Tab key for the template management (create/edit/delete) tab. */
+const TAB_KEY_MANAGE_TEMPLATES = 'manage-templates';
 
 /** Default test request values for validation. */
 const DEFAULT_TEST_REQUEST: TestRequest = {
@@ -78,8 +95,8 @@ export interface EmbeddedAppProps {
    * should be applied (typically the shadow-DOM container div).
    */
   containerRef?: RefObject<HTMLDivElement | null>;
-  /** Optional policy template for pre-filling and constraining the editor. */
-  template?: PolicyTemplate;
+  /** Optional field template for pre-filling and constraining the builder form. */
+  fieldTemplate?: FieldTemplate;
 }
 
 /**
@@ -94,9 +111,13 @@ const EmbeddedApp = ({
   i18nOverrides,
   themeOverrides,
   containerRef,
-  template,
+  fieldTemplate,
 }: EmbeddedAppProps) => {
-  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext, serviceId } = config;
+  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext, serviceId, hiddenTabs } = config;
+
+  // EmbeddedApp renders the I18nProvider itself, so it cannot read strings via
+  // useI18n(); it resolves them directly for the (translatable) tab titles.
+  const tabStrings = useMemo(() => resolveStrings(i18nOverrides).policyEditor, [i18nOverrides]);
 
   // --- API configuration ---
   useEffect(() => {
@@ -131,8 +152,108 @@ const EmbeddedApp = ({
     }
   }, [mode, policyId, serviceId]);
 
+  // --- Template state ---
+  /** Available templates fetched from the backend. */
+  const [templates, setTemplates] = useState<Template[]>([]);
+  /** Whether templates are currently loading. */
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  /** The currently selected template in the Template tab. */
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  /** Whether the policy was created from a template (disables other tabs). */
+  const [createdFromTemplate, setCreatedFromTemplate] = useState(false);
+  /** Whether a template-based policy creation is in progress. */
+  const [isCreatingFromTemplate, setIsCreatingFromTemplate] = useState(false);
+
+  // Fetch available templates for create mode when the template tab is visible.
+  // Scoped to the configured service (if any) and re-run when it changes, so a
+  // service-scoped template can be used to create a policy.
+  useEffect(() => {
+    if (mode === 'edit' || hiddenTabs.hideTemplateTab) {
+      setTemplatesLoading(false);
+      return;
+    }
+
+    setTemplatesLoading(true);
+    setSelectedTemplate(null);
+
+    const fetchPromise = serviceId
+      ? ServiceService.getServiceTemplates(serviceId)
+      : TemplateService.getTemplates();
+
+    fetchPromise
+      .then((list) => {
+        setTemplates(list);
+      })
+      .catch(() => {
+        // Silently fail — templates are optional
+        setTemplates([]);
+      })
+      .finally(() => {
+        setTemplatesLoading(false);
+      });
+  }, [mode, hiddenTabs.hideTemplateTab, serviceId]);
+
+  /** Whether the template selection tab should be visible. */
+  const showTemplateTab = mode === 'create' && !hiddenTabs.hideTemplateTab && !templatesLoading && templates.length > 0;
+
+  /**
+   * Whether the template management tab should be visible.
+   *
+   * Independent of the editor `mode`: template authoring is orthogonal to
+   * whether a policy is being created or edited. Controlled by the
+   * `hide-template-create-tab` attribute.
+   */
+  const showManageTemplatesTab = !hiddenTabs.hideTemplateCreateTab;
+
+  // --- Determine the default active tab based on visibility ---
+  /**
+   * Computes the default tab key, choosing only among tabs that are actually
+   * rendered. Priority: template (when available) > builder > raw > manage.
+   */
+  const defaultTab = useMemo(() => {
+    if (mode === 'create' && !hiddenTabs.hideTemplateTab && templates.length > 0) {
+      return TAB_KEY_TEMPLATE;
+    }
+    if (!hiddenTabs.hideBuilderTab) return TAB_KEY_BUILDER;
+    if (!hiddenTabs.hideRawTab) return TAB_KEY_ODRL;
+    if (!hiddenTabs.hideTemplateCreateTab) return TAB_KEY_MANAGE_TEMPLATES;
+    // Nothing is visible (all tabs hidden) — fall back to the builder key.
+    return TAB_KEY_BUILDER;
+  }, [hiddenTabs, mode, templates.length]);
+
+  /** Returns whether the tab with the given key is currently rendered. */
+  const isTabVisible = useCallback(
+    (key: string): boolean => {
+      switch (key) {
+        case TAB_KEY_TEMPLATE:
+          return showTemplateTab;
+        case TAB_KEY_BUILDER:
+          return !hiddenTabs.hideBuilderTab;
+        case TAB_KEY_ODRL:
+          return !hiddenTabs.hideRawTab;
+        case TAB_KEY_MANAGE_TEMPLATES:
+          return showManageTemplatesTab;
+        default:
+          return false;
+      }
+    },
+    [showTemplateTab, showManageTemplatesTab, hiddenTabs.hideBuilderTab, hiddenTabs.hideRawTab],
+  );
+
   // --- Editor tab state ---
-  const [activeTab, setActiveTab] = useState('builder');
+  const [activeTab, setActiveTab] = useState(TAB_KEY_BUILDER);
+  /** True once the user has manually chosen a tab. */
+  const userSelectedTabRef = useRef(false);
+
+  // Follow the computed default until the user picks a tab; afterwards only move
+  // them if their current tab has become hidden. This stops the async template
+  // fetch (which changes `defaultTab` once templates resolve) from yanking the
+  // user off a tab — e.g. an in-progress Manage Templates form — mid-edit.
+  useEffect(() => {
+    setActiveTab((current) =>
+      userSelectedTabRef.current && isTabVisible(current) ? current : defaultTab,
+    );
+  }, [defaultTab, isTabVisible]);
 
   // --- Raw ODRL tab state ---
   /** Raw JSON text decoupled from the policy state for free-form editing. */
@@ -161,7 +282,7 @@ const EmbeddedApp = ({
 
   // Sync rawText from the current policy when switching TO the raw tab.
   useEffect(() => {
-    if (activeTab === 'odrl' && prevTabRef.current !== 'odrl') {
+    if (activeTab === TAB_KEY_ODRL && prevTabRef.current !== TAB_KEY_ODRL) {
       setRawText(JSON.stringify(policy, null, 2));
       setJsonError('');
     }
@@ -231,6 +352,44 @@ const EmbeddedApp = ({
   }, [policy]);
 
   /**
+   * Handles policy creation from a filled template.
+   *
+   * Saves the generated ODRL JSON as a new policy, locks the editor
+   * to prevent further modifications, and emits the `policy-created` event.
+   *
+   * @param odrl - The ODRL policy JSON with placeholders replaced.
+   */
+  const handleCreateFromTemplate = useCallback((odrl: Record<string, unknown>) => {
+    setIsCreatingFromTemplate(true);
+
+    // Ensure the policy has a UID; generate one if the template did not include it.
+    if (!odrl['odrl:uid']) {
+      odrl['odrl:uid'] = crypto.randomUUID();
+    }
+
+    const requestBody = odrl as OdrlPolicyJson;
+    const effectiveId = (odrl['odrl:uid'] as string) ?? '';
+
+    // Store the policy under its `odrl:uid` (PUT /policy/{id}) rather than via
+    // POST /policy, which would assign a server-generated id the host cannot
+    // resolve. This keeps the emitted `id` retrievable via GET /policy/{id}.
+    const savePromise = serviceId
+      ? ServiceService.createServicePolicyWithId(serviceId, effectiveId, requestBody)
+      : PolicyService.createPolicyWithId(effectiveId, requestBody);
+
+    savePromise
+      .then(() => {
+        setPolicy(requestBody);
+        setCreatedFromTemplate(true);
+        onEvent('policy-created', { policy: requestBody, id: effectiveId });
+      })
+      .catch((err: Error) => setSaveError(err.message))
+      .finally(() => {
+        setIsCreatingFromTemplate(false);
+      });
+  }, [serviceId, onEvent]);
+
+  /**
    * Saves the policy and emits the appropriate event.
    *
    * When `serviceId` is set, uses service-scoped endpoints
@@ -239,29 +398,41 @@ const EmbeddedApp = ({
    */
   const handleSave = useCallback(() => {
     setSaveError('');
-    const uid = (policy as Record<string, unknown>)['odrl:uid'] as string | undefined;
-    const effectiveId = policyId ?? uid ?? '';
 
-    let savePromise;
-    if (serviceId) {
-      savePromise =
-        mode === 'edit' && policyId
-          ? ServiceService.createServicePolicyWithId(serviceId, policyId, policy)
-          : ServiceService.createServicePolicy(serviceId, policy);
-    } else {
-      savePromise =
-        mode === 'edit' && policyId
-          ? PolicyService.createPolicyWithId(policyId, policy)
-          : PolicyService.createPolicy(policy);
+    // Ensure the policy carries a UID so it can be stored under — and later
+    // retrieved by — that id. Creating via plain POST /policy would let the
+    // backend assign a generated id that the host cannot resolve through
+    // GET /policy/{id}, producing a 404 on the follow-up fetch.
+    const body = { ...(policy as Record<string, unknown>) };
+    if (!body['odrl:uid']) {
+      body['odrl:uid'] = crypto.randomUUID();
     }
+    const policyToSave = body as OdrlPolicyJson;
+    const effectiveId = policyId ?? (body['odrl:uid'] as string);
+
+    // Both create and edit use the id-scoped endpoint (PUT /policy/{id}),
+    // which "creates or overwrites", so the stored id always matches the
+    // emitted id.
+    const savePromise = serviceId
+      ? ServiceService.createServicePolicyWithId(serviceId, effectiveId, policyToSave)
+      : PolicyService.createPolicyWithId(effectiveId, policyToSave);
 
     savePromise
       .then(() => {
         const eventType = mode === 'edit' ? 'policy-updated' : 'policy-created';
-        onEvent(eventType, { policy, id: effectiveId });
+        onEvent(eventType, { policy: policyToSave, id: effectiveId });
       })
       .catch((err: Error) => setSaveError(err.message));
   }, [policy, mode, policyId, onEvent, serviceId]);
+
+  /**
+   * Keeps the working policy in sync with the template being filled in, so
+   * that validation and other actions operate on the template-derived policy
+   * rather than the default empty one.
+   */
+  const handleTemplatePolicyChange = useCallback((odrl: Record<string, unknown>) => {
+    setPolicy(odrl as OdrlPolicyJson);
+  }, []);
 
   /** Cancels editing and notifies the host. */
   const handleCancel = useCallback(() => {
@@ -316,99 +487,153 @@ const EmbeddedApp = ({
           <Tabs
             id="embedded-editor-tabs"
             activeKey={activeTab}
-            onSelect={(k) => setActiveTab(k!)}
+            onSelect={(k) => {
+              if (!k) return;
+              // The template and management tabs stay switchable even when the
+              // policy editor is locked in read-only (template-created) mode.
+              if (!createdFromTemplate || k === TAB_KEY_TEMPLATE || k === TAB_KEY_MANAGE_TEMPLATES) {
+                userSelectedTabRef.current = true;
+                setActiveTab(k);
+              }
+            }}
             className="mb-3"
           >
-            <Tab eventKey="builder" title="Policy Builder">
-              <PolicyBuilder policy={policy} setPolicy={setPolicy} template={template} />
-            </Tab>
-            <Tab eventKey="odrl" title="Raw ODRL">
-              {/* --- Context management --- */}
-              <div className="mb-3 p-3 border rounded" style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
-                <h6 className="mb-2">JSON-LD Context (@context)</h6>
-                {(() => {
-                  const ctx = (policy as Record<string, unknown>)['@context'];
-                  if (typeof ctx === 'object' && ctx !== null && !Array.isArray(ctx)) {
-                    return (
-                      <div className="mb-2 d-flex flex-wrap gap-1">
-                        {Object.entries(ctx as Record<string, string>).map(([prefix, uri]) => (
-                          <Badge
-                            key={prefix}
-                            bg="secondary"
-                            className="d-inline-flex align-items-center gap-1 px-2 py-1"
-                            title={uri}
-                          >
-                            <strong>{prefix}</strong>: {uri}
-                            <CloseButton
-                              variant="white"
-                              style={{ fontSize: '0.5rem' }}
-                              onClick={() => handleRemoveContext(prefix)}
-                              aria-label={`Remove ${prefix}`}
-                            />
-                          </Badge>
-                        ))}
-                      </div>
-                    );
-                  }
-                  if (typeof ctx === 'string') {
-                    return <p className="text-muted small mb-2">{ctx}</p>;
-                  }
-                  return null;
-                })()}
-                <InputGroup size="sm">
-                  <Form.Control
-                    placeholder="e.g., dome-op"
-                    value={newCtxPrefix}
-                    onChange={(e) => setNewCtxPrefix(e.target.value)}
-                    aria-label="Context prefix"
-                  />
-                  <Form.Control
-                    placeholder="e.g., https://example.com/ns/"
-                    value={newCtxUri}
-                    onChange={(e) => setNewCtxUri(e.target.value)}
-                    aria-label="Context namespace URI"
-                  />
-                  <Button
-                    variant="outline-primary"
-                    onClick={handleAddContext}
-                    disabled={!newCtxPrefix.trim() || !newCtxUri.trim()}
-                  >
-                    Add Context
-                  </Button>
-                </InputGroup>
-              </div>
+            {/* Template tab — shown only for create mode when templates exist and tab is not hidden */}
+            {showTemplateTab && (
+              <Tab eventKey={TAB_KEY_TEMPLATE} title={tabStrings.tabTemplate}>
+                <TemplateSelector
+                  templates={templates}
+                  selectedTemplate={selectedTemplate}
+                  onSelect={setSelectedTemplate}
+                />
+                {selectedTemplate && (
+                  <div className="mt-4">
+                    <hr />
+                    <TemplateFiller
+                      key={selectedTemplate.id}
+                      template={selectedTemplate}
+                      onCreatePolicy={handleCreateFromTemplate}
+                      onPolicyChange={handleTemplatePolicyChange}
+                      isCreating={isCreatingFromTemplate}
+                    />
+                  </div>
+                )}
+              </Tab>
+            )}
 
-              {/* --- Raw JSON textarea --- */}
-              <Form.Control
-                as="textarea"
-                rows={16}
-                value={rawText}
-                onChange={(e) => handleRawTextChange(e.target.value)}
-                isInvalid={!!jsonError}
-                isValid={!jsonError && rawText.length > 0}
-                className="font-monospace"
-              />
-              {jsonError && (
-                <Form.Text className="text-danger">{jsonError}</Form.Text>
-              )}
-            </Tab>
+            {!hiddenTabs.hideBuilderTab && (
+              <Tab
+                eventKey={TAB_KEY_BUILDER}
+                title={tabStrings.tabBuilder}
+                disabled={createdFromTemplate}
+              >
+                <PolicyBuilder policy={policy} setPolicy={setPolicy} fieldTemplate={fieldTemplate} />
+              </Tab>
+            )}
+            {!hiddenTabs.hideRawTab && (
+              <Tab
+                eventKey={TAB_KEY_ODRL}
+                title={tabStrings.tabRawOdrl}
+                disabled={createdFromTemplate}
+              >
+                {/* --- Context management --- */}
+                <div className="mb-3 p-3 border rounded" style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
+                  <h6 className="mb-2">JSON-LD Context (@context)</h6>
+                  {(() => {
+                    const ctx = (policy as Record<string, unknown>)['@context'];
+                    if (typeof ctx === 'object' && ctx !== null && !Array.isArray(ctx)) {
+                      return (
+                        <div className="mb-2 d-flex flex-wrap gap-1">
+                          {Object.entries(ctx as Record<string, string>).map(([prefix, uri]) => (
+                            <Badge
+                              key={prefix}
+                              bg="secondary"
+                              className="d-inline-flex align-items-center gap-1 px-2 py-1"
+                              title={uri}
+                            >
+                              <strong>{prefix}</strong>: {uri}
+                              <CloseButton
+                                variant="white"
+                                style={{ fontSize: '0.5rem' }}
+                                onClick={() => handleRemoveContext(prefix)}
+                                aria-label={`Remove ${prefix}`}
+                              />
+                            </Badge>
+                          ))}
+                        </div>
+                      );
+                    }
+                    if (typeof ctx === 'string') {
+                      return <p className="text-muted small mb-2">{ctx}</p>;
+                    }
+                    return null;
+                  })()}
+                  <InputGroup size="sm">
+                    <Form.Control
+                      placeholder="e.g., dome-op"
+                      value={newCtxPrefix}
+                      onChange={(e) => setNewCtxPrefix(e.target.value)}
+                      aria-label="Context prefix"
+                    />
+                    <Form.Control
+                      placeholder="e.g., https://example.com/ns/"
+                      value={newCtxUri}
+                      onChange={(e) => setNewCtxUri(e.target.value)}
+                      aria-label="Context namespace URI"
+                    />
+                    <Button
+                      variant="outline-primary"
+                      onClick={handleAddContext}
+                      disabled={!newCtxPrefix.trim() || !newCtxUri.trim()}
+                    >
+                      Add Context
+                    </Button>
+                  </InputGroup>
+                </div>
+
+                {/* --- Raw JSON textarea --- */}
+                <Form.Control
+                  as="textarea"
+                  rows={16}
+                  value={rawText}
+                  onChange={(e) => handleRawTextChange(e.target.value)}
+                  isInvalid={!!jsonError}
+                  isValid={!jsonError && rawText.length > 0}
+                  className="font-monospace"
+                />
+                {jsonError && (
+                  <Form.Text className="text-danger">{jsonError}</Form.Text>
+                )}
+              </Tab>
+            )}
+
+            {/* Template management tab — create/edit/delete templates */}
+            {showManageTemplatesTab && (
+              <Tab eventKey={TAB_KEY_MANAGE_TEMPLATES} title={tabStrings.tabManageTemplates}>
+                <EmbeddedTemplateManager serviceId={serviceId} onEvent={onEvent} />
+              </Tab>
+            )}
           </Tabs>
 
-          {/* Action buttons */}
-          <div className="d-flex gap-2 mt-3 mb-3">
-            <Button variant="primary" onClick={handleSave}>
-              Save
-            </Button>
-            <Button variant="secondary" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button
-              variant="info"
-              onClick={() => setShowValidation(!showValidation)}
-            >
-              {showValidation ? 'Hide Validation' : 'Validate'}
-            </Button>
-          </div>
+          {/* Policy action buttons — shown only while editing a policy.
+              Hidden in template-created read-only mode and on the template
+              management tab, where policy save/validate is not applicable. */}
+          {!createdFromTemplate && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (
+            <div className="d-flex gap-2 mt-3 mb-3">
+              <Button variant="primary" onClick={handleSave}>
+                Save
+              </Button>
+              <Button variant="secondary" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button
+                variant="info"
+                onClick={() => setShowValidation(!showValidation)}
+              >
+                {showValidation ? 'Hide Validation' : 'Validate'}
+              </Button>
+            </div>
+          )}
 
           {saveError && (
             <Alert variant="danger" className="mt-2" dismissible onClose={() => setSaveError('')}>
@@ -417,7 +642,7 @@ const EmbeddedApp = ({
           )}
 
           {/* Inline validation panel (no modal — avoids portal issues in Shadow DOM) */}
-          {showValidation && (
+          {showValidation && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (
             <div className="border rounded p-3 mt-3" data-testid="validation-panel">
               <h5>Validate Policy</h5>
 

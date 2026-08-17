@@ -37,13 +37,14 @@ vi.mock('../services/api', () => ({
   configureApi: (...args: unknown[]) => mockConfigureApi(...args),
 }));
 
-// Mock CSS imports to avoid Vite-specific `?inline` handling in tests
+// Mock CSS imports to avoid Vite-specific `?inline` handling in tests.
+// Include `:root`/`body` selectors so the shadow-DOM rescoping can be asserted.
 vi.mock('bootstrap/dist/css/bootstrap.min.css?inline', () => ({
-  default: '/* bootstrap-mock */',
+  default: ':root{--bs-body-bg:#fff;}/* bootstrap-mock */',
 }));
 
 vi.mock('../theme/theme.css?inline', () => ({
-  default: '/* theme-mock */',
+  default: ':root{--odrl-bg-color:#FFFFFF;}body{color:var(--odrl-text-color);}/* theme-mock */',
 }));
 
 describe('OdrlPolicyEditorElement', () => {
@@ -93,6 +94,18 @@ describe('OdrlPolicyEditorElement', () => {
     // Style should contain our mocked CSS
     expect(styles[0].textContent).toContain('bootstrap-mock');
     expect(styles[0].textContent).toContain('theme-mock');
+  });
+
+  it('rescopes :root to :host so custom properties resolve inside the shadow tree', () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    const css = el.shadowRoot!.querySelector('style')!.textContent!;
+    // :root would not match inside a shadow tree; it must be rescoped to :host.
+    expect(css).not.toMatch(/:root\b/);
+    expect(css).toContain(':host{--bs-body-bg:#fff;}');
+    expect(css).toContain(':host{--odrl-bg-color:#FFFFFF;}');
+    // A base surface rule is added for the mount container.
+    expect(css).toContain('.odrl-wc-container');
   });
 
   it('creates a container div inside the shadow root', () => {
@@ -157,6 +170,10 @@ describe('OdrlPolicyEditorElement', () => {
       'locale',
       'policy-context',
       'service-id',
+      'hide-builder-tab',
+      'hide-raw-tab',
+      'hide-template-tab',
+      'hide-template-create-tab',
     ]);
   });
 
@@ -331,8 +348,8 @@ describe('OdrlPolicyEditorElement', () => {
       editableFields: [],
       lockedFields: [],
     };
-    el.template = template;
-    expect(el.template).toBe(template);
+    el.fieldTemplate = template;
+    expect(el.fieldTemplate).toBe(template);
 
     // Should trigger a re-render
     await vi.dynamicImportSettled();
@@ -341,7 +358,7 @@ describe('OdrlPolicyEditorElement', () => {
 
   it('returns undefined for template when none is set', () => {
     const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
-    expect(el.template).toBeUndefined();
+    expect(el.fieldTemplate).toBeUndefined();
   });
 
   it('allows clearing the template by setting undefined', async () => {
@@ -359,11 +376,11 @@ describe('OdrlPolicyEditorElement', () => {
       editableFields: [],
       lockedFields: [],
     };
-    el.template = template;
-    expect(el.template).toBe(template);
+    el.fieldTemplate = template;
+    expect(el.fieldTemplate).toBe(template);
 
-    el.template = undefined;
-    expect(el.template).toBeUndefined();
+    el.fieldTemplate = undefined;
+    expect(el.fieldTemplate).toBeUndefined();
   });
 
   // -----------------------------------------------------------
@@ -420,5 +437,57 @@ describe('OdrlPolicyEditorElement', () => {
 
     await vi.dynamicImportSettled();
     expect(mockRender).toHaveBeenCalled();
+  });
+
+  // -----------------------------------------------------------
+  // Boolean hide-* attributes
+  // -----------------------------------------------------------
+
+  /** Reads the `hiddenTabs` config from the most recent React render. */
+  const lastHiddenTabs = () => {
+    const element = mockRender.mock.calls.at(-1)![0] as { props: { config: { hiddenTabs: Record<string, boolean> } } };
+    return element.props.config.hiddenTabs;
+  };
+
+  it('treats a bare hide-*-tab attribute as true', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    el.setAttribute('hide-template-tab', '');
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    expect(lastHiddenTabs().hideTemplateTab).toBe(true);
+  });
+
+  it('treats hide-*-tab="false" and "0" as false (framework falsy bindings)', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    el.setAttribute('hide-template-tab', 'false');
+    el.setAttribute('hide-builder-tab', '0');
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    const hidden = lastHiddenTabs();
+    expect(hidden.hideTemplateTab).toBe(false);
+    expect(hidden.hideBuilderTab).toBe(false);
+  });
+
+  it('treats hide-*-tab="true" as true', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    el.setAttribute('hide-raw-tab', 'true');
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    expect(lastHiddenTabs().hideRawTab).toBe(true);
+  });
+
+  it('treats an absent hide-*-tab attribute as false', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    const hidden = lastHiddenTabs();
+    expect(hidden.hideTemplateTab).toBe(false);
+    expect(hidden.hideBuilderTab).toBe(false);
+    expect(hidden.hideRawTab).toBe(false);
+    expect(hidden.hideTemplateCreateTab).toBe(false);
   });
 });

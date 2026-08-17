@@ -31,15 +31,26 @@ const renderOperand = (operand: unknown, notSet: string): string => {
 };
 
 /**
+ * Renders an ODRL action as a display string, tolerating both the plain
+ * string form (`"odrl:read"`) and the object form (`{ "@id": "odrl:read" }`)
+ * emitted by templates. The `odrl:` prefix is stripped for readability.
+ */
+const renderAction = (action: unknown, notSet: string): string => {
+  if (!action) return notSet;
+  return renderOperand(action, notSet).replace('odrl:', '');
+};
+
+/**
  * Generates a human-readable summary of the policy permission.
  */
 function buildHumanSummary(
-  action: string | undefined,
+  action: unknown,
   target: unknown,
   assignee: unknown,
   notSet: string,
 ): string {
-  const actionStr = action ? action.replace('odrl:', '').toUpperCase() : notSet;
+  const rawAction = renderAction(action, notSet);
+  const actionStr = rawAction === notSet ? notSet : rawAction.toUpperCase();
   const targetStr = renderOperand(target, notSet);
   const assigneeStr = renderOperand(assignee, notSet);
   return `Allow ${actionStr} on ${targetStr} for ${assigneeStr}`;
@@ -71,7 +82,7 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
   const permission = (policy['odrl:permission'] || {}) as Record<string, unknown>;
   const target = permission['odrl:target'];
   const assignee = permission['odrl:assignee'];
-  const action = permission['odrl:action'] as string | undefined;
+  const action = permission['odrl:action'];
   const constraint = permission['odrl:constraint'] as Record<string, unknown> | unknown[] | undefined;
 
   const renderConstraintItem = (c: Record<string, unknown>, index: number) => (
@@ -87,13 +98,26 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
     </ListGroup.Item>
   );
 
-  const renderRefinements = (refinements: unknown[]) => {
-    if (!refinements || refinements.length === 0) return null;
+  /**
+   * Normalizes an ODRL `odrl:refinement` value into an array of constraint
+   * items. ODRL allows a refinement to be either a single constraint object
+   * or an array of them; templates commonly emit the single-object form, so
+   * both must be handled to avoid calling `.map` on a non-array.
+   */
+  const toRefinementArray = (refinement: unknown): Record<string, unknown>[] => {
+    if (!refinement) return [];
+    if (Array.isArray(refinement)) return refinement as Record<string, unknown>[];
+    return [refinement as Record<string, unknown>];
+  };
+
+  const renderRefinements = (refinement: unknown) => {
+    const refinements = toRefinementArray(refinement);
+    if (refinements.length === 0) return null;
     return (
       <div className="mt-2 ms-4">
         <h6>{t.refinements}:</h6>
         <ListGroup as="ol" numbered>
-          {(refinements as Record<string, unknown>[]).map(renderConstraintItem)}
+          {refinements.map(renderConstraintItem)}
         </ListGroup>
       </div>
     );
@@ -107,7 +131,7 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
       return (
         <>
           {name}: {obj['@type'] as string}
-          {renderRefinements(obj['odrl:refinement'] as unknown[])}
+          {renderRefinements(obj['odrl:refinement'])}
         </>
       );
     }
@@ -193,7 +217,7 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
               <ListGroup.Item>{renderEntity(target, t.target)}</ListGroup.Item>
               <ListGroup.Item>{renderEntity(assignee, t.assignee)}</ListGroup.Item>
               <ListGroup.Item>
-                {t.action}: {action || notSet}
+                {t.action}: {renderAction(action, notSet)}
               </ListGroup.Item>
             </ListGroup>
             {renderConstraints()}

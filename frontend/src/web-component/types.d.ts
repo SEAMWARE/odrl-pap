@@ -19,6 +19,27 @@ export type EditorMode = 'create' | 'edit';
 export type EmbeddedThemePreset = 'light' | 'dark';
 
 // ---------------------------------------------------------------------------
+// Tab visibility
+// ---------------------------------------------------------------------------
+
+/**
+ * Controls the visibility of individual editor tabs in the web component.
+ *
+ * Each property, when `true`, hides the corresponding tab.
+ * By default all tabs are visible (all values are `false`).
+ */
+export interface TabVisibility {
+  /** When `true`, hides the visual policy builder tab. */
+  hideBuilderTab: boolean;
+  /** When `true`, hides the raw ODRL JSON editor tab. */
+  hideRawTab: boolean;
+  /** When `true`, hides the template selection tab. */
+  hideTemplateTab: boolean;
+  /** When `true`, hides the template creation/management tab. */
+  hideTemplateCreateTab: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Event map
 // ---------------------------------------------------------------------------
 
@@ -42,6 +63,10 @@ export interface EmbeddedEventMap {
   'policy-validated': { result: Record<string, unknown> };
   /** Fired when the user clicks Cancel. */
   'editor-cancelled': Record<string, never>;
+  /** Fired after a new template is created via the template editor. */
+  'template-created': { template: Record<string, unknown>; id: string };
+  /** Fired after an existing template is updated via the template editor. */
+  'template-updated': { template: Record<string, unknown>; id: string };
 }
 
 /** Callback signature for dispatching custom events to the host. */
@@ -85,6 +110,13 @@ export interface EmbeddedConfig {
    * endpoints (`POST /policy`).
    */
   serviceId: string | null;
+  /**
+   * Controls which editor tabs are hidden.
+   *
+   * Each property, when `true`, hides the corresponding tab.
+   * Defaults to all tabs visible.
+   */
+  hiddenTabs: TabVisibility;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,12 +141,16 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | `locale`         | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
  * | `policy-context` | JSON-LD `@context` for new policies (JSON)    | `null`     |
  * | `service-id`     | Service ID for service-scoped policy ops       | `null`     |
+ * | `hide-builder-tab`         | Boolean — hides the visual policy builder tab   | absent |
+ * | `hide-raw-tab`             | Boolean — hides the raw ODRL JSON editor tab    | absent |
+ * | `hide-template-tab`        | Boolean — hides the template selection tab      | absent |
+ * | `hide-template-create-tab` | Boolean — hides the template management tab     | absent |
  *
  * ## JS Properties
  *
  * - `i18nStrings` — partial i18n override object (deep-merged with defaults)
  * - `themeConfig` — partial ThemeConfig override merged on top of the preset
- * - `template` — a PolicyTemplate object to pre-fill and constrain the editor
+ * - `fieldTemplate` — a FieldTemplate object to pre-fill and constrain the editor
  * - `policyContext` — custom JSON-LD `@context` object/string for new policies
  * - `serviceId` — service ID string for service-scoped policy operations
  *
@@ -126,6 +162,8 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | `policy-updated`   | `{ policy: object, id: string }`            |
  * | `policy-validated` | `{ result: object }`                        |
  * | `editor-cancelled` | `{}`                                        |
+ * | `template-created` | `{ template: object, id: string }`          |
+ * | `template-updated` | `{ template: object, id: string }`          |
  */
 export declare class OdrlPolicyEditorElement extends HTMLElement {
   /** Attributes that trigger re-renders when changed. */
@@ -152,11 +190,14 @@ export declare class OdrlPolicyEditorElement extends HTMLElement {
   themeConfig: Record<string, string> | undefined;
 
   /**
-   * Policy template to pre-fill and constrain the editor.
+   * Field template to pre-fill and constrain the builder form.
+   *
+   * A client-side skeleton with editable/locked fields — distinct from the
+   * stored, placeholder-based templates managed through the template tabs.
    *
    * @example
    * ```js
-   * editor.template = {
+   * editor.fieldTemplate = {
    *   id: 'dome-access',
    *   name: 'DOME Marketplace Access',
    *   skeleton: { '@context': '...', '@type': 'odrl:Agreement', ... },
@@ -165,7 +206,7 @@ export declare class OdrlPolicyEditorElement extends HTMLElement {
    * };
    * ```
    */
-  template: Record<string, unknown> | undefined;
+  fieldTemplate: Record<string, unknown> | undefined;
 
   /**
    * Custom JSON-LD `@context` for new policies.

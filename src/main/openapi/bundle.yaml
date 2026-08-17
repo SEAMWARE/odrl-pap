@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: OPA Bundle API
   description: OPA Bundle API
-  version: 0.63.0
+  version: 1.19.0
 paths:
   /bundles/service/v1/policies.tar.gz:
     get:

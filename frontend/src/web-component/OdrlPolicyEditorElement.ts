@@ -7,16 +7,20 @@
  *
  * ## Observed attributes
  *
- * | Attribute        | Description                                   | Default    |
- * |------------------|-----------------------------------------------|------------|
- * | `api-base-url`   | PAP API base URL                              | `""`       |
- * | `auth-token`     | Bearer token for API authentication           | `null`     |
- * | `mode`           | `"create"` or `"edit"`                        | `"create"` |
- * | `policy-id`      | Policy ID to load (when `mode="edit"`)        | `null`     |
- * | `theme`          | `"light"` or `"dark"`                         | `"light"`  |
- * | `locale`         | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
- * | `policy-context` | JSON-LD `@context` for new policies (JSON)    | `null`     |
- * | `service-id`     | Service ID for service-scoped policy ops       | `null`     |
+ * | Attribute                | Description                                          | Default    |
+ * |--------------------------|------------------------------------------------------|------------|
+ * | `api-base-url`           | PAP API base URL                                     | `""`       |
+ * | `auth-token`             | Bearer token for API authentication                  | `null`     |
+ * | `mode`                   | `"create"` or `"edit"`                               | `"create"` |
+ * | `policy-id`              | Policy ID to load (when `mode="edit"`)               | `null`     |
+ * | `theme`                  | `"light"` or `"dark"`                                | `"light"`  |
+ * | `locale`                 | Language code (e.g., `"en"`, `"de"`)                 | `"en"`     |
+ * | `policy-context`         | JSON-LD `@context` for new policies (JSON)           | `null`     |
+ * | `service-id`             | Service ID for service-scoped policy ops              | `null`     |
+ * | `hide-builder-tab`       | Boolean — hides the visual policy builder tab        | absent     |
+ * | `hide-raw-tab`           | Boolean — hides the raw ODRL JSON editor tab         | absent     |
+ * | `hide-template-tab`      | Boolean — hides the template selection tab           | absent     |
+ * | `hide-template-create-tab` | Boolean — hides the template management tab        | absent     |
  *
  * ## Custom Events
  *
@@ -26,12 +30,14 @@
  * | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string }`    |
  * | `policy-validated` | `{ result: ValidationResponse }`            |
  * | `editor-cancelled` | `{}`                                        |
+ * | `template-created` | `{ template: object, id: string }`          |
+ * | `template-updated` | `{ template: object, id: string }`          |
  *
  * ## JS Properties
  *
  * - `i18nStrings` — partial i18n override object (deep-merged with defaults)
  * - `themeConfig` — partial ThemeConfig override merged on top of the preset
- * - `template` — a {@link PolicyTemplate} object to pre-fill and constrain the editor
+ * - `fieldTemplate` — a {@link FieldTemplate} object to pre-fill and constrain the editor
  * - `policyContext` — custom JSON-LD `@context` object/string for new policies
  * - `serviceId` — service ID string for service-scoped policy operations
  *
@@ -57,11 +63,11 @@
 import { createElement, createRef, type RefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { configureApi } from '../services/api';
-import type { EmbeddedConfig, EditorMode, EmbeddedThemePreset } from './EmbeddedContext';
+import type { EmbeddedConfig, EditorMode, EmbeddedThemePreset, TabVisibility } from './EmbeddedContext';
 import type { DeepPartial } from '../i18n/I18nContext';
 import type { I18nStrings } from '../i18n/en';
 import type { ThemeConfig } from '../theme/defaultTheme';
-import type { PolicyTemplate } from '../types';
+import type { FieldTemplate } from '../types';
 
 // Bootstrap CSS imported as a string for shadow-DOM injection.
 // The `?inline` suffix tells Vite to return the CSS text, not inject it
@@ -78,6 +84,41 @@ const DEFAULT_MODE: EditorMode = 'create';
 const DEFAULT_THEME: EmbeddedThemePreset = 'light';
 const DEFAULT_LOCALE = 'en';
 
+/** CSS class of the div the React tree is mounted into. */
+const CONTAINER_CLASS = 'odrl-wc-container';
+
+/**
+ * Rewrites a stylesheet authored for the light DOM so it works inside a
+ * shadow root.
+ *
+ * Bootstrap and the theme stylesheet declare their CSS custom properties on
+ * `:root` and their base typography/background on `body`. Neither selector
+ * matches inside a shadow tree — the shadow root is a `DocumentFragment`
+ * (not the `:root` element) and there is no `<body>` — so every
+ * `var(--bs-*)` / `var(--odrl-*)` reference would resolve to nothing and the
+ * UI would render unstyled (invisible inputs, borderless tabs, white-on-white
+ * badges).
+ *
+ * Rescoping `:root` to `:host` declares the variables on the shadow host,
+ * from where custom properties inherit into the entire shadow tree. A base
+ * surface rule for the mount container replaces what the (now non-matching)
+ * `body` rule used to provide.
+ *
+ * @param css - The concatenated Bootstrap + theme CSS text.
+ * @returns The rescoped CSS, safe to inject into a shadow root.
+ */
+function scopeCssForShadowDom(css: string): string {
+  const rescoped = css.replace(/:root\b/g, ':host');
+  const surface = `
+:host { display: block; }
+.${CONTAINER_CLASS} {
+  font-family: var(--odrl-font-family);
+  color: var(--odrl-text-color);
+  background-color: var(--odrl-bg-color);
+}`;
+  return `${rescoped}\n${surface}`;
+}
+
 /**
  * `<odrl-policy-editor>` custom element.
  *
@@ -89,7 +130,11 @@ const DEFAULT_LOCALE = 'en';
 export class OdrlPolicyEditorElement extends HTMLElement {
   /** Attributes that trigger re-renders when changed. */
   static get observedAttributes(): string[] {
-    return ['api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale', 'policy-context', 'service-id'];
+    return [
+      'api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale',
+      'policy-context', 'service-id',
+      'hide-builder-tab', 'hide-raw-tab', 'hide-template-tab', 'hide-template-create-tab',
+    ];
   }
 
   /** React root instance (created on connect, destroyed on disconnect). */
@@ -107,8 +152,8 @@ export class OdrlPolicyEditorElement extends HTMLElement {
   /** Partial theme overrides set via JS property. */
   private _themeConfig: Partial<ThemeConfig> | undefined;
 
-  /** Policy template set via JS property. */
-  private _template: PolicyTemplate | undefined;
+  /** Field template set via JS property. */
+  private _fieldTemplate: FieldTemplate | undefined;
 
   /** Custom JSON-LD `@context` set via JS property. */
   private _policyContext: Record<string, string> | string | undefined;
@@ -157,15 +202,16 @@ export class OdrlPolicyEditorElement extends HTMLElement {
   }
 
   /**
-   * Sets a policy template (JS property, not HTML attribute).
+   * Sets a field template (JS property, not HTML attribute).
    *
-   * When set, the editor pre-fills the form from the template skeleton
-   * and locks fields listed in `lockedFields`.
+   * When set, the editor pre-fills the form from the template skeleton and
+   * locks fields listed in `lockedFields`. This is distinct from the stored,
+   * placeholder-based templates managed through the template tabs.
    *
    * @example
    * ```js
    * const editor = document.querySelector('odrl-policy-editor');
-   * editor.template = {
+   * editor.fieldTemplate = {
    *   id: 'dome-access',
    *   name: 'DOME Marketplace Access',
    *   description: 'Grants access to a DOME resource',
@@ -176,14 +222,14 @@ export class OdrlPolicyEditorElement extends HTMLElement {
    * };
    * ```
    */
-  set template(value: PolicyTemplate | undefined) {
-    this._template = value;
+  set fieldTemplate(value: FieldTemplate | undefined) {
+    this._fieldTemplate = value;
     this.renderReact();
   }
 
-  /** Returns the current policy template, or `undefined` if none is set. */
-  get template(): PolicyTemplate | undefined {
-    return this._template;
+  /** Returns the current field template, or `undefined` if none is set. */
+  get fieldTemplate(): FieldTemplate | undefined {
+    return this._fieldTemplate;
   }
 
   /**
@@ -251,14 +297,16 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       this.attachShadow({ mode: 'open' });
     }
 
-    // Inject Bootstrap + theme CSS into the shadow root
+    // Inject Bootstrap + theme CSS into the shadow root. The stylesheets are
+    // rescoped from `:root`/`body` to `:host`/container so their custom
+    // properties resolve inside the shadow tree (see scopeCssForShadowDom).
     const style = document.createElement('style');
-    style.textContent = `${bootstrapCss}\n${themeCss}`;
+    style.textContent = scopeCssForShadowDom(`${bootstrapCss}\n${themeCss}`);
     this.shadowRoot!.appendChild(style);
 
     // Create the React mount container
     this.container = document.createElement('div');
-    this.container.setAttribute('class', 'odrl-wc-container');
+    this.container.setAttribute('class', CONTAINER_CLASS);
     this.shadowRoot!.appendChild(this.container);
 
     // Create React root and render
@@ -322,6 +370,41 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     return this.getAttribute('service-id');
   }
 
+  /**
+   * Reads a boolean HTML attribute.
+   *
+   * The attribute's presence normally means `true`, but an explicit value of
+   * `"false"` or `"0"` (case-insensitive) is treated as `false`. This makes the
+   * component safe with framework hosts that render the attribute for a falsy
+   * binding — e.g. Angular `[attr.hide-template-tab]="false"` and Vue
+   * `:hide-template-tab="false"` both emit `hide-template-tab="false"`, which
+   * would otherwise hide the tab and leave the editor blank.
+   *
+   * @param name - The attribute name.
+   * @returns `true` when the attribute is present and not explicitly false.
+   */
+  private readBooleanAttribute(name: string): boolean {
+    if (!this.hasAttribute(name)) {
+      return false;
+    }
+    const value = (this.getAttribute(name) ?? '').trim().toLowerCase();
+    return value !== 'false' && value !== '0';
+  }
+
+  /**
+   * Resolves tab visibility from the `hide-*-tab` boolean attributes.
+   *
+   * @returns A {@link TabVisibility} object.
+   */
+  private resolveHiddenTabs(): TabVisibility {
+    return {
+      hideBuilderTab: this.readBooleanAttribute('hide-builder-tab'),
+      hideRawTab: this.readBooleanAttribute('hide-raw-tab'),
+      hideTemplateTab: this.readBooleanAttribute('hide-template-tab'),
+      hideTemplateCreateTab: this.readBooleanAttribute('hide-template-create-tab'),
+    };
+  }
+
   /** Builds the {@link EmbeddedConfig} from the current attribute values. */
   private buildConfig(): EmbeddedConfig {
     const policyContext = this.resolvePolicyContextAttr();
@@ -334,6 +417,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       theme: (this.getAttribute('theme') as EmbeddedThemePreset) ?? DEFAULT_THEME,
       onEvent: this.dispatchComponentEvent.bind(this),
       serviceId: this.resolveServiceId(),
+      hiddenTabs: this.resolveHiddenTabs(),
       ...(policyContext !== undefined && { policyContext }),
     };
   }
@@ -388,7 +472,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
           i18nOverrides: this._i18nStrings,
           themeOverrides: this._themeConfig,
           containerRef: this.containerRef,
-          template: this._template,
+          fieldTemplate: this._fieldTemplate,
         }),
       );
     });

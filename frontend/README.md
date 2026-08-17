@@ -15,10 +15,15 @@ The editor can be used in two ways:
    with Shadow DOM style isolation and zero framework dependencies on the
    host page.
 
+> **New to the policy editor?** See the **[User Guide](./docs/USAGE.md)** for a
+> screenshot-based walkthrough of creating policies from templates and managing
+> templates.
+
 ---
 
 ## Table of Contents
 
+- [User Guide](./docs/USAGE.md)
 - [Installation](#installation)
 - [Quick Integration](#quick-integration)
 - [Docker](#docker)
@@ -325,6 +330,25 @@ at runtime triggers a re-render automatically.
 | `theme`         | `"light"` or `"dark"`                         | `"light"`  |
 | `locale`        | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
 | `policy-context`| Default `@context` for new policies (JSON string) | `{"odrl":"http://www.w3.org/ns/odrl/2/"}` |
+| `service-id`    | Service ID for service-scoped policy/template operations | `null` |
+| `hide-builder-tab` | Boolean — hides the visual policy builder tab | absent (visible) |
+| `hide-raw-tab`  | Boolean — hides the raw ODRL JSON editor tab  | absent (visible) |
+| `hide-template-tab` | Boolean — hides the template selection tab | absent (visible) |
+| `hide-template-create-tab` | Boolean — hides the template management tab (create/edit/delete templates) | absent (visible) |
+
+Boolean attributes follow the HTML convention: their **presence** means `true`
+(the tab is hidden) and their **absence** means `false` (the tab is visible).
+Use `hide-template-create-tab` to disable template authoring when embedding in
+third-party applications.
+
+```html
+<!-- Policy editing only: no template authoring, no template picker -->
+<odrl-policy-editor
+  api-base-url="https://pap.example.com"
+  hide-template-tab
+  hide-template-create-tab
+></odrl-policy-editor>
+```
 
 ```javascript
 // Attributes can be changed at runtime
@@ -343,8 +367,9 @@ JavaScript properties on the element:
 |---------------|------------------------------|------------------------------------------------------|
 | `i18nStrings` | `DeepPartial<I18nStrings>`   | Partial i18n overrides (deep-merged with defaults)   |
 | `themeConfig` | `Partial<ThemeConfig>`       | Partial theme CSS custom property overrides           |
-| `template`    | `PolicyTemplate`             | Pre-fills the form and optionally locks fields        |
+| `fieldTemplate` | `FieldTemplate`            | Pre-fills the builder form and optionally locks fields (client-side; distinct from stored templates) |
 | `policyContext` | `Record<string, string>`   | Default `@context` for new policies (takes precedence over attribute) |
+| `serviceId`   | `string`                     | Service scope for policy/template operations (takes precedence over attribute) |
 
 ```javascript
 const editor = document.querySelector('odrl-policy-editor');
@@ -361,8 +386,9 @@ editor.themeConfig = {
   'odrl-secondary-color': '#e8710a',
 };
 
-// Pre-fill and constrain the editor with a template
-editor.template = {
+// Pre-fill and constrain the builder form with a field template
+// (distinct from the stored, placeholder-based templates in the template tabs)
+editor.fieldTemplate = {
   id: 'dome-access',
   name: 'DOME Marketplace Access',
   description: 'Grants access to a DOME resource',
@@ -391,6 +417,8 @@ Events bubble and cross Shadow DOM boundaries (`composed: true`).
 | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string }`    | An existing policy is updated    |
 | `policy-validated` | `{ result: ValidationResponse }`            | Policy validation completes      |
 | `editor-cancelled` | `{}`                                        | The user clicks Cancel           |
+| `template-created` | `{ template: object, id: string }`          | A new template is created in the management tab |
+| `template-updated` | `{ template: object, id: string }`          | An existing template is updated in the management tab |
 
 ```javascript
 const editor = document.querySelector('odrl-policy-editor');
