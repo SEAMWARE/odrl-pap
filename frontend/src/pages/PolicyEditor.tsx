@@ -32,6 +32,11 @@ import TemplateSelector from '../components/TemplateSelector';
 import TemplateFiller from '../components/TemplateFiller';
 import { useI18n } from '../i18n';
 import { createNewPolicy } from '../constants/policyDefaults';
+import {
+  isJsonLdContextObject,
+  jsonLdContextEntryIri,
+  type JsonLdContextObject,
+} from '../utils/jsonLdContext';
 
 /** Session storage key for persisting the last HTTP test request. */
 const SESSION_KEY_TEST_REQUEST = 'odrl-pap-test-request';
@@ -294,10 +299,10 @@ const PolicyEditor = () => {
     if (!newCtxPrefix.trim() || !newCtxUri.trim()) return;
 
     const currentCtx = (policy as Record<string, unknown>)['@context'];
-    let contextObj: Record<string, string>;
+    let contextObj: JsonLdContextObject;
 
-    if (typeof currentCtx === 'object' && currentCtx !== null && !Array.isArray(currentCtx)) {
-      contextObj = { ...(currentCtx as Record<string, string>) };
+    if (isJsonLdContextObject(currentCtx)) {
+      contextObj = { ...currentCtx };
     } else if (typeof currentCtx === 'string') {
       // Convert a plain-string context to a namespaced object
       contextObj = { odrl: currentCtx };
@@ -322,8 +327,8 @@ const PolicyEditor = () => {
    */
   const handleRemoveContext = useCallback((prefix: string) => {
     const currentCtx = (policy as Record<string, unknown>)['@context'];
-    if (typeof currentCtx === 'object' && currentCtx !== null && !Array.isArray(currentCtx)) {
-      const copy = { ...(currentCtx as Record<string, string>) };
+    if (isJsonLdContextObject(currentCtx)) {
+      const copy = { ...currentCtx };
       delete copy[prefix];
       const updatedPolicy = { ...policy, '@context': copy } as OdrlPolicyJson;
       setPolicy(updatedPolicy);
@@ -551,25 +556,28 @@ const PolicyEditor = () => {
             <h6 className="mb-2">{t.contextTitle}</h6>
             {(() => {
               const ctx = (policy as Record<string, unknown>)['@context'];
-              if (typeof ctx === 'object' && ctx !== null && !Array.isArray(ctx)) {
+              if (isJsonLdContextObject(ctx)) {
                 return (
                   <div className="mb-2 d-flex flex-wrap gap-1">
-                    {Object.entries(ctx as Record<string, string>).map(([prefix, uri]) => (
-                      <Badge
-                        key={prefix}
-                        bg="secondary"
-                        className="d-inline-flex align-items-center gap-1 px-2 py-1"
-                        title={uri}
-                      >
-                        <strong>{prefix}</strong>: {uri}
-                        <CloseButton
-                          variant="white"
-                          style={{ fontSize: '0.5rem' }}
-                          onClick={() => handleRemoveContext(prefix)}
-                          aria-label={`${t.removeContext} ${prefix}`}
-                        />
-                      </Badge>
-                    ))}
+                    {Object.entries(ctx).map(([prefix, entry]) => {
+                      const uri = jsonLdContextEntryIri(entry);
+                      return (
+                        <Badge
+                          key={prefix}
+                          bg="secondary"
+                          className="d-inline-flex align-items-center gap-1 px-2 py-1"
+                          title={uri}
+                        >
+                          <strong>{prefix}</strong>: {uri}
+                          <CloseButton
+                            variant="white"
+                            style={{ fontSize: '0.5rem' }}
+                            onClick={() => handleRemoveContext(prefix)}
+                            aria-label={`${t.removeContext} ${prefix}`}
+                          />
+                        </Badge>
+                      );
+                    })}
                   </div>
                 );
               }
