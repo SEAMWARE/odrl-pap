@@ -23,6 +23,11 @@ const MOCK_MAPPINGS: Mappings = {
   leftOperands: [
     { name: 'dome-op:role', description: 'Role of the requesting party' },
     { name: 'http:body_value', description: 'Value from HTTP request body' },
+    {
+      name: 'http:bodyValue',
+      description: 'Value from HTTP request body at the given path',
+      parameterCount: 1,
+    },
   ],
   rightOperands: [
     { name: 'odrl:rightOperand', description: 'Right operand value' },
@@ -443,6 +448,141 @@ describe('ConstraintBuilder propertyKey', () => {
     expect(lastCall['@type']).toBe('odrl:PartyCollection');
     expect(Array.isArray(lastCall['odrl:refinement'])).toBe(true);
     expect(lastCall['odrl:constraint']).toBeUndefined();
+  });
+
+  /**
+   * Operands reported with a parameterCount > 0 need their parameter written as the value of the
+   * namespaced key itself. Referencing them via `odrl:leftOperand` leaves the parameter unresolved
+   * and makes the backend reject the policy.
+   */
+  describe('parameterized left operands', () => {
+    /** Returns the first constraint of the most recent setParent call. */
+    const lastConstraintOf = (setParentMock: ReturnType<typeof vi.fn>) => {
+      const lastCall = setParentMock.mock.calls[setParentMock.mock.calls.length - 1][0];
+      return lastCall['odrl:constraint'][0];
+    };
+
+    it('does not show a parameter input for an operand without parameters', async () => {
+      const user = userEvent.setup();
+
+      renderWithI18n(
+        <ConstraintBuilder
+          parent={{ 'odrl:constraint': [{}] }}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+        />,
+      );
+
+      await user.selectOptions(screen.getByLabelText(/select left operand 1/i), 'dome-op:role');
+
+      expect(screen.queryByLabelText(/operand parameter 1/i)).not.toBeInTheDocument();
+    });
+
+    it('writes the operand as its own key when it requires a parameter', async () => {
+      const user = userEvent.setup();
+
+      renderWithI18n(
+        <ConstraintBuilder
+          parent={{ 'odrl:constraint': [{}] }}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+        />,
+      );
+
+      await user.selectOptions(screen.getByLabelText(/select left operand 1/i), 'http:bodyValue');
+
+      const constraint = lastConstraintOf(setParent);
+      expect(constraint).toHaveProperty('http:bodyValue');
+      expect(constraint['odrl:leftOperand']).toBeUndefined();
+    });
+
+    it('stores the entered parameter as the value of the operand key', async () => {
+      const user = userEvent.setup();
+
+      renderWithI18n(
+        <ConstraintBuilder
+          parent={{ 'odrl:constraint': [{ 'http:bodyValue': '' }] }}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+        />,
+      );
+
+      await user.type(screen.getByLabelText(/operand parameter 1/i), '$.numNodes.value');
+
+      expect(lastConstraintOf(setParent)['http:bodyValue']).toBe('$.numNodes.value');
+    });
+
+    it('preselects the operand and its parameter from an existing constraint', () => {
+      renderWithI18n(
+        <ConstraintBuilder
+          parent={{
+            'odrl:constraint': [
+              {
+                '@type': 'odrl:Constraint',
+                'http:bodyValue': '$.numNodes.value',
+                'odrl:operator': { '@id': 'odrl:eq' },
+                'odrl:rightOperand': { '@value': '3', '@type': 'xsd:string' },
+              },
+            ],
+          }}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+        />,
+      );
+
+      expect(screen.getByLabelText(/select left operand 1/i)).toHaveValue('http:bodyValue');
+      expect(screen.getByLabelText(/operand parameter 1/i)).toHaveValue('$.numNodes.value');
+    });
+
+    it('reads a parameter that is given as a JSON-LD value object', () => {
+      renderWithI18n(
+        <ConstraintBuilder
+          parent={{
+            'odrl:constraint': [{ 'http:bodyValue': { '@value': '$.numNodes.value' } }],
+          }}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+        />,
+      );
+
+      expect(screen.getByLabelText(/operand parameter 1/i)).toHaveValue('$.numNodes.value');
+    });
+
+    it('drops the operand key when switching to an operand without parameters', async () => {
+      const user = userEvent.setup();
+
+      renderWithI18n(
+        <ConstraintBuilder
+          parent={{ 'odrl:constraint': [{ 'http:bodyValue': '$.numNodes.value' }] }}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+        />,
+      );
+
+      await user.selectOptions(screen.getByLabelText(/select left operand 1/i), 'dome-op:role');
+
+      const constraint = lastConstraintOf(setParent);
+      expect(constraint['http:bodyValue']).toBeUndefined();
+      expect(constraint['odrl:leftOperand']).toEqual({ '@id': 'dome-op:role' });
+    });
+
+    it('drops odrl:leftOperand when switching to an operand with parameters', async () => {
+      const user = userEvent.setup();
+
+      renderWithI18n(
+        <ConstraintBuilder
+          parent={{ 'odrl:constraint': [{ 'odrl:leftOperand': { '@id': 'dome-op:role' } }] }}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+        />,
+      );
+
+      await user.selectOptions(screen.getByLabelText(/select left operand 1/i), 'http:bodyValue');
+
+      const constraint = lastConstraintOf(setParent);
+      expect(constraint['odrl:leftOperand']).toBeUndefined();
+      expect(constraint['http:bodyValue']).toBe('');
+    });
   });
 
   it('loads a single-object refinement as an editable constraint card', () => {

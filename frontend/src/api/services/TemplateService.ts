@@ -25,6 +25,10 @@ export class TemplateService {
             url: '/template',
             body: requestBody,
             mediaType: 'application/json',
+            errors: {
+                400: `Validation failed — e.g. a missing required field (name/odrl), duplicate placeholder keys, or a placeholder/token mismatch.
+                `,
+            },
         });
     }
     /**
@@ -89,6 +93,8 @@ export class TemplateService {
             body: requestBody,
             mediaType: 'application/json',
             errors: {
+                400: `Validation failed — e.g. a missing required field (name/odrl), duplicate placeholder keys, or a placeholder/token mismatch.
+                `,
                 404: `No such template exists`,
             },
         });

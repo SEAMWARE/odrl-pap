@@ -31,6 +31,29 @@ const renderOperand = (operand: unknown, notSet: string): string => {
 };
 
 /**
+ * Keys of a constraint that never hold the left operand.
+ */
+const NON_LEFT_OPERAND_KEYS = ['@type', '@id', 'odrl:operator', 'odrl:rightOperand'];
+
+/**
+ * Renders the left operand of a constraint as a display string.
+ *
+ * Besides the referenced form (`"odrl:leftOperand": {"@id": "http:path"}`), operands that require a
+ * parameter are written as the namespaced key itself, carrying the parameter as its value
+ * (`"http:bodyValue": "$.my.property"`). Both forms are rendered as `operand: parameter`.
+ */
+const renderLeftOperand = (constraint: Record<string, unknown>, notSet: string): string => {
+  if (constraint['odrl:leftOperand']) {
+    return renderOperand(constraint['odrl:leftOperand'], notSet);
+  }
+  const operandKey = Object.keys(constraint).find((key) => !NON_LEFT_OPERAND_KEYS.includes(key));
+  if (!operandKey) return notSet;
+
+  const parameter = renderOperand(constraint[operandKey], '');
+  return parameter ? `${operandKey}: ${parameter}` : operandKey;
+};
+
+/**
  * Renders an ODRL action as a display string, tolerating both the plain
  * string form (`"odrl:read"`) and the object form (`{ "@id": "odrl:read" }`)
  * emitted by templates. The `odrl:` prefix is stripped for readability.
@@ -90,7 +113,7 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
       <div className="ms-2 me-auto">
         <div className="fw-bold">{t.constraint}</div>
         <Stack direction="horizontal" gap={2}>
-          <Badge bg="secondary">{renderOperand(c['odrl:leftOperand'], notSet)}</Badge>
+          <Badge bg="secondary">{renderLeftOperand(c, notSet)}</Badge>
           <span className="fw-bold text-primary">{renderOperand(c['odrl:operator'], notSet)}</span>
           <Badge bg="secondary">{renderOperand(c['odrl:rightOperand'], notSet)}</Badge>
         </Stack>

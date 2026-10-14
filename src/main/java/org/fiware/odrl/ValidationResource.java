@@ -241,6 +241,7 @@ public class ValidationResource implements UiApi {
                 .stream()
                 .map(regoMapEntry -> new Mapping()
                         .description(regoMapEntry.getValue().description())
+                        .parameterCount(regoMapEntry.getValue().parameterCount())
                         .name(String.format("%s:%s", namespace, regoMapEntry.getKey())))
                 .forEach(mappings::add));
         return mappings;

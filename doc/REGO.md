@@ -1,5 +1,23 @@
 # REGO Methods
 
+## Parameterized operands
+
+Some operands need an additional parameter from the policy - for example `http:bodyValue`, which needs
+the path of the body-element to read, or `ovc:leftOperand`, which needs the JSON-path of the claim.
+Such an operand has to be written as the namespaced key itself, carrying the parameter as its value:
+
+```json
+{
+  "@type": "odrl:Constraint",
+  "http:bodyValue": "$.numNodes.value",
+  "odrl:operator": { "@id": "odrl:eq" },
+  "odrl:rightOperand": "3"
+}
+```
+
+Referencing it via `"odrl:leftOperand": {"@id": "http:bodyValue"}` provides no parameter and is
+rejected with a `400`, since the generated rego would be incomplete. The `/mappings` endpoint reports
+the number of required parameters per mapping as `parameterCount`.
 
 ## dome
 
