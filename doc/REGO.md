@@ -120,7 +120,7 @@ the number of required parameters per mapping as `parameterCount`.
 | ODRL Class | ODRL Key | Rego-Method | Description |
 | --- | --- | --- | --- |
 | action | ngsild:create | default | Check if the given request is a creation |
-| leftOperand | ngsi-ld:entityType | entity_type(http_part) | retrieves the type from an entity, either from the request path or from the body |
+| leftOperand | ngsi-ld:entityType | entity_type(http_part) | retrieves the type from an entity, either from the request path or from the body - for a batch, the type all of its entities have |
 | leftOperand | ngsi-ld:<property> | # | retrieves the value of the property, only applies to properties of type "Property". |
 | leftOperand | ngsi-ld:<property>_observedAt | # | retrieves the observedAt of the property The method should be concretized in the mapping.json, |
 | leftOperand | ngsi-ld:<property>_modifiedAt | # | retrieves the modifiedAt of the property The method should be concretized in the mapping.json, |

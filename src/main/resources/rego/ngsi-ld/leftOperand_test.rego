@@ -65,6 +65,63 @@ test_entity_type_from_body if {
 }
 
 # -----------------------
+# Tests for type_from_batch and entity_type on a batch (entityOperations/*)
+# -----------------------
+test_type_from_batch_one_type if {
+	body := [{"id": "urn:ngsi-ld:Vehicle:1", "type": "Vehicle"}, {"id": "urn:ngsi-ld:Vehicle:2", "type": "Vehicle"}]
+	leftOperand.type_from_batch(body) == "Vehicle"
+}
+
+test_type_from_batch_two_types if {
+	body := [{"id": "urn:ngsi-ld:Vehicle:1", "type": "Vehicle"}, {"id": "urn:ngsi-ld:Bus:1", "type": "Bus"}]
+	not leftOperand.type_from_batch(body)
+}
+
+test_type_from_batch_one_without_type if {
+	body := [{"id": "urn:ngsi-ld:Vehicle:1", "type": "Vehicle"}, {"id": "urn:ngsi-ld:Vehicle:2"}]
+	not leftOperand.type_from_batch(body)
+}
+
+test_type_from_batch_type_not_a_string if {
+	body := [{"id": "urn:ngsi-ld:Vehicle:1", "type": ["Vehicle", "Car"]}]
+	not leftOperand.type_from_batch(body)
+}
+
+test_type_from_batch_empty if {
+	not leftOperand.type_from_batch([])
+}
+
+test_type_from_batch_not_an_array if {
+	not leftOperand.type_from_batch({"type": "Vehicle"})
+}
+
+test_entity_type_from_batch if {
+	http_part := {
+		"path": "/ngsi-ld/v1/entityOperations/create",
+		"body": [{"id": "urn:ngsi-ld:Vehicle:1", "type": "Vehicle"}, {"id": "urn:ngsi-ld:Vehicle:2", "type": "Vehicle"}],
+	}
+	leftOperand.entity_type(http_part) == "Vehicle"
+}
+
+test_entity_type_from_batch_two_types if {
+	http_part := {
+		"path": "/ngsi-ld/v1/entityOperations/upsert",
+		"body": [{"id": "urn:ngsi-ld:Vehicle:1", "type": "Vehicle"}, {"id": "urn:ngsi-ld:Bus:1", "type": "Bus"}],
+	}
+	not leftOperand.entity_type(http_part)
+}
+
+# a query parameter still comes first, as for any other path
+test_entity_type_batch_query_first if {
+	http_part := {
+		"path": "/ngsi-ld/v1/entityOperations/create",
+		"query": {"type": "Bus"},
+		"body": [{"id": "urn:ngsi-ld:Vehicle:1", "type": "Vehicle"}],
+	}
+	leftOperand.entity_type(http_part) == "Bus"
+}
+
+# -----------------------
 # Tests for property_value
 # -----------------------
 test_property_value if {
