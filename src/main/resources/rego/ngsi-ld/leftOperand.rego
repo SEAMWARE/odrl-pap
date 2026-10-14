@@ -15,12 +15,27 @@ type_from_path(http_part) := tfe if {
 # helper to retrieve the type from the body
 type_from_body(body) := body.type
 
+# helper to retrieve the type from a batch body (entityOperations/create, upsert, update: an array of entities) -
+# the type all of its entities have; undefined when they do not all have the same one, or one is not a string
+type_from_batch(body) := tfb if {
+	is_array(body)
+	count(body) > 0
+	every entity in body {
+		is_string(entity.type)
+	}
+	types := {entity.type | some entity in body}
+	count(types) == 1
+	some tfb in types
+}
+
 ## ngsi-ld:entityType
-# retrieves the type from an entity, either from the request path or from the body
+# retrieves the type from an entity, either from the request path or from the body - for a batch, the type all of its entities have
 entity_type(http_part) := tfp if {
 	tfp = type_from_path(http_part)
 } else := tfb if {
 	tfb = type_from_body(http_part.body)
+} else := tfa if {
+	tfa = type_from_batch(http_part.body)
 }
 
 ## ngsi-ld:<property>
