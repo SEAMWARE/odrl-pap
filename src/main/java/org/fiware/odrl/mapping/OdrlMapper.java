@@ -40,6 +40,19 @@ import static org.fiware.odrl.mapping.OdrlConstants.VALUE_KEY;
 public class OdrlMapper {
 
     public static final String STRING_ESCAPE_TEMPLATE = "\"%s\"";
+
+    /**
+     * Failure message for a mapping that requires a parameter the policy does not provide. The parameter has to be
+     * provided as the value of the namespaced key itself, e.g. {@code "http:bodyValue": "$.my.property"}.
+     */
+    private static final String MISSING_PARAMETER_TEMPLATE =
+            "The %s `%s` requires %d parameter(s), but the policy does not provide a value. Provide it as `\"%s\": \"<value>\"`.";
+
+    /**
+     * Failure message for a type that is not configured in the mapping configuration.
+     */
+    private static final String NO_MAPPING_TEMPLATE = "No mapping for the %s `%s` configured.";
+
     private static final NamespacedValue ODRL_AND_SEQUENCE = new NamespacedValue("odrl", "andSequence");
     private final ObjectMapper objectMapper;
     private final MappingConfiguration mappingConfiguration;
@@ -384,12 +397,16 @@ public class OdrlMapper {
         } else {
             RegoMethod leftOperandMethod = getFromConfig(OdrlAttribute.LEFT_OPERAND, getNamespaced(leftOperandType));
             mappingResult.addImport(leftOperandMethod.regoPackage());
-            leftOperand = leftOperandValue.map(v -> {
-                if (v instanceof String) {
-                    return String.format(leftOperandMethod.regoMethod(), String.format(STRING_ESCAPE_TEMPLATE, v));
+            if (leftOperandValue.isPresent()) {
+                Object theValue = leftOperandValue.get();
+                if (theValue instanceof String) {
+                    leftOperand = String.format(leftOperandMethod.regoMethod(), String.format(STRING_ESCAPE_TEMPLATE, theValue));
+                } else {
+                    leftOperand = String.format(leftOperandMethod.regoMethod(), theValue);
                 }
-                return String.format(leftOperandMethod.regoMethod(), v);
-            }).orElseGet(leftOperandMethod::regoMethod);
+            } else {
+                leftOperand = getUnparameterizedRegoMethod(OdrlAttribute.LEFT_OPERAND, leftOperandType, leftOperandMethod);
+            }
         }
 
         String operatorKey = operatorMapper.getOperatorKey(constraint);
@@ -418,7 +435,7 @@ public class OdrlMapper {
             Object rightOperand;
             if (rightOperandValue.isEmpty()) {
                 RegoMethod ro = rightOperandMapper.getMethod(rightOperandType);
-                rightOperand = ro.regoMethod();
+                rightOperand = getUnparameterizedRegoMethod(OdrlAttribute.RIGHT_OPERAND, rightOperandType, ro);
                 mappingResult.addImport(ro.regoPackage());
             } else if (rightOperandValue.get() instanceof String) {
                 rightOperand = String.format(STRING_ESCAPE_TEMPLATE, rightOperandValue.get());
@@ -438,8 +455,12 @@ public class OdrlMapper {
         List<String> additionalMappedConstraints = new ArrayList<>();
         for (String additionalConstraint : additionalConstraints) {
             RegoMethod additionalConstraintRegoMethod = constraintMapper.getMethod(additionalConstraint);
-            additionalMappedConstraints.add(constraintMapper.getValue(additionalConstraint, constraint.get(additionalConstraint))
-                    .map(v -> String.format(additionalConstraintRegoMethod.regoMethod(), v)).orElseGet(additionalConstraintRegoMethod::regoMethod));
+            Optional<?> additionalConstraintValue = constraintMapper.getValue(additionalConstraint, constraint.get(additionalConstraint));
+            if (additionalConstraintValue.isPresent()) {
+                additionalMappedConstraints.add(String.format(additionalConstraintRegoMethod.regoMethod(), additionalConstraintValue.get()));
+            } else {
+                additionalMappedConstraints.add(getUnparameterizedRegoMethod(OdrlAttribute.CONSTRAINT, additionalConstraint, additionalConstraintRegoMethod));
+            }
             regoPackages.add(additionalConstraintRegoMethod.regoPackage());
         }
 
@@ -551,9 +572,34 @@ public class OdrlMapper {
     }
 
     private void mapAction(Object theAction) throws MappingException {
-        RegoMethod regoMethod = getFromConfig(OdrlAttribute.ACTION, getNamespaced(getStringOrByKey(theAction, ID_KEY)));
+        String actionType = getStringOrByKey(theAction, ID_KEY);
+        RegoMethod regoMethod = getFromConfig(OdrlAttribute.ACTION, getNamespaced(actionType));
         mappingResult.addImport(regoMethod.regoPackage());
-        mappingResult.addRule(regoMethod.regoMethod());
+        mappingResult.addRule(getUnparameterizedRegoMethod(OdrlAttribute.ACTION, actionType, regoMethod));
+    }
+
+    /**
+     * Returns the rego-method of a mapping that is used without any parameter from the policy.
+     *
+     * <p>A rego-method configured with format parameters (e.g. {@code http_lo.body_value(helper.http_part.body, %s)})
+     * requires the policy to provide a value for each of them. Without a value the template cannot be resolved, so the
+     * mapping is failed here instead of emitting the unresolved template, which would produce rego that does not
+     * compile.</p>
+     *
+     * @param odrlAttribute the attribute the mapping belongs to, used for the failure message
+     * @param type          the namespaced type that was looked up, e.g. {@code http:bodyValue}
+     * @param regoMethod    the mapping to be used without a parameter
+     * @return the rego-method, if it does not declare any parameter
+     * @throws MappingException if no mapping was found or the mapping requires a parameter
+     */
+    private String getUnparameterizedRegoMethod(OdrlAttribute odrlAttribute, String type, RegoMethod regoMethod) throws MappingException {
+        if (regoMethod == null) {
+            throw new MappingException(String.format(NO_MAPPING_TEMPLATE, odrlAttribute.getValue(), type));
+        }
+        if (regoMethod.isParameterized()) {
+            throw new MappingException(String.format(MISSING_PARAMETER_TEMPLATE, odrlAttribute.getValue(), type, regoMethod.parameterCount(), type));
+        }
+        return regoMethod.regoMethod();
     }
 
     private boolean isNamespaced(String namespacedValue) {

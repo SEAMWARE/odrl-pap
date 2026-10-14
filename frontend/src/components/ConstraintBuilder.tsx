@@ -7,12 +7,16 @@
  */
 import { Form, Row, Col, Button, Stack, Card, Badge } from 'react-bootstrap';
 import type { Mappings } from '../services/api';
+import type { Mapping } from '../api';
 import { useState, useEffect } from 'react';
 import { useI18n } from '../i18n';
 import NamespacedDropdown from './NamespacedDropdown';
 
 /** Default parent property that holds the constraint(s). */
 const DEFAULT_PROPERTY_KEY = 'odrl:constraint';
+
+/** Key under which a left operand is referenced by name. */
+const LEFT_OPERAND_KEY = 'odrl:leftOperand';
 
 interface ConstraintBuilderProps {
   /** Parent object containing the constraint field (see {@link ConstraintBuilderProps.propertyKey}). */
@@ -37,6 +41,44 @@ interface ConstraintData {
   'odrl:operator'?: { '@id': string };
   'odrl:rightOperand'?: { '@id'?: string; '@value'?: string; '@type'?: string };
   [key: string]: unknown;
+}
+
+/**
+ * Returns the number of parameters the given operand requires, as reported by the
+ * `/mappings` endpoint. Unknown operands are treated as parameterless.
+ */
+function getParameterCount(operands: Mapping[], operandName: string): number {
+  return operands.find((operand) => operand.name === operandName)?.parameterCount ?? 0;
+}
+
+/**
+ * Returns the left operand selected in the given constraint.
+ *
+ * A left operand is either referenced by name (`"odrl:leftOperand": {"@id": "http:path"}`) or - for
+ * operands that require a parameter - written as the namespaced key itself, carrying the parameter as
+ * its value (`"http:bodyValue": "$.my.property"`).
+ */
+function getLeftOperandId(constraint: ConstraintData, operands: Mapping[]): string {
+  const referenced = constraint[LEFT_OPERAND_KEY] as { '@id'?: string } | undefined;
+  if (referenced?.['@id']) {
+    return referenced['@id'];
+  }
+  return Object.keys(constraint).find((key) => operands.some((operand) => operand.name === key)) ?? '';
+}
+
+/**
+ * Returns the parameter of a parameterized left operand, which is stored as the value of the
+ * operand's own key. Accepts both the plain and the JSON-LD value-object form.
+ */
+function getLeftOperandParameter(constraint: ConstraintData, operandName: string): string {
+  const value = constraint[operandName];
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value && typeof value === 'object' && '@value' in value) {
+    return String((value as { '@value'?: unknown })['@value'] ?? '');
+  }
+  return '';
 }
 
 /**
@@ -117,6 +159,43 @@ const ConstraintBuilder = ({
     const newConstraints = [...internalConstraints];
     newConstraints[index] = { ...newConstraints[index], [field]: value };
     setInternalConstraints(newConstraints);
+  };
+
+  const replaceConstraint = (index: number, constraint: ConstraintData) => {
+    const newConstraints = [...internalConstraints];
+    newConstraints[index] = constraint;
+    setInternalConstraints(newConstraints);
+  };
+
+  /**
+   * Selects the left operand of a constraint.
+   *
+   * Operands that require a parameter (e.g. `http:bodyValue`) have to be written as the namespaced key
+   * itself, carrying the parameter as its value, since the backend takes the parameter from there.
+   * Parameterless operands are referenced by name via `odrl:leftOperand`. Only one of both forms may be
+   * present, so any previous representation is removed first.
+   */
+  const handleLeftOperandChange = (index: number, operandName: string) => {
+    const current = internalConstraints[index];
+    const previousOperand = getLeftOperandId(current, leftOperands);
+    const previousParameter = getLeftOperandParameter(current, previousOperand);
+
+    const updated: ConstraintData = { ...current };
+    delete updated[LEFT_OPERAND_KEY];
+    leftOperands.forEach((operand) => {
+      if (operand.name) {
+        delete updated[operand.name];
+      }
+    });
+
+    if (operandName) {
+      if (getParameterCount(leftOperands, operandName) > 0) {
+        updated[operandName] = previousParameter;
+      } else {
+        updated[LEFT_OPERAND_KEY] = { '@id': operandName };
+      }
+    }
+    replaceConstraint(index, updated);
   };
 
   const addConstraint = () => {
@@ -218,14 +297,35 @@ const ConstraintBuilder = ({
                 <Form.Label className="small fw-bold">{t.selectLeftOperand}</Form.Label>
                 <NamespacedDropdown
                   items={leftOperands}
-                  value={constraint['odrl:leftOperand']?.['@id'] || ''}
-                  onChange={(val) =>
-                    handleConstraintChange(index, 'odrl:leftOperand', { '@id': val })
-                  }
+                  value={getLeftOperandId(constraint, leftOperands)}
+                  onChange={(val) => handleLeftOperandChange(index, val)}
                   placeholder={t.selectLeftOperand}
                   ariaLabel={`${t.selectLeftOperand} ${index + 1}`}
                   disabled={locked}
                 />
+                {getParameterCount(leftOperands, getLeftOperandId(constraint, leftOperands)) > 0 && (
+                  <div className="mt-2">
+                    <Form.Label className="small fw-bold">{t.leftOperandParameter}</Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder={t.leftOperandParameterPlaceholder}
+                      value={getLeftOperandParameter(
+                        constraint,
+                        getLeftOperandId(constraint, leftOperands),
+                      )}
+                      onChange={(e) =>
+                        handleConstraintChange(
+                          index,
+                          getLeftOperandId(constraint, leftOperands),
+                          e.target.value,
+                        )
+                      }
+                      aria-label={`${t.leftOperandParameter} ${index + 1}`}
+                      disabled={locked}
+                    />
+                    <Form.Text className="text-muted">{t.leftOperandParameterHelp}</Form.Text>
+                  </div>
+                )}
               </Col>
 
               {/* Operator */}

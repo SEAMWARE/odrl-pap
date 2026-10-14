@@ -22,7 +22,7 @@ jobs:
           cache: maven
 
       - name: Run tests
-        run: mvn clean test
+        run: ./mvnw clean test
   opa-test:
     name: Run OPA tests
     runs-on: ubuntu-latest
