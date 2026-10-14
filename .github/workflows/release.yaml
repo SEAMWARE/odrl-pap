@@ -53,8 +53,8 @@ jobs:
 
       - name: Build image
         run: |
-          mvn versions:set -DnewVersion=${{ needs.generate-version.outputs.version }}
-          mvn clean package \
+          ./mvnw versions:set -DnewVersion=${{ needs.generate-version.outputs.version }}
+          ./mvnw clean package \
             -Dquarkus.package.type=native \
             -Dquarkus.container-image.build=true \
             -Dquarkus.jib.platforms=linux/arm64 \
@@ -68,7 +68,7 @@ jobs:
 
       - name: Test image
         run: |
-          mvn integration-test -Pk8s-it  -DskipTests -Dquarkus.container-image.tag=${{ needs.generate-version.outputs.version }}-arm64 -Dquarkus.container-image.registry="${{ env.REGISTRY }}" -Dquarkus.container-image.group="${{ env.REPOSITORY }}" -Dhelm.version=3.17.3
+          ./mvnw integration-test -Pk8s-it  -DskipTests -Dquarkus.container-image.tag=${{ needs.generate-version.outputs.version }}-arm64 -Dquarkus.container-image.registry="${{ env.REGISTRY }}" -Dquarkus.container-image.group="${{ env.REPOSITORY }}" -Dhelm.version=3.17.3
 
       - name: Dump cluster diagnostics on failure
         if: failure()
@@ -101,8 +101,8 @@ jobs:
 
       - name: Build image
         run: |
-          mvn versions:set -DnewVersion=${{ needs.generate-version.outputs.version }}
-          mvn clean package \
+          ./mvnw versions:set -DnewVersion=${{ needs.generate-version.outputs.version }}
+          ./mvnw clean package \
             -Dquarkus.package.type=native \
             -Dquarkus.container-image.build=true \
             -Dquarkus.jib.platforms=linux/amd64 \
@@ -116,7 +116,7 @@ jobs:
 
       - name: Test image
         run: |
-          mvn integration-test -Pk8s-it  -DskipTests -Dquarkus.container-image.tag=${{ needs.generate-version.outputs.version }}-amd64 -Dquarkus.container-image.registry="${{ env.REGISTRY }}" -Dquarkus.container-image.group="${{ env.REPOSITORY }}" -Dhelm.version=3.17.3
+          ./mvnw integration-test -Pk8s-it  -DskipTests -Dquarkus.container-image.tag=${{ needs.generate-version.outputs.version }}-amd64 -Dquarkus.container-image.registry="${{ env.REGISTRY }}" -Dquarkus.container-image.group="${{ env.REPOSITORY }}" -Dhelm.version=3.17.3
 
       - name: Push
         run: |
