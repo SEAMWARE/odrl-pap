@@ -107,3 +107,41 @@ describe('PolicySummary refinement handling', () => {
     expect(screen.getByText('Refinements:')).toBeInTheDocument();
   });
 });
+
+describe('PolicySummary left operand handling', () => {
+  /** Builds a policy with a single constraint. */
+  function policyWithConstraint(constraint: Record<string, unknown>): OdrlPolicyJson {
+    return {
+      '@type': 'odrl:Policy',
+      'odrl:permission': {
+        'odrl:target': 'urn:asset:1',
+        'odrl:assignee': 'did:web:other.org',
+        'odrl:action': { '@id': 'odrl:read' },
+        'odrl:constraint': [constraint],
+      },
+      'odrl:uid': 'p5',
+    } as unknown as OdrlPolicyJson;
+  }
+
+  it('renders a left operand referenced via odrl:leftOperand', () => {
+    renderSummary(policyWithConstraint({
+      '@type': 'odrl:Constraint',
+      'odrl:leftOperand': { '@id': 'vc:role' },
+      'odrl:operator': { '@id': 'odrl:eq' },
+      'odrl:rightOperand': { '@value': 'ADMIN', '@type': 'xsd:string' },
+    }));
+
+    expect(screen.getAllByText(/vc:role/).length).toBeGreaterThan(0);
+  });
+
+  it('renders a parameterized left operand written as its own key', () => {
+    renderSummary(policyWithConstraint({
+      '@type': 'odrl:Constraint',
+      'http:bodyValue': '$.numNodes.value',
+      'odrl:operator': { '@id': 'odrl:eq' },
+      'odrl:rightOperand': { '@value': '3', '@type': 'xsd:string' },
+    }));
+
+    expect(screen.getByText('http:bodyValue: $.numNodes.value')).toBeInTheDocument();
+  });
+});
