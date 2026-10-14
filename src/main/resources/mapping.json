@@ -224,7 +224,7 @@
       "bodyValue": {
         "description": "Returns the value from the requested element in the http-body. Requires the body to be in json-format",
         "regoPackage": "http.leftOperand as http_lo",
-        "regoMethod": "http_lo.body_value(helper.http_part.body, %s)"
+        "regoMethod": "http_lo.body_value(helper.http_part.body)"
       }
     },
     "vc": {
