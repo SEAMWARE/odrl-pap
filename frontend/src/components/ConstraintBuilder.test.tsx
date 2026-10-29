@@ -42,6 +42,30 @@ const MOCK_MAPPINGS: Mappings = {
 const renderWithI18n = (ui: React.ReactElement) =>
   render(<I18nProvider>{ui}</I18nProvider>);
 
+/** A parent that keeps the value (as the real editors do) and reports every write. */
+const StatefulBuilder = ({
+  initial,
+  onWrite,
+  propertyKey,
+}: {
+  initial: Record<string, unknown>;
+  onWrite: (value: Record<string, unknown>) => void;
+  propertyKey?: string;
+}) => {
+  const [parent, setParent] = useState(initial);
+  return (
+    <ConstraintBuilder
+      parent={parent}
+      setParent={(value) => {
+        onWrite(value);
+        setParent(value);
+      }}
+      mappings={MOCK_MAPPINGS}
+      propertyKey={propertyKey}
+    />
+  );
+};
+
 describe('ConstraintBuilder', () => {
   let parent: Record<string, unknown>;
   let setParent: ReturnType<typeof vi.fn>;
@@ -89,13 +113,7 @@ describe('ConstraintBuilder', () => {
   it('renders constraint cards after adding constraints', async () => {
     const user = userEvent.setup();
 
-    renderWithI18n(
-      <ConstraintBuilder
-        parent={parent}
-        setParent={setParent}
-        mappings={MOCK_MAPPINGS}
-      />,
-    );
+    renderWithI18n(<StatefulBuilder initial={parent} onWrite={setParent} />);
 
     await user.click(screen.getByRole('button', { name: /add constraint/i }));
 
@@ -501,11 +519,7 @@ describe('ConstraintBuilder propertyKey', () => {
       const user = userEvent.setup();
 
       renderWithI18n(
-        <ConstraintBuilder
-          parent={{ 'odrl:constraint': [{ 'http:bodyValue': '' }] }}
-          setParent={setParent}
-          mappings={MOCK_MAPPINGS}
-        />,
+        <StatefulBuilder initial={{ 'odrl:constraint': [{ 'http:bodyValue': '' }] }} onWrite={setParent} />,
       );
 
       await user.type(screen.getByLabelText(/operand parameter 1/i), '$.numNodes.value');
@@ -688,12 +702,12 @@ describe('ConstraintBuilder with a parent that owns the state', () => {
       expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
     });
 
-    it('keeps a lone constraint object, turning it into a list once', () => {
+    it('shows a lone constraint object as editable and leaves it untouched until edited', () => {
       const { values, errorCount } = settle({ '@type': 'PartyCollection', 'odrl:refinement': CONSTRAINT });
 
       expect(errorCount).toBe(0);
-      expect(values.length).toBeLessThan(10);
-      expect(values.at(-1)).toEqual([CONSTRAINT]);
+      expect(values).toEqual([CONSTRAINT]);
+      expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
     });
 
     it('keeps a logical (OR) group and settles', () => {
@@ -703,6 +717,34 @@ describe('ConstraintBuilder with a parent that owns the state', () => {
       expect(errorCount).toBe(0);
       expect(values.length).toBeLessThan(10);
       expect(values.at(-1)).toEqual(group);
+    });
+
+    it('keeps fast typing in a literal value intact while the parent echoes every write back', async () => {
+      // Typing used to be able to flicker and loop: the builder held a copy of the list and two
+      // effects synced it with the parent, which could swap the copies back and forth.
+      const user = userEvent.setup({ delay: null });
+      const writes = vi.fn();
+      const literal = (value: string) => ({
+        'odrl:leftOperand': { '@id': 'dome-op:role' },
+        'odrl:operator': { '@id': 'odrl:eq' },
+        'odrl:rightOperand': { '@value': value, '@type': '' },
+      });
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      renderWithI18n(
+        <StatefulBuilder
+          initial={{ 'odrl:refinement': [literal('test'), literal('abc'), literal('asd')] }}
+          onWrite={writes}
+          propertyKey="odrl:refinement"
+        />,
+      );
+      await user.type(screen.getByLabelText(/value for constraint 3/i), 'xyz');
+
+      expect(errors).not.toHaveBeenCalled();
+      expect(screen.getByLabelText(/value for constraint 3/i)).toHaveValue('asdxyz');
+      expect(writes).toHaveBeenCalledTimes(3);
+      expect(screen.getByLabelText(/value for constraint 1/i)).toHaveValue('test');
+      errors.mockRestore();
     });
 
     it('does not write an unchanged value back to the parent', () => {

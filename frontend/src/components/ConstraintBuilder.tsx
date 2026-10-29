@@ -8,7 +8,6 @@
 import { Form, Row, Col, Button, Stack, Card, Badge } from 'react-bootstrap';
 import type { Mappings } from '../services/api';
 import type { Mapping } from '../api';
-import { useState, useEffect } from 'react';
 import { useI18n } from '../i18n';
 import NamespacedDropdown from './NamespacedDropdown';
 
@@ -134,65 +133,38 @@ const ConstraintBuilder = ({
   const { strings } = useI18n();
   const t = strings.constraintBuilder;
 
-  /** The parent's raw constraint value, extracted for dependency tracking. */
+  // The parent is the single source of truth: the constraints and their logical grouping are read
+  // from it on every render and every edit is written straight back. An earlier version kept its own
+  // copy of the list in state and synced it with the parent through two effects; when both copies
+  // changed in the same render the effects swapped them back and forth forever ("Maximum update
+  // depth exceeded", the value flickering), whenever the editor opened a policy that had
+  // constraints or the user typed quickly.
   const parentConstraint = parent[propertyKey] as Record<string, unknown> | ConstraintData[] | undefined;
+  const held = readConstraints(parentConstraint);
+  const internalConstraints: ConstraintData[] = held?.constraints ?? [];
+  const logicalType = held?.logicalType ?? 'and';
 
-  // Start from what the parent already holds. Starting empty would, on mount, push
-  // `[]` into the parent (wiping its constraints) while the sync below pulled them
-  // back in: the two fought over the empty and the full list, which flickered and
-  // ended in "Maximum update depth exceeded" whenever the editor opened a policy
-  // that already had constraints.
-  const [internalConstraints, setInternalConstraints] = useState<ConstraintData[]>(
-    () => readConstraints(parentConstraint)?.constraints ?? [],
-  );
-  const [logicalType, setLogicalType] = useState(
-    () => readConstraints(parentConstraint)?.logicalType ?? 'and',
-  );
-
-  /**
-   * Adopts constraints from the parent unless they are the same as the ones
-   * already held. This sync and the one below feed each other, and the parent
-   * often builds an equal-but-new array (e.g. `odrl:refinement: []` when a
-   * collection is chosen). Comparing by reference would then hand the arrays
-   * back and forth forever ("Maximum update depth exceeded").
-   */
-  const adoptConstraints = (next: ConstraintData[]) =>
-    setInternalConstraints((current) =>
-      JSON.stringify(current) === JSON.stringify(next) ? current : next,
-    );
-
-  // Sync internal state from parent constraint
-  useEffect(() => {
-    const read = readConstraints(parentConstraint);
-    if (read) {
-      setLogicalType(read.logicalType);
-      adoptConstraints(read.constraints);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentConstraint]);
-
-  // Propagate changes back to parent
-  useEffect(() => {
-    const next =
-      logicalType === 'and'
-        ? internalConstraints
-        : { '@type': 'odrl:LogicalConstraint', [`odrl:${logicalType}`]: internalConstraints };
-    // Already what the parent holds (same content): writing it back would only churn.
-    if (JSON.stringify(parentConstraint) === JSON.stringify(next)) return;
-    setParent({ ...parent, [propertyKey]: next });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [internalConstraints, logicalType]);
+  /** Writes a list (and, optionally, a new logical grouping) into the parent. */
+  const write = (constraints: ConstraintData[], type: string = logicalType) => {
+    setParent({
+      ...parent,
+      [propertyKey]:
+        type === 'and'
+          ? constraints
+          : { '@type': 'odrl:LogicalConstraint', [`odrl:${type}`]: constraints },
+    });
+  };
 
   const handleConstraintChange = (index: number, field: string, value: unknown) => {
     const newConstraints = [...internalConstraints];
     newConstraints[index] = { ...newConstraints[index], [field]: value };
-    setInternalConstraints(newConstraints);
+    write(newConstraints);
   };
 
   const replaceConstraint = (index: number, constraint: ConstraintData) => {
     const newConstraints = [...internalConstraints];
     newConstraints[index] = constraint;
-    setInternalConstraints(newConstraints);
+    write(newConstraints);
   };
 
   /**
@@ -227,13 +199,13 @@ const ConstraintBuilder = ({
   };
 
   const addConstraint = () => {
-    setInternalConstraints([...internalConstraints, {} as ConstraintData]);
+    write([...internalConstraints, {} as ConstraintData]);
   };
 
   const removeConstraint = (index: number) => {
     const newConstraints = [...internalConstraints];
     newConstraints.splice(index, 1);
-    setInternalConstraints(newConstraints);
+    write(newConstraints);
   };
 
   const handleRightOperandTypeChange = (index: number, type: 'named' | 'literal') => {
@@ -275,7 +247,7 @@ const ConstraintBuilder = ({
                   <Form.Label className="fw-bold mb-1">{t.groupingLabel}</Form.Label>
                   <Form.Select
                     value={logicalType}
-                    onChange={(e) => setLogicalType(e.target.value)}
+                    onChange={(e) => write(internalConstraints, e.target.value)}
                     aria-label={t.groupingLabel}
                     disabled={locked}
                   >
