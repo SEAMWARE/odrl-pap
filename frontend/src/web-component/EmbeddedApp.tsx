@@ -7,6 +7,8 @@
  *   environment variables or the URL.
  * - Emits Custom Events via the `onEvent` callback instead of
  *   navigating between pages.
+ * - Can run in emit-only mode (`persist: false`), where the finished policy
+ *   is handed to the host through those events and never written to the PAP.
  * - Wraps children in `I18nProvider` and applies theme CSS custom
  *   properties on its own container (not `document.documentElement`).
  * - Supports template-based policy creation via a template selection tab.
@@ -118,7 +120,7 @@ const EmbeddedApp = ({
   containerRef,
   fieldTemplate,
 }: EmbeddedAppProps) => {
-  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext, serviceId, hiddenTabs } = config;
+  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext, serviceId, hiddenTabs, persist } = config;
 
   // EmbeddedApp renders the I18nProvider itself, so it cannot read strings via
   // useI18n(); it resolves them directly for the (translatable) tab titles.
@@ -207,8 +209,12 @@ const EmbeddedApp = ({
    * Independent of the editor `mode`: template authoring is orthogonal to
    * whether a policy is being created or edited. Controlled by the
    * `hide-template-create-tab` attribute.
+   *
+   * Always hidden in emit-only mode (`persist: false`): the manager stores
+   * templates through the PAP template API, so showing it would contradict
+   * the guarantee that this mode issues no write requests.
    */
-  const showManageTemplatesTab = !hiddenTabs.hideTemplateCreateTab;
+  const showManageTemplatesTab = !hiddenTabs.hideTemplateCreateTab && persist;
 
   // --- Determine the default active tab based on visibility ---
   /**
@@ -221,10 +227,10 @@ const EmbeddedApp = ({
     }
     if (!hiddenTabs.hideBuilderTab) return TAB_KEY_BUILDER;
     if (!hiddenTabs.hideRawTab) return TAB_KEY_ODRL;
-    if (!hiddenTabs.hideTemplateCreateTab) return TAB_KEY_MANAGE_TEMPLATES;
+    if (!hiddenTabs.hideTemplateCreateTab && persist) return TAB_KEY_MANAGE_TEMPLATES;
     // Nothing is visible (all tabs hidden) — fall back to the builder key.
     return TAB_KEY_BUILDER;
-  }, [hiddenTabs, mode, templates.length]);
+  }, [hiddenTabs, mode, templates.length, persist]);
 
   /** Returns whether the tab with the given key is currently rendered. */
   const isTabVisible = useCallback(
@@ -365,8 +371,6 @@ const EmbeddedApp = ({
    * @param odrl - The ODRL policy JSON with placeholders replaced.
    */
   const handleCreateFromTemplate = useCallback((odrl: Record<string, unknown>) => {
-    setIsCreatingFromTemplate(true);
-
     // Ensure the policy has a UID; generate one if the template did not include it.
     if (!odrl['odrl:uid']) {
       odrl['odrl:uid'] = crypto.randomUUID();
@@ -374,6 +378,18 @@ const EmbeddedApp = ({
 
     const requestBody = odrl as OdrlPolicyJson;
     const effectiveId = (odrl['odrl:uid'] as string) ?? '';
+
+    // Emit-only mode: adopt the filled template and hand it to the host
+    // without contacting the PAP. There is no request to wait for, so the
+    // creating state is never entered.
+    if (!persist) {
+      setPolicy(requestBody);
+      setCreatedFromTemplate(true);
+      onEvent('policy-created', { policy: requestBody, id: effectiveId, persisted: false });
+      return;
+    }
+
+    setIsCreatingFromTemplate(true);
 
     // Store the policy under its `odrl:uid` (PUT /policy/{id}) rather than via
     // POST /policy, which would assign a server-generated id the host cannot
@@ -386,13 +402,13 @@ const EmbeddedApp = ({
       .then(() => {
         setPolicy(requestBody);
         setCreatedFromTemplate(true);
-        onEvent('policy-created', { policy: requestBody, id: effectiveId });
+        onEvent('policy-created', { policy: requestBody, id: effectiveId, persisted: true });
       })
       .catch((err: Error) => setSaveError(err.message))
       .finally(() => {
         setIsCreatingFromTemplate(false);
       });
-  }, [serviceId, onEvent]);
+  }, [serviceId, onEvent, persist]);
 
   /**
    * Saves the policy and emits the appropriate event.
@@ -400,6 +416,9 @@ const EmbeddedApp = ({
    * When `serviceId` is set, uses service-scoped endpoints
    * (`POST /service/{serviceId}/policy` or `PUT /service/{serviceId}/policy/{id}`).
    * Otherwise, falls back to root-level endpoints.
+   *
+   * In emit-only mode (`persist: false`) no endpoint is contacted at all —
+   * the policy is emitted straight to the host with `persisted: false`.
    */
   const handleSave = useCallback(() => {
     setSaveError('');
@@ -414,6 +433,15 @@ const EmbeddedApp = ({
     }
     const policyToSave = body as OdrlPolicyJson;
     const effectiveId = policyId ?? (body['odrl:uid'] as string);
+    const eventType = mode === 'edit' ? 'policy-updated' : 'policy-created';
+
+    // Emit-only mode: the host asked for the policy, not for it to be stored.
+    // Skip the write entirely and report straight away — the generated UID is
+    // still included so the host can store the policy under a stable id.
+    if (!persist) {
+      onEvent(eventType, { policy: policyToSave, id: effectiveId, persisted: false });
+      return;
+    }
 
     // Both create and edit use the id-scoped endpoint (PUT /policy/{id}),
     // which "creates or overwrites", so the stored id always matches the
@@ -424,11 +452,10 @@ const EmbeddedApp = ({
 
     savePromise
       .then(() => {
-        const eventType = mode === 'edit' ? 'policy-updated' : 'policy-created';
-        onEvent(eventType, { policy: policyToSave, id: effectiveId });
+        onEvent(eventType, { policy: policyToSave, id: effectiveId, persisted: true });
       })
       .catch((err: Error) => setSaveError(err.message));
-  }, [policy, mode, policyId, onEvent, serviceId]);
+  }, [policy, mode, policyId, onEvent, serviceId, persist]);
 
   /**
    * Keeps the working policy in sync with the template being filled in, so

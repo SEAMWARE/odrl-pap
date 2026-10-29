@@ -170,6 +170,7 @@ describe('OdrlPolicyEditorElement', () => {
       'locale',
       'policy-context',
       'service-id',
+      'persist',
       'hide-builder-tab',
       'hide-raw-tab',
       'hide-template-tab',
@@ -489,5 +490,47 @@ describe('OdrlPolicyEditorElement', () => {
     expect(hidden.hideBuilderTab).toBe(false);
     expect(hidden.hideRawTab).toBe(false);
     expect(hidden.hideTemplateCreateTab).toBe(false);
+  });
+
+  // -----------------------------------------------------------
+  // persist attribute
+  // -----------------------------------------------------------
+
+  /** Reads the `persist` flag from the most recent React render. */
+  const lastPersist = () => {
+    const element = mockRender.mock.calls.at(-1)![0] as { props: { config: { persist: boolean } } };
+    return element.props.config.persist;
+  };
+
+  it.each([
+    { label: 'absent', value: undefined, expected: true },
+    { label: 'bare', value: '', expected: true },
+    { label: 'explicitly true', value: 'true', expected: true },
+    { label: 'explicitly false', value: 'false', expected: false },
+    { label: 'zero', value: '0', expected: false },
+    { label: 'upper-case FALSE', value: 'FALSE', expected: false },
+    { label: 'padded " false "', value: ' false ', expected: false },
+  ])('resolves persist to $expected when the attribute is $label', async ({ value, expected }) => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    if (value !== undefined) {
+      el.setAttribute('persist', value);
+    }
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    expect(lastPersist()).toBe(expected);
+  });
+
+  it('re-renders when the persist attribute changes at runtime', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    expect(lastPersist()).toBe(true);
+
+    el.setAttribute('persist', 'false');
+    await vi.dynamicImportSettled();
+
+    expect(lastPersist()).toBe(false);
   });
 });

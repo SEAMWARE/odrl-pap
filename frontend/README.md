@@ -331,6 +331,7 @@ at runtime triggers a re-render automatically.
 | `locale`        | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
 | `policy-context`| Default `@context` for new policies (JSON string) | `{"odrl":"http://www.w3.org/ns/odrl/2/"}` |
 | `service-id`    | Service ID for service-scoped policy/template operations | `null` |
+| `persist`       | Boolean — set to `"false"` to emit policies instead of storing them | `true` (stores) |
 | `hide-builder-tab` | Boolean — hides the visual policy builder tab | absent (visible) |
 | `hide-raw-tab`  | Boolean — hides the raw ODRL JSON editor tab  | absent (visible) |
 | `hide-template-tab` | Boolean — hides the template selection tab | absent (visible) |
@@ -413,8 +414,8 @@ Events bubble and cross Shadow DOM boundaries (`composed: true`).
 
 | Event              | Detail payload                              | Fired when                       |
 |--------------------|---------------------------------------------|----------------------------------|
-| `policy-created`   | `{ policy: OdrlPolicyJson, id: string }`    | A new policy is saved            |
-| `policy-updated`   | `{ policy: OdrlPolicyJson, id: string }`    | An existing policy is updated    |
+| `policy-created`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` | A new policy is saved (or, with `persist="false"`, completed) |
+| `policy-updated`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` | An existing policy is updated |
 | `policy-validated` | `{ result: ValidationResponse }`            | Policy validation completes      |
 | `editor-cancelled` | `{}`                                        | The user clicks Cancel           |
 | `template-created` | `{ template: object, id: string }`          | A new template is created in the management tab |
@@ -438,6 +439,59 @@ editor.addEventListener('editor-cancelled', () => {
   document.querySelector('odrl-policy-editor').remove();
 });
 ```
+
+### Emit-Only Mode (`persist="false"`)
+
+By default the editor stores a policy in the PAP and *then* emits
+`policy-created` / `policy-updated`. Set `persist="false"` to turn the
+component into a pure policy *builder*: the user configures the policy as
+usual, but on Save nothing is written — the finished ODRL JSON is handed to
+the host application through the very same events, with
+`detail.persisted === false`.
+
+```html
+<odrl-policy-editor
+  id="editor"
+  api-base-url="https://pap.example.com"
+  persist="false"
+></odrl-policy-editor>
+
+<script>
+  document.getElementById('editor').addEventListener('policy-created', (e) => {
+    // e.detail.persisted === false — the PAP has not stored anything
+    console.log('Policy built:', e.detail.policy);
+    console.log('Suggested id:', e.detail.id); // the policy's odrl:uid
+    myOwnBackend.save(e.detail.policy);
+  });
+</script>
+```
+
+Because listener code is identical in both modes, switching between them is a
+single attribute change — check `detail.persisted` if the host needs to tell
+them apart.
+
+**What emit-only mode changes**
+
+| Behaviour | `persist` (default) | `persist="false"` |
+|-----------|---------------------|-------------------|
+| Save button | `PUT /policy/{id}` (or the service-scoped variant), then event | event only |
+| Create from template | stores, then event | event only |
+| `detail.persisted` | `true` | `false` |
+| Template management tab | visible (unless hidden) | always hidden — it can only write to the PAP |
+
+**What it does not change** — emit-only only suppresses *writes*. The
+component still needs a reachable PAP for read-only calls:
+
+- `GET /mappings` — **required**; the visual builder's vocabulary dropdowns
+  are built from it.
+- `GET /policy/{id}` — when `mode="edit"`, to load the policy being edited.
+- `POST /validate` — only when the user runs a validation.
+- `GET /templates` — to populate the template picker (hide it with
+  `hide-template-tab` if unwanted).
+
+A policy emitted this way carries an `odrl:uid` (generated if the user did not
+set one) and `detail.id` mirrors it, so the host can store the policy under a
+stable identifier.
 
 ### Full Embedding Example
 

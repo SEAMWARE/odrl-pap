@@ -55,10 +55,19 @@ export interface TabVisibility {
  * ```
  */
 export interface EmbeddedEventMap {
-  /** Fired after a new policy is successfully saved. */
-  'policy-created': { policy: Record<string, unknown>; id: string };
-  /** Fired after an existing policy is successfully updated. */
-  'policy-updated': { policy: Record<string, unknown>; id: string };
+  /**
+   * Fired after a new policy has been accepted by the editor.
+   *
+   * `persisted` is `true` when the policy was written to the PAP and `false`
+   * in emit-only mode (`persist="false"`), where storing it is up to the host.
+   */
+  'policy-created': { policy: Record<string, unknown>; id: string; persisted: boolean };
+  /**
+   * Fired after an existing policy has been updated in the editor.
+   *
+   * See `policy-created` for the meaning of `persisted`.
+   */
+  'policy-updated': { policy: Record<string, unknown>; id: string; persisted: boolean };
   /** Fired after a policy validation completes. */
   'policy-validated': { result: Record<string, unknown> };
   /** Fired when the user clicks Cancel. */
@@ -117,6 +126,18 @@ export interface EmbeddedConfig {
    * Defaults to all tabs visible.
    */
   hiddenTabs: TabVisibility;
+  /**
+   * Whether saving a policy writes it to the PAP.
+   *
+   * `true` (the default) stores the policy through the policy API and then
+   * emits `policy-created` / `policy-updated` with `persisted: true`.
+   *
+   * `false` issues no write request at all: the same events carry the fully
+   * built ODRL policy with `persisted: false`, and storing it is left to the
+   * host. Read-only calls (loading a policy for editing, `/mappings`,
+   * `/validate`) are unaffected.
+   */
+  persist: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +162,7 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | `locale`         | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
  * | `policy-context` | JSON-LD `@context` for new policies (JSON)    | `null`     |
  * | `service-id`     | Service ID for service-scoped policy ops       | `null`     |
+ * | `persist`        | Boolean — `"false"` emits the policy without storing it | `true` |
  * | `hide-builder-tab`         | Boolean — hides the visual policy builder tab   | absent |
  * | `hide-raw-tab`             | Boolean — hides the raw ODRL JSON editor tab    | absent |
  * | `hide-template-tab`        | Boolean — hides the template selection tab      | absent |
@@ -156,10 +178,10 @@ export const TAG_NAME: 'odrl-policy-editor';
  *
  * ## Custom Events
  *
- * | Event              | Detail                                      |
- * |--------------------|---------------------------------------------|
- * | `policy-created`   | `{ policy: object, id: string }`            |
- * | `policy-updated`   | `{ policy: object, id: string }`            |
+ * | Event              | Detail                                                  |
+ * |--------------------|---------------------------------------------------------|
+ * | `policy-created`   | `{ policy: object, id: string, persisted: boolean }`    |
+ * | `policy-updated`   | `{ policy: object, id: string, persisted: boolean }`    |
  * | `policy-validated` | `{ result: object }`                        |
  * | `editor-cancelled` | `{}`                                        |
  * | `template-created` | `{ template: object, id: string }`          |
