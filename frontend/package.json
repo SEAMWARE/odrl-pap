@@ -54,7 +54,6 @@
     "generate-api": "openapi --input ../api/odrl.yaml --output ./src/api --client axios"
   },
   "dependencies": {
-    "@seamware/odrl-policy-editor": "file:../../seamware-odrl-policy-editor-0.1.0.tgz",
     "axios": "^1.12.2",
     "bootstrap": "^5.3.8",
     "react": "^19.1.1",
