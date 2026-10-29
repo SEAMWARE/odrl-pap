@@ -49,7 +49,7 @@ import {
 } from '../utils/jsonLdContext';
 import { toPolicyId } from '../utils/policyId';
 import { DEFAULT_CAPABILITIES, isRemote } from './capabilities';
-import { DEFAULT_MAPPINGS } from './defaultMappings';
+import { DEFAULT_MAPPINGS, mergeMappings } from './defaultMappings';
 
 /** Tab key for the template selection tab. */
 const TAB_KEY_TEMPLATE = 'template';
@@ -113,8 +113,9 @@ export interface EmbeddedAppProps {
   policy?: OdrlPolicyJson;
   /**
    * Mappings supplied by the host (JS property `mappings`). When set they are
-   * used instead of fetching `/mappings`; with the `mappings` capability off
-   * and nothing supplied, the built-in defaults are used.
+   * layered over the built-in defaults (same `name` wins) and `/mappings` is
+   * not fetched; with the `mappings` capability off and nothing supplied, the
+   * built-in defaults are used.
    */
   mappings?: Mappings;
 }
@@ -166,6 +167,13 @@ const EmbeddedApp = ({
     () => policyProp ?? (createNewPolicy(policyContext) as OdrlPolicyJson),
   );
   const [saveError, setSaveError] = useState('');
+
+  // Host mappings are layered over the built-in ones; with neither a host
+  // value nor a remote capability the built-ins alone are used.
+  const builderMappings = useMemo(
+    () => (mappingsProp ? mergeMappings(DEFAULT_MAPPINGS, mappingsProp) : remoteMappings ? undefined : DEFAULT_MAPPINGS),
+    [mappingsProp, remoteMappings],
+  );
 
   // The last policy the host knows about: the one it supplied or the last one
   // we reported through `policy-changed`. Used to avoid echoing it back.
@@ -589,7 +597,7 @@ const EmbeddedApp = ({
                   policy={policy}
                   setPolicy={setPolicy}
                   fieldTemplate={fieldTemplate}
-                  mappings={mappingsProp ?? (remoteMappings ? undefined : DEFAULT_MAPPINGS)}
+                  mappings={builderMappings}
                 />
               </Tab>
             )}

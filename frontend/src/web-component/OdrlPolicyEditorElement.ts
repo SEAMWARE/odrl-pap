@@ -215,8 +215,10 @@ export class OdrlPolicyEditorElement extends HTMLElement {
    * Sets the mappings (actions, operators, operands...) the visual builder
    * offers in its dropdowns (JS property).
    *
-   * When set, the builder does not fetch `/mappings` from the PAP. With
-   * `mappings="none"` and nothing set, the PAP's built-in mappings are used.
+   * When set, the builder does not fetch `/mappings` from the PAP; the values
+   * are layered over the PAP's built-in mappings, and one with the same `name`
+   * replaces the built-in one. With `mappings="none"` and nothing set, the
+   * built-in mappings are used as they are.
    */
   set mappings(value: Mappings | undefined) {
     this._mappings = value;

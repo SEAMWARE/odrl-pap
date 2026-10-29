@@ -290,8 +290,10 @@ export declare class OdrlPolicyEditorElement extends HTMLElement {
 
   /**
    * Mappings (actions, operators, operands...) the visual builder offers.
-   * When set the builder does not fetch them from the PAP. With
-   * `mappings="none"` and nothing set, the PAP's built-in mappings are used.
+   * When set the builder does not fetch them from the PAP; they are layered
+   * over the PAP's built-in mappings, and a mapping with the same `name`
+   * replaces the built-in one. With `mappings="none"` and nothing set, the
+   * built-in mappings are used as they are.
    */
   mappings: Record<string, unknown> | undefined;
 }

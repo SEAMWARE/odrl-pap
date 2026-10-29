@@ -384,11 +384,12 @@ editor.mappings = { actions: [...], operators: [...], leftOperands: [...] };
 editor.addEventListener('policy-changed', (e) => store(e.detail.policy));
 ```
 
-With `mappings="none"` the visual builder uses the `mappings` property when
-set, and otherwise the mappings the PAP ships with (generated from the
-backend's `mapping.json` at build time, so they match the PAP of the same
-release). Mappings an operator adds through the PAP's `paths.mapping` are only
-visible with `mappings="remote"`. With `save="none"`,
+With `mappings="none"` the visual builder offers the mappings the PAP ships
+with (generated from the backend's `mapping.json` at build time, so they match
+the PAP of the same release). Set the `mappings` property to extend or override
+them: its entries are layered over the built-in ones per attribute, and an
+entry with the same `name` replaces the built-in one. Mappings an operator adds
+through the PAP's `paths.mapping` are only visible with `mappings="remote"`. With `save="none"`,
 filling in a template loads the result into the editor instead of storing it.
 
 ### JavaScript Properties
@@ -404,7 +405,7 @@ JavaScript properties on the element:
 | `policyContext` | `Record<string, string>`   | Default `@context` for new policies (takes precedence over attribute) |
 | `serviceId`   | `string`                     | Service scope for policy/template operations (takes precedence over attribute) |
 | `policy`      | `object \| string`           | The working policy (object or JSON text); reads back the latest edit |
-| `mappings`    | `Mappings`                   | Builder dropdown mappings; when set, `/mappings` is not fetched. Defaults to the PAP's built-in mappings when `mappings="none"` |
+| `mappings`    | `Mappings`                   | Builder dropdown mappings; when set, `/mappings` is not fetched. Layered over the PAP's built-in mappings (same `name` wins); with `mappings="none"` the built-ins are used as they are |
 
 ```javascript
 const editor = document.querySelector('odrl-policy-editor');
