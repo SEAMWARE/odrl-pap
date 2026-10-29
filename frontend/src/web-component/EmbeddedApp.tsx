@@ -38,6 +38,7 @@ import type { I18nStrings } from '../i18n';
 import { lightTheme, darkTheme, type ThemeConfig } from '../theme/defaultTheme';
 import {
   DEFAULT_SUMMARY_PLACEMENT,
+  DEFAULT_VARIANT,
   EmbeddedProvider,
   type EmbeddedConfig,
   type EmbeddedThemePreset,
@@ -144,6 +145,7 @@ const EmbeddedApp = ({
   const capabilities = config.capabilities ?? DEFAULT_CAPABILITIES;
   const summaryPlacement = config.summaryPlacement ?? DEFAULT_SUMMARY_PLACEMENT;
   const hideCancelButton = config.hiddenButtons?.hideCancelButton ?? false;
+  const variant = config.variant ?? DEFAULT_VARIANT;
   const remoteLoad = isRemote(capabilities, 'load');
   const remoteSave = isRemote(capabilities, 'save');
   const remoteValidate = isRemote(capabilities, 'validate');
@@ -556,7 +558,11 @@ const EmbeddedApp = ({
   return (
     <EmbeddedProvider config={config}>
       <I18nProvider locale={locale} strings={i18nOverrides}>
-        <div ref={effectiveRef} className="odrl-embedded-root p-3">
+        <div
+          ref={effectiveRef}
+          className={`odrl-embedded-root${variant === 'card' ? ' p-3' : ''}`}
+          data-variant={variant}
+        >
           {/* Editor Tabs */}
           <Tabs
             id="embedded-editor-tabs"

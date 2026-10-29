@@ -337,6 +337,7 @@ at runtime triggers a re-render automatically.
 | `hide-template-create-tab` | Boolean — hides the template management tab (create/edit/delete templates) | absent (visible) |
 | `summary`       | `"side"` \| `"tab"` \| `"none"` — where the live policy summary is shown | `"side"` |
 | `hide-cancel-button` | Boolean — hides the Cancel button (e.g. when the host provides its own) | absent (visible) |
+| `variant`       | `"card"` \| `"plain"` — editor framed as a card, or with no chrome | `"card"` |
 | `load`          | `"remote"` \| `"none"` — fetch the policy when `mode="edit"` | `"remote"` |
 | `save`          | `"remote"` \| `"none"` — store the policy in the PAP; `none` removes the Save button | `"remote"` |
 | `validate`      | `"remote"` \| `"none"` — validate against the PAP; `none` removes the Validate button and panel | `"remote"` |
@@ -363,6 +364,33 @@ const editor = document.querySelector('odrl-policy-editor');
 editor.setAttribute('theme', 'dark');
 editor.setAttribute('locale', 'de');
 editor.setAttribute('api-base-url', 'https://new-api.example.com');
+```
+
+#### Look: variant and theme tokens
+
+By default the editor is drawn as a card (background, border, radius, shadow
+and padding). `variant="plain"` removes that frame, for hosts that already
+put it inside a card or a modal.
+
+Tabs, buttons, cards and the step badges follow the `--odrl-*` theme tokens
+instead of Bootstrap's own colors, so setting tokens restyles them: the tabs
+are an underlined strip in the primary color, primary buttons are filled with
+it, secondary and info buttons are outlined, and danger and success buttons use
+their tokens. Besides the existing tokens there are two new ones:
+
+| Token | Meaning |
+|-------|---------|
+| `odrl-primary-text-color` | Text on a primary-colored fill (primary buttons, step badges) |
+| `odrl-card-radius` | Border radius of cards, the outer one and the step cards |
+
+Set them with the `themeConfig` property:
+
+```javascript
+editor.themeConfig = {
+  'odrl-primary-color': '#1a3461',
+  'odrl-primary-text-color': '#ffffff',
+  'odrl-card-radius': '1rem',
+};
 ```
 
 #### Layout: summary and Cancel

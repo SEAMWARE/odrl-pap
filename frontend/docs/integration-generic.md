@@ -644,6 +644,7 @@ via versioned URLs.
 | `policy-context` | `string` (JSON) | `null` | Default JSON-LD `@context` for new policies |
 | `summary` | `"side" \| "tab" \| "none"` | `"side"` | Where the policy summary is shown; `tab` suits narrow containers |
 | `hide-cancel-button` | boolean | absent | Hides the Cancel button |
+| `variant` | `"card" \| "plain"` | `"card"` | Editor framed as a card, or without chrome (for hosts that already provide one) |
 | `load` | `"remote" \| "none"` | `"remote"` | Fetch the policy when `mode="edit"` |
 | `save` | `"remote" \| "none"` | `"remote"` | Store the policy in the PAP; `none` hides Save |
 | `validate` | `"remote" \| "none"` | `"remote"` | Validate against the PAP; `none` hides Validate |

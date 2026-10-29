@@ -341,3 +341,27 @@ describe('EmbeddedApp layout flags', () => {
   });
 });
 
+describe('EmbeddedApp variant', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(TemplateService.getTemplates).mockResolvedValue([]);
+    vi.mocked(UiService.getMappings).mockResolvedValue({});
+  });
+
+  const root = (container: HTMLElement) => container.querySelector('.odrl-embedded-root') as HTMLElement;
+
+  it('is a padded card by default', () => {
+    const { container } = render(<EmbeddedApp config={CONFIG} />);
+
+    expect(root(container).dataset.variant).toBe('card');
+    expect(root(container).classList).toContain('p-3');
+  });
+
+  it('adds no chrome or padding when plain', () => {
+    const { container } = render(<EmbeddedApp config={{ ...CONFIG, variant: 'plain' }} />);
+
+    expect(root(container).dataset.variant).toBe('plain');
+    expect(root(container).classList).not.toContain('p-3');
+  });
+});
+

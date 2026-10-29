@@ -36,6 +36,10 @@ export interface ThemeConfig {
   'odrl-info-color': string;
   /** Box shadow for cards. */
   'odrl-card-shadow': string;
+  /** Text and icon color on a primary-colored fill (e.g. primary buttons). */
+  'odrl-primary-text-color': string;
+  /** Border radius of cards; the outer editor card and the builder's step cards. */
+  'odrl-card-radius': string;
 }
 
 /** Light theme (default) matching the existing Bootstrap-based look. */
@@ -54,6 +58,8 @@ export const lightTheme: ThemeConfig = {
   'odrl-danger-color': '#dc3545',
   'odrl-info-color': '#0dcaf0',
   'odrl-card-shadow': '0 0.125rem 0.25rem rgba(0,0,0,0.075)',
+  'odrl-primary-text-color': '#FFFFFF',
+  'odrl-card-radius': '0.375rem',
 };
 
 /** Dark theme preset. */
@@ -72,6 +78,8 @@ export const darkTheme: ThemeConfig = {
   'odrl-danger-color': '#e74c3c',
   'odrl-info-color': '#17a2b8',
   'odrl-card-shadow': '0 0.125rem 0.25rem rgba(0,0,0,0.3)',
+  'odrl-primary-text-color': '#FFFFFF',
+  'odrl-card-radius': '0.375rem',
 };
 
 /** Default theme used when no ThemeProvider is present. */

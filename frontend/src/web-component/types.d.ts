@@ -44,6 +44,13 @@ export type CapabilityModes = Record<Capability, CapabilityMode>;
  */
 export type SummaryPlacement = 'side' | 'tab' | 'none';
 
+/**
+ * How the editor is framed: `"card"` draws it as a card (background, border,
+ * radius, shadow, padding); `"plain"` adds no chrome, for hosts that already
+ * put it inside a card or a modal.
+ */
+export type EditorVariant = 'card' | 'plain';
+
 /** Action buttons the host can hide; each, when `true`, hides its button. */
 export interface ButtonVisibility {
   /** When `true`, hides the Cancel button. */
@@ -166,6 +173,8 @@ export interface EmbeddedConfig {
   summaryPlacement: SummaryPlacement;
   /** Which action buttons are hidden. */
   hiddenButtons: ButtonVisibility;
+  /** How the editor is framed. Defaults to `"card"`. */
+  variant: EditorVariant;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +205,7 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | `hide-template-create-tab` | Boolean — hides the template management tab     | absent |
  * | `summary`        | `"side"` \| `"tab"` \| `"none"` — where the policy summary is shown | `"side"` |
  * | `hide-cancel-button` | Boolean — hides the Cancel button            | absent |
+ * | `variant`        | `"card"` \| `"plain"` — framed as a card, or no chrome | `"card"` |
  * | `load`           | `"remote"` \| `"none"` — fetch the policy when `mode="edit"` | `"remote"` |
  * | `save`           | `"remote"` \| `"none"` — store the policy in the PAP (Save button) | `"remote"` |
  * | `validate`       | `"remote"` \| `"none"` — validate against the PAP (Validate button) | `"remote"` |

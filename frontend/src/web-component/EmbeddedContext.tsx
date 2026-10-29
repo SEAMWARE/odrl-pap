@@ -48,6 +48,16 @@ export type SummaryPlacement = 'side' | 'tab' | 'none';
 /** Default placement, the layout of earlier versions. */
 export const DEFAULT_SUMMARY_PLACEMENT: SummaryPlacement = 'side';
 
+/**
+ * How the editor is framed: `card` draws it as a card (background, border,
+ * radius, shadow and padding); `plain` adds no chrome, for hosts that already
+ * put it inside a card or a modal.
+ */
+export type EditorVariant = 'card' | 'plain';
+
+/** Default variant. */
+export const DEFAULT_VARIANT: EditorVariant = 'card';
+
 /** Action buttons the host can hide; each, when `true`, hides its button. */
 export interface ButtonVisibility {
   hideCancelButton: boolean;
@@ -120,6 +130,8 @@ export interface EmbeddedConfig {
   summaryPlacement: SummaryPlacement;
   /** Which action buttons are hidden. */
   hiddenButtons: ButtonVisibility;
+  /** How the editor is framed. */
+  variant: EditorVariant;
 }
 
 /** Full context value including an `isEmbedded` flag. */

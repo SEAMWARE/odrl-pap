@@ -176,6 +176,7 @@ describe('OdrlPolicyEditorElement', () => {
       'hide-template-create-tab',
       'summary',
       'hide-cancel-button',
+      'variant',
       'load',
       'save',
       'validate',
@@ -647,5 +648,22 @@ describe('OdrlPolicyEditorElement', () => {
 
     const css = el.shadowRoot!.querySelector('style')!.textContent!;
     expect(css).toMatch(/:host\s*\{[^}]*isolation:\s*isolate/);
+  });
+
+  it('frames the editor as a card by default and reads variant', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    const variant = () =>
+      (mockRender.mock.calls.at(-1)![0] as { props: { config: { variant: string } } }).props.config.variant;
+    await vi.dynamicImportSettled();
+    expect(variant()).toBe('card');
+
+    el.setAttribute('variant', ' PLAIN ');
+    await vi.dynamicImportSettled();
+    expect(variant()).toBe('plain');
+
+    el.setAttribute('variant', 'fancy');
+    await vi.dynamicImportSettled();
+    expect(variant()).toBe('card');
   });
 });

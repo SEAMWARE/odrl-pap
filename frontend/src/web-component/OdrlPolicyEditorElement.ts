@@ -23,6 +23,7 @@
  * | `hide-template-create-tab` | Boolean — hides the template management tab        | absent     |
  * | `summary`                | `"side"`, `"tab"` or `"none"` — where the policy summary is shown | `"side"` |
  * | `hide-cancel-button`     | Boolean — hides the Cancel button                    | absent     |
+ * | `variant`                | `"card"` or `"plain"` — editor drawn as a card, or without chrome | `"card"` |
  * | `load`                   | `"remote"` or `"none"` — fetch the policy in edit mode | `"remote"` |
  * | `save`                   | `"remote"` or `"none"` — store the policy in the PAP  | `"remote"` |
  * | `validate`               | `"remote"` or `"none"` — validate against the PAP     | `"remote"` |
@@ -81,7 +82,7 @@ import type { FieldTemplate } from '../types';
 import type { OdrlPolicyJson } from '../services/api';
 import type { Mappings } from '../api';
 import { CAPABILITIES, resolveCapabilities } from './capabilities';
-import { DEFAULT_SUMMARY_PLACEMENT, type ButtonVisibility, type SummaryPlacement } from './EmbeddedContext';
+import { DEFAULT_SUMMARY_PLACEMENT, DEFAULT_VARIANT, type ButtonVisibility, type EditorVariant, type SummaryPlacement } from './EmbeddedContext';
 
 // Bootstrap CSS imported as a string for shadow-DOM injection.
 // The `?inline` suffix tells Vite to return the CSS text, not inject it
@@ -128,7 +129,6 @@ function scopeCssForShadowDom(css: string): string {
 .${CONTAINER_CLASS} {
   font-family: var(--odrl-font-family);
   color: var(--odrl-text-color);
-  background-color: var(--odrl-bg-color);
 }`;
   return `${rescoped}\n${surface}`;
 }
@@ -148,7 +148,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       'api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale',
       'policy-context', 'service-id',
       'hide-builder-tab', 'hide-raw-tab', 'hide-template-tab', 'hide-template-create-tab',
-      'summary', 'hide-cancel-button',
+      'summary', 'hide-cancel-button', 'variant',
       ...CAPABILITIES,
     ];
   }
@@ -489,6 +489,12 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     return value === 'side' || value === 'tab' || value === 'none' ? value : DEFAULT_SUMMARY_PLACEMENT;
   }
 
+  /** Reads the `variant` attribute; unknown values fall back to the default. */
+  private resolveVariant(): EditorVariant {
+    const value = this.getAttribute('variant')?.trim().toLowerCase();
+    return value === 'card' || value === 'plain' ? value : DEFAULT_VARIANT;
+  }
+
   /** Builds the {@link EmbeddedConfig} from the current attribute values. */
   private buildConfig(): EmbeddedConfig {
     const policyContext = this.resolvePolicyContextAttr();
@@ -504,6 +510,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       hiddenTabs: this.resolveHiddenTabs(),
       capabilities: resolveCapabilities((name) => this.getAttribute(name)),
       summaryPlacement: this.resolveSummaryPlacement(),
+      variant: this.resolveVariant(),
       hiddenButtons: this.resolveHiddenButtons(),
       ...(policyContext !== undefined && { policyContext }),
     };
