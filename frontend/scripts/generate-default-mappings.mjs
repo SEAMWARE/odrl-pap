@@ -10,11 +10,18 @@
  * strings stay on the server: only name, description and parameter count are
  * exposed, exactly like the endpoint does.
  *
+ * The file is not committed: it is generated on `npm install` and before
+ * dev, test and build, so it always matches the `mapping.json` of the checkout
+ * (and therefore of the PAP the package is published from).
+ *
  * Usage:
- *   node scripts/generate-default-mappings.mjs           # (re)write the file
- *   node scripts/generate-default-mappings.mjs --check   # exit 1 if out of date
+ *   node scripts/generate-default-mappings.mjs                # (re)write the file
+ *   node scripts/generate-default-mappings.mjs --if-present   # same, but do nothing
+ *                                                             # when mapping.json is
+ *                                                             # missing (frontend-only
+ *                                                             # checkout / Docker build)
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -59,17 +66,12 @@ export function buildMappings(mappingConfiguration) {
 }
 
 function main() {
-  const generated = `${JSON.stringify(buildMappings(JSON.parse(readFileSync(SOURCE, 'utf8'))), null, 2)}\n`;
-
-  if (process.argv.includes('--check')) {
-    const current = readFileSync(TARGET, 'utf8');
-    if (current !== generated) {
-      console.error('defaultMappings.json is out of date; run `npm run generate-default-mappings`.');
-      process.exit(1);
-    }
-    return;
+  if (!existsSync(SOURCE)) {
+    if (process.argv.includes('--if-present')) return;
+    console.error(`Cannot generate the default mappings: ${SOURCE} not found.`);
+    process.exit(1);
   }
-  writeFileSync(TARGET, generated);
+  writeFileSync(TARGET, `${JSON.stringify(buildMappings(JSON.parse(readFileSync(SOURCE, 'utf8'))), null, 2)}\n`);
   console.log(`Wrote ${TARGET}`);
 }
 

@@ -3,9 +3,9 @@
  * allowed to fetch them (`mappings="none"`). Mappings the host sets through the
  * `mappings` property are layered over them with {@link mergeMappings}.
  *
- * `defaultMappings.json` is generated from the backend's `mapping.json` by
- * `npm run generate-default-mappings` (also run by `build:component`), so it
- * matches the PAP of the same release. It does not include mappings an
+ * `defaultMappings.json` is generated (not committed) from the backend's
+ * `mapping.json` by `npm run generate-default-mappings`, which runs on install
+ * and before dev, test and build, so it matches the PAP of the same release. It does not include mappings an
  * operator adds through `paths.mapping`: only a remote fetch sees those.
  */
 import type { Mappings } from '../api';

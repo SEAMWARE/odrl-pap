@@ -177,7 +177,7 @@ npm run lint         # ESLint
 - **JS Properties:** `i18nStrings`, `themeConfig`, `fieldTemplate`, `policyContext`, `serviceId`, `policy`, `mappings`
 - **Events:** `policy-created`, `policy-updated`, `policy-validated`, `policy-changed`, `editor-cancelled`, `template-created`, `template-updated`
 - **Capabilities:** every backend operation is a named capability in `src/web-component/capabilities.ts`; add a new capability or mode there and gate its consumer in `EmbeddedApp.tsx`
-- **Default mappings:** `src/web-component/defaultMappings.json` is GENERATED from the backend's `src/main/resources/mapping.json` (`npm run generate-default-mappings`, also run by `build:component`). After changing `mapping.json`, regenerate and commit it, or the frontend test `defaultMappings.test.ts` fails in CI
+- **Default mappings:** `src/web-component/defaultMappings.json` is GENERATED and git-ignored: `npm run generate-default-mappings` derives it from the backend's `src/main/resources/mapping.json` and runs on `npm install` and before dev/test/build (`build:component` fails if `mapping.json` is missing). The published package therefore always carries the mappings of the commit it is released from; nothing to regenerate or commit when `mapping.json` changes
 
 ### Frontend Docker
 - Multi-stage: Node 18 build → Nginx 1.21 serve (port 80)

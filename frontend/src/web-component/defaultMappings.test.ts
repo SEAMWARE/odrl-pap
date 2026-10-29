@@ -1,14 +1,8 @@
 /**
- * Keeps the generated default mappings in step with the backend's mapping.json.
+ * Tests for the generated default mappings and for merging host mappings over them.
  */
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { DEFAULT_MAPPINGS, mergeMappings } from './defaultMappings';
-
-const SCRIPT = resolve(__dirname, '../../scripts/generate-default-mappings.mjs');
-const BACKEND_MAPPING = resolve(__dirname, '../../../src/main/resources/mapping.json');
 
 describe('default mappings', () => {
   it('exposes every attribute the builder reads', () => {
@@ -27,14 +21,6 @@ describe('default mappings', () => {
     const path = DEFAULT_MAPPINGS.leftOperands?.find((m) => m.name === 'http:path');
     expect(path?.parameterCount).toBe(0);
   });
-
-  // The backend file is only there when the whole repository is checked out.
-  it.skipIf(!existsSync(BACKEND_MAPPING))(
-    'is up to date with the backend mapping.json (run `npm run generate-default-mappings`)',
-    () => {
-      expect(() => execFileSync('node', [SCRIPT, '--check'], { stdio: 'pipe' })).not.toThrow();
-    },
-  );
 });
 
 describe('mergeMappings', () => {
