@@ -46,6 +46,7 @@ import {
   jsonLdContextEntryIri,
   type JsonLdContextObject,
 } from '../utils/jsonLdContext';
+import { toPolicyId } from '../utils/policyId';
 
 /** Tab key for the template selection tab. */
 const TAB_KEY_TEMPLATE = 'template';
@@ -373,11 +374,13 @@ const EmbeddedApp = ({
     }
 
     const requestBody = odrl as OdrlPolicyJson;
-    const effectiveId = (odrl['odrl:uid'] as string) ?? '';
+    const effectiveId = toPolicyId(odrl['odrl:uid'] as string);
 
-    // Store the policy under its `odrl:uid` (PUT /policy/{id}) rather than via
-    // POST /policy, which would assign a server-generated id the host cannot
-    // resolve. This keeps the emitted `id` retrievable via GET /policy/{id}.
+    // Store the policy under an id derived from its `odrl:uid` (PUT /policy/{id})
+    // rather than via POST /policy, which would assign a server-generated id the
+    // host cannot resolve. This keeps the emitted `id` retrievable via
+    // GET /policy/{id}. The uid itself is usually not a valid policy id (see
+    // toPolicyId), and an invalid one is rejected by the PAP.
     const savePromise = serviceId
       ? ServiceService.createServicePolicyWithId(serviceId, effectiveId, requestBody)
       : PolicyService.createPolicyWithId(effectiveId, requestBody);
@@ -413,7 +416,7 @@ const EmbeddedApp = ({
       body['odrl:uid'] = crypto.randomUUID();
     }
     const policyToSave = body as OdrlPolicyJson;
-    const effectiveId = policyId ?? (body['odrl:uid'] as string);
+    const effectiveId = policyId ?? toPolicyId(body['odrl:uid'] as string);
 
     // Both create and edit use the id-scoped endpoint (PUT /policy/{id}),
     // which "creates or overwrites", so the stored id always matches the

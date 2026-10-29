@@ -55,7 +55,13 @@ export interface TabVisibility {
  * ```
  */
 export interface EmbeddedEventMap {
-  /** Fired after a new policy is successfully saved. */
+  /**
+   * Fired after a new policy is successfully saved.
+   *
+   * `id` is the id the policy is stored under at the PAP (`GET /policy/{id}`).
+   * It is derived from the policy's `odrl:uid`, and differs from it when the
+   * uid is not a valid policy id (e.g. a UUID or an IRI).
+   */
   'policy-created': { policy: Record<string, unknown>; id: string };
   /** Fired after an existing policy is successfully updated. */
   'policy-updated': { policy: Record<string, unknown>; id: string };

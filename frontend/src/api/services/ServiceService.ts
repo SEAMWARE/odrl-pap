@@ -165,6 +165,7 @@ export class ServiceService {
             body: requestBody,
             mediaType: 'application/json',
             errors: {
+                400: `Should be returned in case the id is not a valid rego identifier ([a-zA-Z_][a-zA-Z0-9_]*, not a rego keyword), since it becomes the rego package of the policy.`,
                 409: `Should be returned in case the policy is not allowed to be modified`,
             },
         });
