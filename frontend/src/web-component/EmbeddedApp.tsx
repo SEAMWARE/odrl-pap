@@ -49,6 +49,7 @@ import {
 } from '../utils/jsonLdContext';
 import { toPolicyId } from '../utils/policyId';
 import { DEFAULT_CAPABILITIES, isRemote } from './capabilities';
+import { DEFAULT_MAPPINGS } from './defaultMappings';
 
 /** Tab key for the template selection tab. */
 const TAB_KEY_TEMPLATE = 'template';
@@ -112,7 +113,8 @@ export interface EmbeddedAppProps {
   policy?: OdrlPolicyJson;
   /**
    * Mappings supplied by the host (JS property `mappings`). When set they are
-   * used instead of fetching `/mappings`.
+   * used instead of fetching `/mappings`; with the `mappings` capability off
+   * and nothing supplied, the built-in defaults are used.
    */
   mappings?: Mappings;
 }
@@ -587,7 +589,7 @@ const EmbeddedApp = ({
                   policy={policy}
                   setPolicy={setPolicy}
                   fieldTemplate={fieldTemplate}
-                  mappings={mappingsProp ?? (remoteMappings ? undefined : {})}
+                  mappings={mappingsProp ?? (remoteMappings ? undefined : DEFAULT_MAPPINGS)}
                 />
               </Tab>
             )}

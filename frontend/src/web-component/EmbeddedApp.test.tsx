@@ -14,6 +14,7 @@ import type { EmbeddedConfig } from './EmbeddedContext';
 import { TemplateService } from '../api/services/TemplateService';
 import { PolicyService } from '../api/services/PolicyService';
 import { UiService } from '../api/services/UiService';
+import { DEFAULT_MAPPINGS } from './defaultMappings';
 import { DEFAULT_CAPABILITIES, type CapabilityModes } from './capabilities';
 import type { Template } from '../api/models/Template';
 import { isValidPolicyId } from '../utils/policyId';
@@ -222,6 +223,16 @@ describe('EmbeddedApp capabilities', () => {
     render(<EmbeddedApp config={CONFIG} mappings={{ actions: [] }} />);
 
     expect(UiService.getMappings).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the built-in mappings when mappings is none and none are supplied', async () => {
+    render(<EmbeddedApp config={withNone('mappings')} />);
+
+    // The builder renders (no "failed to load mappings" alert) with the
+    // default vocabulary, without touching the backend.
+    expect(UiService.getMappings).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(DEFAULT_MAPPINGS.actions?.map((m) => m.name)).toContain('odrl:use');
   });
 
   it('makes no backend call at all with every capability off', () => {

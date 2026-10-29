@@ -218,7 +218,8 @@ from `policy-changed`.
 
 ```javascript
 editor.policy = currentPolicyJson;
-editor.mappings = { actions: [], operators: [], leftOperands: [] };
+// Optional: the PAP's built-in mappings are used when you do not set any.
+// editor.mappings = { actions: [...], operators: [...], leftOperands: [...] };
 editor.addEventListener('policy-changed', (e) => {
   textarea.value = JSON.stringify(e.detail.policy, null, 2);
 });

@@ -35,13 +35,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:component": "vite build --config vite.component.config.ts && cp src/web-component/types.d.ts dist-component/odrl-policy-editor.d.ts",
+    "build:component": "npm run generate-default-mappings && vite build --config vite.component.config.ts && cp src/web-component/types.d.ts dist-component/odrl-policy-editor.d.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ci": "vitest run --reporter=verbose",
+    "generate-default-mappings": "node scripts/generate-default-mappings.mjs",
     "generate-api": "openapi --input ../api/odrl.yaml --output ./src/api --client axios"
   },
   "dependencies": {
