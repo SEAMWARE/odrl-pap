@@ -12,11 +12,19 @@ import userEvent from '@testing-library/user-event';
 import EmbeddedApp from './EmbeddedApp';
 import type { EmbeddedConfig } from './EmbeddedContext';
 import { TemplateService } from '../api/services/TemplateService';
+import { PolicyService } from '../api/services/PolicyService';
 import type { Template } from '../api/models/Template';
+import { isValidPolicyId } from '../utils/policyId';
 
 vi.mock('../api/services/TemplateService', () => ({
   TemplateService: {
     getTemplates: vi.fn(),
+  },
+}));
+
+vi.mock('../api/services/PolicyService', () => ({
+  PolicyService: {
+    createPolicyWithId: vi.fn(),
   },
 }));
 
@@ -112,5 +120,28 @@ describe('EmbeddedApp template selection', () => {
     // Both context entries are rendered with the IRI of their term definition.
     expect(screen.getByTitle(ODRL_NAMESPACE)).toHaveTextContent(`odrl: ${ODRL_NAMESPACE}`);
     expect(screen.getByTitle(XSD_NAMESPACE)).toHaveTextContent(`xsd: ${XSD_NAMESPACE}`);
+  });
+});
+
+describe('EmbeddedApp save', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(TemplateService.getTemplates).mockResolvedValue([]);
+    vi.mocked(PolicyService.createPolicyWithId).mockResolvedValue('');
+  });
+
+  it('stores a new policy under a valid policy id derived from its odrl:uid', async () => {
+    const onEvent = vi.fn();
+    render(<EmbeddedApp config={{ ...CONFIG, onEvent }} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    // A new policy gets a UUID as odrl:uid, which has hyphens: the PAP would
+    // reject it as a policy id, since it becomes the rego package.
+    expect(PolicyService.createPolicyWithId).toHaveBeenCalledTimes(1);
+    const [id, policy] = vi.mocked(PolicyService.createPolicyWithId).mock.calls[0];
+    expect(isValidPolicyId(id)).toBe(true);
+    expect((policy as Record<string, unknown>)['odrl:uid']).toMatch(/-/);
+    expect(onEvent).toHaveBeenCalledWith('policy-created', { policy, id });
   });
 });
