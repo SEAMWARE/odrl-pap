@@ -40,6 +40,8 @@ export interface ThemeConfig {
   'odrl-primary-text-color': string;
   /** Border radius of cards; the outer editor card and the builder's step cards. */
   'odrl-card-radius': string;
+  /** Background of text fields, selects and checkboxes. */
+  'odrl-input-bg': string;
 }
 
 /** Light theme (default) matching the existing Bootstrap-based look. */
@@ -60,6 +62,7 @@ export const lightTheme: ThemeConfig = {
   'odrl-card-shadow': '0 0.125rem 0.25rem rgba(0,0,0,0.075)',
   'odrl-primary-text-color': '#FFFFFF',
   'odrl-card-radius': '0.375rem',
+  'odrl-input-bg': '#FFFFFF',
 };
 
 /** Dark theme preset. */
@@ -80,6 +83,7 @@ export const darkTheme: ThemeConfig = {
   'odrl-card-shadow': '0 0.125rem 0.25rem rgba(0,0,0,0.3)',
   'odrl-primary-text-color': '#FFFFFF',
   'odrl-card-radius': '0.375rem',
+  'odrl-input-bg': '#1a1a2e',
 };
 
 /** Default theme used when no ThemeProvider is present. */

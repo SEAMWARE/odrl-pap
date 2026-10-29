@@ -35,13 +35,12 @@ import TemplateFiller from '../components/TemplateFiller';
 import EmbeddedTemplateManager from './EmbeddedTemplateManager';
 import { I18nProvider, resolveStrings, type DeepPartial } from '../i18n';
 import type { I18nStrings } from '../i18n';
-import { lightTheme, darkTheme, type ThemeConfig } from '../theme/defaultTheme';
+import type { ThemeConfig } from '../theme/defaultTheme';
 import {
   DEFAULT_SUMMARY_PLACEMENT,
   DEFAULT_VARIANT,
   EmbeddedProvider,
   type EmbeddedConfig,
-  type EmbeddedThemePreset,
 } from './EmbeddedContext';
 import { createNewPolicy } from '../constants/policyDefaults';
 import {
@@ -79,20 +78,15 @@ const DEFAULT_JSON_INPUT: GenericJsonInput = {
   payload: {},
 };
 
-/** Resolves a theme preset name to a {@link ThemeConfig} object. */
-function resolveThemePreset(preset: EmbeddedThemePreset): ThemeConfig {
-  return preset === 'dark' ? darkTheme : lightTheme;
-}
-
 /**
  * Applies ODRL theme CSS custom properties onto a DOM element.
  *
  * Used to scope theme variables to the shadow-DOM container instead
  * of polluting `document.documentElement`.
  */
-function applyThemeToElement(el: HTMLElement, theme: ThemeConfig): void {
+function applyThemeToElement(el: HTMLElement, theme: Partial<ThemeConfig>): void {
   for (const [prop, value] of Object.entries(theme)) {
-    el.style.setProperty(`--${prop}`, value);
+    if (value !== undefined) el.style.setProperty(`--${prop}`, value);
   }
 }
 
@@ -141,7 +135,7 @@ const EmbeddedApp = ({
   policy: policyProp,
   mappings: mappingsProp,
 }: EmbeddedAppProps) => {
-  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext, serviceId, hiddenTabs } = config;
+  const { apiBaseUrl, authToken, mode, policyId, locale, onEvent, policyContext, serviceId, hiddenTabs } = config;
   const capabilities = config.capabilities ?? DEFAULT_CAPABILITIES;
   const summaryPlacement = config.summaryPlacement ?? DEFAULT_SUMMARY_PLACEMENT;
   const hideCancelButton = config.hiddenButtons?.hideCancelButton ?? false;
@@ -161,14 +155,18 @@ const EmbeddedApp = ({
     configureApi(apiBaseUrl, authToken);
   }, [apiBaseUrl, authToken]);
 
-  // --- Theme application on shadow-DOM container ---
+  // --- Theme overrides on the shadow-DOM container ---
+  // The light and dark presets live in theme.css (`:host` / `:host([theme="dark"])`),
+  // so a page can restyle the editor with plain CSS. Only the tokens the host
+  // passes as `themeConfig` are set inline, and removed again when they change.
   useEffect(() => {
     const el = containerRef?.current;
-    if (!el) return;
-    const resolved = resolveThemePreset(theme);
-    const merged = themeOverrides ? { ...resolved, ...themeOverrides } : resolved;
-    applyThemeToElement(el, merged);
-  }, [theme, themeOverrides, containerRef]);
+    if (!el || !themeOverrides) return;
+    applyThemeToElement(el, themeOverrides);
+    return () => {
+      for (const prop of Object.keys(themeOverrides)) el.style.removeProperty(`--${prop}`);
+    };
+  }, [themeOverrides, containerRef]);
 
   // --- Policy state ---
   const [policy, setPolicy] = useState<OdrlPolicyJson>(

@@ -382,6 +382,21 @@ their tokens. Besides the existing tokens there are two new ones:
 |-------|---------|
 | `odrl-primary-text-color` | Text on a primary-colored fill (primary buttons, step badges) |
 | `odrl-card-radius` | Border radius of cards, the outer one and the step cards |
+| `odrl-input-bg` | Background of text fields, selects and checkboxes |
+
+The light and dark presets are plain CSS on the host (`theme="light"` /
+`theme="dark"`), so a page can override any token with a normal rule instead
+of `themeConfig`; no JavaScript needed, and it keeps following the page's own
+theme:
+
+```css
+odrl-policy-editor {
+  --odrl-primary-color: var(--my-brand-color);
+  --odrl-card-radius: 1rem;
+}
+```
+
+`themeConfig` still works and wins over both.
 
 Set them with the `themeConfig` property:
 

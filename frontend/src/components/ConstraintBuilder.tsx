@@ -412,7 +412,7 @@ const ConstraintBuilder = ({
 
       {/* Add constraint button */}
       <div>
-        <Button variant="success" onClick={addConstraint} disabled={locked}>
+        <Button variant="outline-primary" onClick={addConstraint} disabled={locked}>
           + {t.addConstraint}
         </Button>
       </div>

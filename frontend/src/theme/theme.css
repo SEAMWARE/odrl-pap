@@ -26,6 +26,34 @@
   --odrl-card-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
   --odrl-primary-text-color: #FFFFFF;
   --odrl-card-radius: 0.375rem;
+  --odrl-input-bg: #FFFFFF;
+}
+
+/*
+ * Dark preset of the embedded editor, selected by the host's `theme="dark"`.
+ * Declared on the host rather than set inline, so a page can still override
+ * any token with a plain CSS rule on the element
+ * (`odrl-policy-editor { --odrl-primary-color: ... }`). Keep in step with
+ * `darkTheme` in defaultTheme.ts (a test checks it).
+ */
+:host([theme="dark"]) {
+  --odrl-primary-color: #1a4a6b;
+  --odrl-secondary-color: #F07D00;
+  --odrl-bg-color: #1a1a2e;
+  --odrl-text-color: #e0e0e0;
+  --odrl-text-muted: #adb5bd;
+  --odrl-card-bg: #16213e;
+  --odrl-border-color: #2a2a4a;
+  --odrl-font-family: 'Lato', sans-serif;
+  --odrl-border-radius: 0.375rem;
+  --odrl-section-header-bg: #0f3460;
+  --odrl-success-color: #20c997;
+  --odrl-danger-color: #e74c3c;
+  --odrl-info-color: #17a2b8;
+  --odrl-card-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.3);
+  --odrl-primary-text-color: #FFFFFF;
+  --odrl-card-radius: 0.375rem;
+  --odrl-input-bg: #1a1a2e;
 }
 
 body {
@@ -48,7 +76,11 @@ body {
  * on the element) instead of overriding Bootstrap. Scoped to
  * `.odrl-embedded-root`, so the standalone SPA is not affected.
  */
+/* Bootstrap's grid rows have negative side margins that the container's padding
+   normally absorbs. Without that padding (variant="plain") they would stick out
+   and give the host a horizontal scrollbar, so the overflow is clipped. */
 .odrl-embedded-root {
+  overflow-x: clip;
   --bs-primary: var(--odrl-primary-color);
   --bs-body-color: var(--odrl-text-color);
   --bs-secondary-color: var(--odrl-text-muted);
@@ -267,4 +299,83 @@ body {
 .odrl-embedded-root .form-select:focus {
   border-color: color-mix(in srgb, var(--odrl-primary-color) 55%, transparent);
   box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--odrl-primary-color) 25%, transparent);
+}
+
+/* Text fields, selects and checkboxes. */
+.odrl-embedded-root .form-control,
+.odrl-embedded-root .form-select,
+.odrl-embedded-root .input-group-text {
+  background-color: var(--odrl-input-bg);
+  border-color: var(--odrl-border-color);
+  border-radius: var(--odrl-border-radius);
+  color: var(--odrl-text-color);
+}
+
+.odrl-embedded-root .input-group-text {
+  background-color: var(--odrl-section-header-bg);
+}
+
+.odrl-embedded-root .form-control::placeholder {
+  color: var(--odrl-text-muted);
+  opacity: 0.8;
+}
+
+.odrl-embedded-root .form-control:disabled,
+.odrl-embedded-root .form-select:disabled {
+  background-color: color-mix(in srgb, var(--odrl-input-bg) 92%, var(--odrl-text-color));
+  opacity: 0.7;
+}
+
+.odrl-embedded-root .form-check-input {
+  background-color: var(--odrl-input-bg);
+  border-color: var(--odrl-border-color);
+}
+
+/* Titles. */
+.odrl-embedded-root h1,
+.odrl-embedded-root h2,
+.odrl-embedded-root h3,
+.odrl-embedded-root h4,
+.odrl-embedded-root h5,
+.odrl-embedded-root h6 {
+  color: var(--odrl-text-color);
+  font-weight: 600;
+}
+
+.odrl-embedded-root hr {
+  border-color: var(--odrl-border-color);
+  opacity: 1;
+}
+
+/* Lists (the policy summary) and tables. */
+.odrl-embedded-root .list-group {
+  --bs-list-group-bg: var(--odrl-card-bg);
+  --bs-list-group-color: var(--odrl-text-color);
+  --bs-list-group-border-color: var(--odrl-border-color);
+  --bs-list-group-border-radius: var(--odrl-border-radius);
+}
+
+.odrl-embedded-root .table {
+  --bs-table-color: var(--odrl-text-color);
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--odrl-border-color);
+}
+
+/* Alerts follow the status tokens. */
+.odrl-embedded-root .alert-danger {
+  --bs-alert-color: var(--odrl-danger-color);
+  --bs-alert-bg: color-mix(in srgb, var(--odrl-danger-color) 10%, transparent);
+  --bs-alert-border-color: color-mix(in srgb, var(--odrl-danger-color) 35%, transparent);
+}
+
+.odrl-embedded-root .alert-success {
+  --bs-alert-color: var(--odrl-success-color);
+  --bs-alert-bg: color-mix(in srgb, var(--odrl-success-color) 10%, transparent);
+  --bs-alert-border-color: color-mix(in srgb, var(--odrl-success-color) 35%, transparent);
+}
+
+.odrl-embedded-root .alert-info {
+  --bs-alert-color: var(--odrl-info-color);
+  --bs-alert-bg: color-mix(in srgb, var(--odrl-info-color) 10%, transparent);
+  --bs-alert-border-color: color-mix(in srgb, var(--odrl-info-color) 35%, transparent);
 }
