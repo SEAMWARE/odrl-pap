@@ -335,6 +335,14 @@ at runtime triggers a re-render automatically.
 | `hide-raw-tab`  | Boolean — hides the raw ODRL JSON editor tab  | absent (visible) |
 | `hide-template-tab` | Boolean — hides the template selection tab | absent (visible) |
 | `hide-template-create-tab` | Boolean — hides the template management tab (create/edit/delete templates) | absent (visible) |
+| `summary`       | `"side"` \| `"tab"` \| `"none"` — where the live policy summary is shown | `"side"` |
+| `hide-cancel-button` | Boolean — hides the Cancel button (e.g. when the host provides its own) | absent (visible) |
+| `variant`       | `"card"` \| `"plain"` — editor framed as a card, or with no chrome | `"card"` |
+| `load`          | `"remote"` \| `"none"` — fetch the policy when `mode="edit"` | `"remote"` |
+| `save`          | `"remote"` \| `"none"` — store the policy in the PAP; `none` removes the Save button | `"remote"` |
+| `validate`      | `"remote"` \| `"none"` — validate against the PAP; `none` removes the Validate button and panel | `"remote"` |
+| `templates`     | `"remote"` \| `"none"` — list and manage PAP templates; `none` removes both template tabs | `"remote"` |
+| `mappings`      | `"remote"` \| `"none"` — fetch the visual builder's dropdown mappings | `"remote"` |
 
 Boolean attributes follow the HTML convention: their **presence** means `true`
 (the tab is hidden) and their **absence** means `false` (the tab is visible).
@@ -358,6 +366,94 @@ editor.setAttribute('locale', 'de');
 editor.setAttribute('api-base-url', 'https://new-api.example.com');
 ```
 
+#### Look: variant and theme tokens
+
+By default the editor is drawn as a card (background, border, radius, shadow
+and padding). `variant="plain"` removes that frame, for hosts that already
+put it inside a card or a modal.
+
+Tabs, buttons, cards and the step badges follow the `--odrl-*` theme tokens
+instead of Bootstrap's own colors, so setting tokens restyles them: the tabs
+are an underlined strip in the primary color, primary buttons are filled with
+it, secondary and info buttons are outlined, and danger and success buttons use
+their tokens. Besides the existing tokens there are two new ones:
+
+| Token | Meaning |
+|-------|---------|
+| `odrl-primary-text-color` | Text on a primary-colored fill (primary buttons, step badges) |
+| `odrl-card-radius` | Border radius of cards, the outer one and the step cards |
+| `odrl-input-bg` | Background of text fields, selects and checkboxes |
+
+The light and dark presets are plain CSS on the host (`theme="light"` /
+`theme="dark"`), so a page can override any token with a normal rule instead
+of `themeConfig`; no JavaScript needed, and it keeps following the page's own
+theme:
+
+```css
+odrl-policy-editor {
+  --odrl-primary-color: var(--my-brand-color);
+  --odrl-card-radius: 1rem;
+}
+```
+
+`themeConfig` still works and wins over both.
+
+Set them with the `themeConfig` property:
+
+```javascript
+editor.themeConfig = {
+  'odrl-primary-color': '#1a3461',
+  'odrl-primary-text-color': '#ffffff',
+  'odrl-card-radius': '1rem',
+};
+```
+
+#### Layout: summary and Cancel
+
+The live policy summary sits in a column beside the visual builder, which only
+makes sense on wide screens (the breakpoint follows the viewport, not the
+space the editor actually has, so it also misfires inside a narrow modal or
+panel). `summary="tab"` moves it to its own **Summary** tab and gives the
+builder the full width; `summary="none"` removes it.
+
+`hide-cancel-button` hides the Cancel button, for hosts that already provide
+their own (a modal's footer, say). With `save` and `validate` also `none`, no
+action row is rendered at all.
+
+The editor renders inside a Shadow DOM, but its sticky summary used
+`z-index: 1020`, which competed with the host page's own stacking contexts.
+The element now isolates its stacking context, so nothing inside it can paint
+over the host page.
+
+#### Backend capabilities
+
+`load`, `save`, `validate`, `templates` and `mappings` decide, one by one,
+whether the editor talks to the PAP. Each defaults to `remote` (the behaviour
+of earlier versions); `none` makes no request and hides the UI that depends on
+it. Unknown values fall back to `remote`.
+
+Used as a form control — the host owns the policy and nothing goes to the PAP:
+
+```html
+<odrl-policy-editor
+  load="none" save="none" validate="none" templates="none" mappings="none"
+></odrl-policy-editor>
+```
+
+```javascript
+editor.policy = existingPolicy;            // object or JSON text
+editor.mappings = { actions: [...], operators: [...], leftOperands: [...] };
+editor.addEventListener('policy-changed', (e) => store(e.detail.policy));
+```
+
+With `mappings="none"` the visual builder offers the mappings the PAP ships
+with (generated from the backend's `mapping.json` at build time, so they match
+the PAP of the same release). Set the `mappings` property to extend or override
+them: its entries are layered over the built-in ones per attribute, and an
+entry with the same `name` replaces the built-in one. Mappings an operator adds
+through the PAP's `paths.mapping` are only visible with `mappings="remote"`. With `save="none"`,
+filling in a template loads the result into the editor instead of storing it.
+
 ### JavaScript Properties
 
 For richer configuration that cannot be expressed as string attributes, use
@@ -370,6 +466,8 @@ JavaScript properties on the element:
 | `fieldTemplate` | `FieldTemplate`            | Pre-fills the builder form and optionally locks fields (client-side; distinct from stored templates) |
 | `policyContext` | `Record<string, string>`   | Default `@context` for new policies (takes precedence over attribute) |
 | `serviceId`   | `string`                     | Service scope for policy/template operations (takes precedence over attribute) |
+| `policy`      | `object \| string`           | The working policy (object or JSON text); reads back the latest edit |
+| `mappings`    | `Mappings`                   | Builder dropdown mappings; when set, `/mappings` is not fetched. Layered over the PAP's built-in mappings (same `name` wins); with `mappings="none"` the built-ins are used as they are |
 
 ```javascript
 const editor = document.querySelector('odrl-policy-editor');
@@ -419,6 +517,7 @@ Events bubble and cross Shadow DOM boundaries (`composed: true`).
 | `editor-cancelled` | `{}`                                        | The user clicks Cancel           |
 | `template-created` | `{ template: object, id: string }`          | A new template is created in the management tab |
 | `template-updated` | `{ template: object, id: string }`          | An existing template is updated in the management tab |
+| `policy-changed`   | `{ policy: OdrlPolicyJson }`                | The policy is edited (builder, raw JSON or template); not for the initial or host-set policy |
 
 ```javascript
 const editor = document.querySelector('odrl-policy-editor');
@@ -543,7 +642,9 @@ editor — they will not interfere with the host page's styles.
 
 ## Internationalization (i18n)
 
-The frontend ships with English (`en`) as the default and only built-in locale.
+The frontend ships with English (`en`, the default) and Spanish (`es`) as built-in locales;
+set `locale="es"` and the whole UI is translated, no `i18nStrings` needed. Other locales
+fall back to English, plus whatever you override.
 The i18n system supports runtime locale switching and partial string overrides,
 making it easy to add new languages without rebuilding.
 

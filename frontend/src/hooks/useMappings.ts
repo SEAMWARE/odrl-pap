@@ -42,6 +42,9 @@ export function clearMappingsCache(): void {
  * Subsequent calls (from any component) return the cached data
  * immediately without a network request.
  *
+ * @param provided - Mappings supplied by the host. When given, no request is
+ *   made and they are returned as-is (used when the `mappings` capability is
+ *   not served by the PAP).
  * @returns Loading state, cached data, error message, and a retry function.
  *
  * @example
@@ -52,12 +55,15 @@ export function clearMappingsCache(): void {
  * // use mappings...
  * ```
  */
-export function useMappings(): UseMappingsResult {
+export function useMappings(provided?: Mappings): UseMappingsResult {
   const [mappings, setMappings] = useState<Mappings | null>(cachedMappings);
-  const [loading, setLoading] = useState<boolean>(!cachedMappings);
+  const [loading, setLoading] = useState<boolean>(!cachedMappings && !provided);
   const [error, setError] = useState<string | null>(null);
 
   const fetchMappings = useCallback(() => {
+    // Mappings supplied by the host: nothing to fetch.
+    if (provided) return;
+
     // If already cached, use it immediately
     if (cachedMappings) {
       setMappings(cachedMappings);
@@ -86,7 +92,7 @@ export function useMappings(): UseMappingsResult {
         setError(err.message || 'Failed to load mappings');
         setLoading(false);
       });
-  }, []);
+  }, [provided]);
 
   const retry = useCallback(() => {
     cachedMappings = null;
@@ -98,5 +104,8 @@ export function useMappings(): UseMappingsResult {
     fetchMappings();
   }, [fetchMappings]);
 
+  if (provided) {
+    return { mappings: provided, loading: false, error: null, retry };
+  }
   return { mappings, loading, error, retry };
 }

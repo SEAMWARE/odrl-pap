@@ -174,6 +174,14 @@ describe('OdrlPolicyEditorElement', () => {
       'hide-raw-tab',
       'hide-template-tab',
       'hide-template-create-tab',
+      'summary',
+      'hide-cancel-button',
+      'variant',
+      'load',
+      'save',
+      'validate',
+      'templates',
+      'mappings',
     ]);
   });
 
@@ -489,5 +497,173 @@ describe('OdrlPolicyEditorElement', () => {
     expect(hidden.hideBuilderTab).toBe(false);
     expect(hidden.hideRawTab).toBe(false);
     expect(hidden.hideTemplateCreateTab).toBe(false);
+  });
+
+  // -----------------------------------------------------------
+  // Capabilities, policy and mappings
+  // -----------------------------------------------------------
+  const mockRenderConfig = (_el: unknown) =>
+    (mockRender.mock.calls.at(-1)?.[0] as { props: { config: unknown } }).props.config;
+  type RenderedProps = {
+    config: { capabilities: Record<string, string> };
+    policy?: Record<string, unknown>;
+    mappings?: Record<string, unknown>;
+  };
+  const lastProps = () =>
+    (mockRender.mock.calls.at(-1)![0] as { props: RenderedProps }).props;
+
+  it('observes the capability attributes', () => {
+    for (const name of ['load', 'save', 'validate', 'templates', 'mappings']) {
+      expect(OdrlPolicyEditorElement.observedAttributes).toContain(name);
+    }
+  });
+
+  it('serves every capability remotely by default', async () => {
+    document.body.appendChild(document.createElement(TAG_NAME));
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().config.capabilities).toEqual({
+      load: 'remote', save: 'remote', validate: 'remote', templates: 'remote', mappings: 'remote',
+    });
+  });
+
+  it('reads each capability independently from its attribute', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    el.setAttribute('save', 'none');
+    el.setAttribute('validate', 'none');
+    el.setAttribute('templates', 'bogus');
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().config.capabilities).toMatchObject({
+      save: 'none', validate: 'none', templates: 'remote', load: 'remote', mappings: 'remote',
+    });
+  });
+
+  it('passes the policy property to the editor and re-renders', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    await vi.dynamicImportSettled();
+    mockRender.mockClear();
+
+    const policy = { '@type': 'odrl:Policy' };
+    el.policy = policy as never;
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().policy).toBe(policy);
+    expect(el.policy).toBe(policy);
+  });
+
+  it('parses a JSON string assigned to policy and ignores invalid text', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    document.body.appendChild(el);
+
+    el.policy = '{"@type":"odrl:Policy"}';
+    expect(el.policy).toEqual({ '@type': 'odrl:Policy' });
+
+    el.policy = '{not json';
+    expect(el.policy).toEqual({ '@type': 'odrl:Policy' });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('keeps the policy property in sync with policy-changed without re-rendering', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    await vi.dynamicImportSettled();
+    const { onEvent } = mockRenderConfig(el) as { onEvent: (t: string, d: unknown) => void };
+    mockRender.mockClear();
+
+    const onChange = vi.fn();
+    el.addEventListener('policy-changed', onChange);
+    const edited = { '@type': 'odrl:Agreement' };
+    onEvent('policy-changed', { policy: edited });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(el.policy).toBe(edited);
+    expect(mockRender).not.toHaveBeenCalled();
+  });
+
+  it('passes the mappings property to the editor', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    await vi.dynamicImportSettled();
+
+    const mappings = { actions: [{ value: 'odrl:use', label: 'Use' }] };
+    el.mappings = mappings as never;
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().mappings).toBe(mappings);
+  });
+
+  // -----------------------------------------------------------
+  // Summary placement, cancel button, stacking
+  // -----------------------------------------------------------
+  type LayoutConfig = { summaryPlacement: string; hiddenButtons: { hideCancelButton: boolean } };
+  const lastLayout = () =>
+    (mockRender.mock.calls.at(-1)![0] as { props: { config: LayoutConfig } }).props.config;
+
+  it('places the summary at the side by default', async () => {
+    document.body.appendChild(document.createElement(TAG_NAME));
+
+    await vi.dynamicImportSettled();
+    expect(lastLayout().summaryPlacement).toBe('side');
+  });
+
+  it('reads the summary placement and falls back to side for unknown values', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    el.setAttribute('summary', ' TAB ');
+    document.body.appendChild(el);
+    await vi.dynamicImportSettled();
+    expect(lastLayout().summaryPlacement).toBe('tab');
+
+    el.setAttribute('summary', 'none');
+    await vi.dynamicImportSettled();
+    expect(lastLayout().summaryPlacement).toBe('none');
+
+    el.setAttribute('summary', 'bottom');
+    await vi.dynamicImportSettled();
+    expect(lastLayout().summaryPlacement).toBe('side');
+  });
+
+  it('reads hide-cancel-button as a boolean attribute', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    await vi.dynamicImportSettled();
+    expect(lastLayout().hiddenButtons.hideCancelButton).toBe(false);
+
+    el.setAttribute('hide-cancel-button', '');
+    await vi.dynamicImportSettled();
+    expect(lastLayout().hiddenButtons.hideCancelButton).toBe(true);
+
+    el.setAttribute('hide-cancel-button', 'false');
+    await vi.dynamicImportSettled();
+    expect(lastLayout().hiddenButtons.hideCancelButton).toBe(false);
+  });
+
+  it('isolates its stacking context so internal z-indexes cannot cover the host page', () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+
+    const css = el.shadowRoot!.querySelector('style')!.textContent!;
+    expect(css).toMatch(/:host\s*\{[^}]*isolation:\s*isolate/);
+  });
+
+  it('frames the editor as a card by default and reads variant', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    const variant = () =>
+      (mockRender.mock.calls.at(-1)![0] as { props: { config: { variant: string } } }).props.config.variant;
+    await vi.dynamicImportSettled();
+    expect(variant()).toBe('card');
+
+    el.setAttribute('variant', ' PLAIN ');
+    await vi.dynamicImportSettled();
+    expect(variant()).toBe('plain');
+
+    el.setAttribute('variant', 'fancy');
+    await vi.dynamicImportSettled();
+    expect(variant()).toBe('card');
   });
 });

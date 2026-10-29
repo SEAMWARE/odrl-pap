@@ -11,6 +11,9 @@ node_modules
 dist
 dist-component
 dist-ssr
+
+# Generated from ../src/main/resources/mapping.json (npm run generate-default-mappings)
+src/web-component/defaultMappings.json
 *.local
 
 # Editor directories and files

@@ -9,6 +9,7 @@
  * running in embedded mode and read the host-supplied configuration.
  */
 import { createContext, useContext, type ReactNode } from 'react';
+import type { CapabilityModes } from './capabilities';
 
 /** Editor operating mode: create a new policy or edit an existing one. */
 export type EditorMode = 'create' | 'edit';
@@ -34,11 +35,37 @@ export interface TabVisibility {
 }
 
 /**
+ * Where the live policy summary is shown: `side` is a column beside the
+ * builder (wide screens only), `tab` is an extra tab, `none` hides it.
+ */
+export type SummaryPlacement = 'side' | 'tab' | 'none';
+
+/** Default placement, the layout of earlier versions. */
+export const DEFAULT_SUMMARY_PLACEMENT: SummaryPlacement = 'side';
+
+/**
+ * How the editor is framed: `card` draws it as a card (background, border,
+ * radius, shadow and padding); `plain` adds no chrome, for hosts that already
+ * put it inside a card or a modal.
+ */
+export type EditorVariant = 'card' | 'plain';
+
+/** Default variant. */
+export const DEFAULT_VARIANT: EditorVariant = 'card';
+
+/** Action buttons the host can hide; each, when `true`, hides its button. */
+export interface ButtonVisibility {
+  hideCancelButton: boolean;
+}
+
+/**
  * Map of custom event names to their `detail` payload types.
  *
  * The Web Component host listens for these events on the custom element.
  */
 export interface EmbeddedEventMap {
+  /** Fired whenever the policy is edited; not for the initial or host-supplied policy. */
+  'policy-changed': { policy: Record<string, unknown> };
   /** Fired after a new policy is successfully saved. */
   'policy-created': { policy: Record<string, unknown>; id: string };
   /** Fired after an existing policy is successfully updated. */
@@ -98,6 +125,14 @@ export interface EmbeddedConfig {
    * Defaults to all tabs visible.
    */
   hiddenTabs: TabVisibility;
+  /** Where each backend operation is served from (see `capabilities.ts`). */
+  capabilities: CapabilityModes;
+  /** Where the policy summary is shown. */
+  summaryPlacement: SummaryPlacement;
+  /** Which action buttons are hidden. */
+  hiddenButtons: ButtonVisibility;
+  /** How the editor is framed. */
+  variant: EditorVariant;
 }
 
 /** Full context value including an `isEmbedded` flag. */

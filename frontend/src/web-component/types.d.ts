@@ -19,6 +19,45 @@ export type EditorMode = 'create' | 'edit';
 export type EmbeddedThemePreset = 'light' | 'dark';
 
 // ---------------------------------------------------------------------------
+// Capabilities
+// ---------------------------------------------------------------------------
+
+/** Operations that can be served by the PAP backend. */
+export type Capability = 'load' | 'save' | 'validate' | 'templates' | 'mappings';
+
+/**
+ * Where a capability is served from: `"remote"` (the PAP API, the default) or
+ * `"none"` (switched off: no request is made and its UI is not rendered).
+ */
+export type CapabilityMode = 'remote' | 'none';
+
+/** The mode of every capability. */
+export type CapabilityModes = Record<Capability, CapabilityMode>;
+
+// ---------------------------------------------------------------------------
+// Layout
+// ---------------------------------------------------------------------------
+
+/**
+ * Where the live policy summary is shown: `"side"` (a column beside the
+ * builder, wide screens only), `"tab"` (its own tab) or `"none"`.
+ */
+export type SummaryPlacement = 'side' | 'tab' | 'none';
+
+/**
+ * How the editor is framed: `"card"` draws it as a card (background, border,
+ * radius, shadow, padding); `"plain"` adds no chrome, for hosts that already
+ * put it inside a card or a modal.
+ */
+export type EditorVariant = 'card' | 'plain';
+
+/** Action buttons the host can hide; each, when `true`, hides its button. */
+export interface ButtonVisibility {
+  /** When `true`, hides the Cancel button. */
+  hideCancelButton: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Tab visibility
 // ---------------------------------------------------------------------------
 
@@ -55,6 +94,11 @@ export interface TabVisibility {
  * ```
  */
 export interface EmbeddedEventMap {
+  /**
+   * Fired whenever the policy is edited (builder, raw JSON or template).
+   * Not fired for the initial policy or one set through the `policy` property.
+   */
+  'policy-changed': { policy: Record<string, unknown> };
   /**
    * Fired after a new policy is successfully saved.
    *
@@ -123,6 +167,14 @@ export interface EmbeddedConfig {
    * Defaults to all tabs visible.
    */
   hiddenTabs: TabVisibility;
+  /** Where each backend operation is served from. All `"remote"` by default. */
+  capabilities: CapabilityModes;
+  /** Where the policy summary is shown. Defaults to `"side"`. */
+  summaryPlacement: SummaryPlacement;
+  /** Which action buttons are hidden. */
+  hiddenButtons: ButtonVisibility;
+  /** How the editor is framed. Defaults to `"card"`. */
+  variant: EditorVariant;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +203,14 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | `hide-raw-tab`             | Boolean — hides the raw ODRL JSON editor tab    | absent |
  * | `hide-template-tab`        | Boolean — hides the template selection tab      | absent |
  * | `hide-template-create-tab` | Boolean — hides the template management tab     | absent |
+ * | `summary`        | `"side"` \| `"tab"` \| `"none"` — where the policy summary is shown | `"side"` |
+ * | `hide-cancel-button` | Boolean — hides the Cancel button            | absent |
+ * | `variant`        | `"card"` \| `"plain"` — framed as a card, or no chrome | `"card"` |
+ * | `load`           | `"remote"` \| `"none"` — fetch the policy when `mode="edit"` | `"remote"` |
+ * | `save`           | `"remote"` \| `"none"` — store the policy in the PAP (Save button) | `"remote"` |
+ * | `validate`       | `"remote"` \| `"none"` — validate against the PAP (Validate button) | `"remote"` |
+ * | `templates`      | `"remote"` \| `"none"` — list and manage PAP templates | `"remote"` |
+ * | `mappings`       | `"remote"` \| `"none"` — fetch the builder's dropdown mappings | `"remote"` |
  *
  * ## JS Properties
  *
@@ -159,11 +219,14 @@ export const TAG_NAME: 'odrl-policy-editor';
  * - `fieldTemplate` — a FieldTemplate object to pre-fill and constrain the editor
  * - `policyContext` — custom JSON-LD `@context` object/string for new policies
  * - `serviceId` — service ID string for service-scoped policy operations
+ * - `policy` — the working policy (object or JSON text); reads back the latest edit
+ * - `mappings` — builder dropdown mappings, used instead of fetching them
  *
  * ## Custom Events
  *
  * | Event              | Detail                                      |
  * |--------------------|---------------------------------------------|
+ * | `policy-changed`   | `{ policy: object }`                        |
  * | `policy-created`   | `{ policy: object, id: string }`            |
  * | `policy-updated`   | `{ policy: object, id: string }`            |
  * | `policy-validated` | `{ result: object }`                        |
@@ -243,6 +306,28 @@ export declare class OdrlPolicyEditorElement extends HTMLElement {
    * ```
    */
   serviceId: string | undefined;
+
+  /**
+   * The working policy. Accepts an object or its JSON text; reading it back
+   * returns the policy as last edited, so it works as the editor's value.
+   * Listen to `policy-changed` to react to edits.
+   *
+   * @example
+   * ```js
+   * editor.policy = existingPolicy;
+   * editor.addEventListener('policy-changed', (e) => store(e.detail.policy));
+   * ```
+   */
+  policy: Record<string, unknown> | string | undefined;
+
+  /**
+   * Mappings (actions, operators, operands...) the visual builder offers.
+   * When set the builder does not fetch them from the PAP; they are layered
+   * over the PAP's built-in mappings, and a mapping with the same `name`
+   * replaces the built-in one. With `mappings="none"` and nothing set, the
+   * built-in mappings are used as they are.
+   */
+  mappings: Record<string, unknown> | undefined;
 }
 
 // ---------------------------------------------------------------------------

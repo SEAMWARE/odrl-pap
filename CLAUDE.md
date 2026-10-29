@@ -173,9 +173,11 @@ npm run lint         # ESLint
 - **Config:** `frontend/vite.component.config.ts` (library build, inlines all CSS/deps)
 - **Entry:** `frontend/src/web-component/index.ts` → registers `<odrl-policy-editor>` custom element
 - **Shadow DOM:** Full style isolation; Bootstrap + theme CSS inlined
-- **Attributes:** `api-base-url`, `auth-token`, `mode`, `policy-id`, `theme`, `locale`, `policy-context`
-- **JS Properties:** `i18nStrings`, `themeConfig`, `template`, `policyContext`
-- **Events:** `policy-created`, `policy-updated`, `policy-validated`, `editor-cancelled`
+- **Attributes:** `api-base-url`, `auth-token`, `mode`, `policy-id`, `theme`, `locale`, `policy-context`, `service-id`, `hide-*-tab`, and the capability modes `load`, `save`, `validate`, `templates`, `mappings` (each `remote` (default) or `none`)
+- **JS Properties:** `i18nStrings`, `themeConfig`, `fieldTemplate`, `policyContext`, `serviceId`, `policy`, `mappings`
+- **Events:** `policy-created`, `policy-updated`, `policy-validated`, `policy-changed`, `editor-cancelled`, `template-created`, `template-updated`
+- **Capabilities:** every backend operation is a named capability in `src/web-component/capabilities.ts`; add a new capability or mode there and gate its consumer in `EmbeddedApp.tsx`
+- **Default mappings:** `src/web-component/defaultMappings.json` is GENERATED and git-ignored: `npm run generate-default-mappings` derives it from the backend's `src/main/resources/mapping.json` and runs on `npm install` and before dev/test/build (`build:component` fails if `mapping.json` is missing). The published package therefore always carries the mappings of the commit it is released from; nothing to regenerate or commit when `mapping.json` changes
 
 ### Frontend Docker
 - Multi-stage: Node 18 build → Nginx 1.21 serve (port 80)

@@ -4,7 +4,9 @@ FROM node:18-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+# --ignore-scripts: the `prepare` hook needs scripts/ (not copied yet) and only
+# produces the web component's offline defaults, which this image does not bundle.
+RUN npm install --ignore-scripts
 COPY . .
 RUN npx vite build
 

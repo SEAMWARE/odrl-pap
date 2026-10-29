@@ -22,6 +22,7 @@ import { TemplateService } from '../api/services/TemplateService';
 import { UiService } from '../api/services/UiService';
 import type { OdrlPolicyJson, ValidationResponse, Template } from '../services/api';
 import { configureApi } from '../services/api';
+import type { Mappings } from '../api';
 import type { FieldTemplate } from '../types';
 import { TestRequest } from '../api/models/TestRequest';
 import type { GenericJsonInput } from '../api/models/GenericJsonInput';
@@ -34,11 +35,12 @@ import TemplateFiller from '../components/TemplateFiller';
 import EmbeddedTemplateManager from './EmbeddedTemplateManager';
 import { I18nProvider, resolveStrings, type DeepPartial } from '../i18n';
 import type { I18nStrings } from '../i18n';
-import { lightTheme, darkTheme, type ThemeConfig } from '../theme/defaultTheme';
+import type { ThemeConfig } from '../theme/defaultTheme';
 import {
+  DEFAULT_SUMMARY_PLACEMENT,
+  DEFAULT_VARIANT,
   EmbeddedProvider,
   type EmbeddedConfig,
-  type EmbeddedThemePreset,
 } from './EmbeddedContext';
 import { createNewPolicy } from '../constants/policyDefaults';
 import {
@@ -47,6 +49,9 @@ import {
   type JsonLdContextObject,
 } from '../utils/jsonLdContext';
 import { toPolicyId } from '../utils/policyId';
+import { DEFAULT_CAPABILITIES, isRemote } from './capabilities';
+import PolicySummary from '../components/PolicySummary';
+import { DEFAULT_MAPPINGS, mergeMappings } from './defaultMappings';
 
 /** Tab key for the template selection tab. */
 const TAB_KEY_TEMPLATE = 'template';
@@ -54,6 +59,8 @@ const TAB_KEY_TEMPLATE = 'template';
 const TAB_KEY_BUILDER = 'builder';
 /** Tab key for the raw ODRL JSON editor tab. */
 const TAB_KEY_ODRL = 'odrl';
+/** Tab key for the policy summary tab (summary="tab"). */
+const TAB_KEY_SUMMARY = 'summary';
 /** Tab key for the template management (create/edit/delete) tab. */
 const TAB_KEY_MANAGE_TEMPLATES = 'manage-templates';
 
@@ -71,20 +78,15 @@ const DEFAULT_JSON_INPUT: GenericJsonInput = {
   payload: {},
 };
 
-/** Resolves a theme preset name to a {@link ThemeConfig} object. */
-function resolveThemePreset(preset: EmbeddedThemePreset): ThemeConfig {
-  return preset === 'dark' ? darkTheme : lightTheme;
-}
-
 /**
  * Applies ODRL theme CSS custom properties onto a DOM element.
  *
  * Used to scope theme variables to the shadow-DOM container instead
  * of polluting `document.documentElement`.
  */
-function applyThemeToElement(el: HTMLElement, theme: ThemeConfig): void {
+function applyThemeToElement(el: HTMLElement, theme: Partial<ThemeConfig>): void {
   for (const [prop, value] of Object.entries(theme)) {
-    el.style.setProperty(`--${prop}`, value);
+    if (value !== undefined) el.style.setProperty(`--${prop}`, value);
   }
 }
 
@@ -103,6 +105,18 @@ export interface EmbeddedAppProps {
   containerRef?: RefObject<HTMLDivElement | null>;
   /** Optional field template for pre-filling and constraining the builder form. */
   fieldTemplate?: FieldTemplate;
+  /**
+   * Policy supplied by the host (JS property `policy`). Whenever this
+   * reference changes the editor adopts it as its working policy.
+   */
+  policy?: OdrlPolicyJson;
+  /**
+   * Mappings supplied by the host (JS property `mappings`). When set they are
+   * layered over the built-in defaults (same `name` wins) and `/mappings` is
+   * not fetched; with the `mappings` capability off and nothing supplied, the
+   * built-in defaults are used.
+   */
+  mappings?: Mappings;
 }
 
 /**
@@ -118,45 +132,91 @@ const EmbeddedApp = ({
   themeOverrides,
   containerRef,
   fieldTemplate,
+  policy: policyProp,
+  mappings: mappingsProp,
 }: EmbeddedAppProps) => {
-  const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext, serviceId, hiddenTabs } = config;
+  const { apiBaseUrl, authToken, mode, policyId, locale, onEvent, policyContext, serviceId, hiddenTabs } = config;
+  const capabilities = config.capabilities ?? DEFAULT_CAPABILITIES;
+  const summaryPlacement = config.summaryPlacement ?? DEFAULT_SUMMARY_PLACEMENT;
+  const hideCancelButton = config.hiddenButtons?.hideCancelButton ?? false;
+  const variant = config.variant ?? DEFAULT_VARIANT;
+  const remoteLoad = isRemote(capabilities, 'load');
+  const remoteSave = isRemote(capabilities, 'save');
+  const remoteValidate = isRemote(capabilities, 'validate');
+  const remoteTemplates = isRemote(capabilities, 'templates');
+  const remoteMappings = isRemote(capabilities, 'mappings');
 
   // EmbeddedApp renders the I18nProvider itself, so it cannot read strings via
   // useI18n(); it resolves them directly for the (translatable) tab titles.
-  const tabStrings = useMemo(() => resolveStrings(i18nOverrides).policyEditor, [i18nOverrides]);
+  const tabStrings = useMemo(() => resolveStrings(i18nOverrides, locale).policyEditor, [i18nOverrides, locale]);
 
   // --- API configuration ---
   useEffect(() => {
     configureApi(apiBaseUrl, authToken);
   }, [apiBaseUrl, authToken]);
 
-  // --- Theme application on shadow-DOM container ---
+  // --- Theme overrides on the shadow-DOM container ---
+  // The light and dark presets live in theme.css (`:host` / `:host([theme="dark"])`),
+  // so a page can restyle the editor with plain CSS. Only the tokens the host
+  // passes as `themeConfig` are set inline, and removed again when they change.
   useEffect(() => {
     const el = containerRef?.current;
-    if (!el) return;
-    const resolved = resolveThemePreset(theme);
-    const merged = themeOverrides ? { ...resolved, ...themeOverrides } : resolved;
-    applyThemeToElement(el, merged);
-  }, [theme, themeOverrides, containerRef]);
+    if (!el || !themeOverrides) return;
+    applyThemeToElement(el, themeOverrides);
+    return () => {
+      for (const prop of Object.keys(themeOverrides)) el.style.removeProperty(`--${prop}`);
+    };
+  }, [themeOverrides, containerRef]);
 
   // --- Policy state ---
   const [policy, setPolicy] = useState<OdrlPolicyJson>(
-    () => createNewPolicy(policyContext) as OdrlPolicyJson,
+    () => policyProp ?? (createNewPolicy(policyContext) as OdrlPolicyJson),
   );
   const [saveError, setSaveError] = useState('');
 
+  // Host mappings are layered over the built-in ones; with neither a host
+  // value nor a remote capability the built-ins alone are used.
+  const builderMappings = useMemo(
+    () => (mappingsProp ? mergeMappings(DEFAULT_MAPPINGS, mappingsProp) : remoteMappings ? undefined : DEFAULT_MAPPINGS),
+    [mappingsProp, remoteMappings],
+  );
+
+  // The last policy the host knows about: the one it supplied or the last one
+  // we reported through `policy-changed`. Used to avoid echoing it back.
+  const hostPolicyRef = useRef<OdrlPolicyJson | undefined>(policy);
+
+  // Adopt a policy supplied (or replaced) by the host.
+  useEffect(() => {
+    if (policyProp && policyProp !== hostPolicyRef.current) {
+      hostPolicyRef.current = policyProp;
+      setPolicy(policyProp);
+    }
+  }, [policyProp]);
+
+  // Report every edit to the host, except the ones that originate from it.
+  useEffect(() => {
+    if (policy === hostPolicyRef.current) return;
+    hostPolicyRef.current = policy;
+    onEvent('policy-changed', { policy: policy as Record<string, unknown> });
+  }, [policy, onEvent]);
+
   // Load existing policy in edit mode (uses service-scoped endpoint when serviceId is set)
   useEffect(() => {
-    if (mode === 'edit' && policyId) {
+    if (remoteLoad && mode === 'edit' && policyId) {
       const loadPromise = serviceId
         ? ServiceService.getServicePolicyById(serviceId, policyId)
         : PolicyService.getPolicyById(policyId);
 
       loadPromise
-        .then((p) => setPolicy(JSON.parse(p.odrl!)))
+        .then((p) => {
+          // The loaded policy is the baseline, not an edit: don't report it as `policy-changed`.
+          const loaded = JSON.parse(p.odrl!);
+          hostPolicyRef.current = loaded;
+          setPolicy(loaded);
+        })
         .catch((err: Error) => setSaveError(err.message));
     }
-  }, [mode, policyId, serviceId]);
+  }, [remoteLoad, mode, policyId, serviceId]);
 
   // --- Template state ---
   /** Available templates fetched from the backend. */
@@ -174,7 +234,7 @@ const EmbeddedApp = ({
   // Scoped to the configured service (if any) and re-run when it changes, so a
   // service-scoped template can be used to create a policy.
   useEffect(() => {
-    if (mode === 'edit' || hiddenTabs.hideTemplateTab) {
+    if (!remoteTemplates || mode === 'edit' || hiddenTabs.hideTemplateTab) {
       setTemplatesLoading(false);
       return;
     }
@@ -197,7 +257,7 @@ const EmbeddedApp = ({
       .finally(() => {
         setTemplatesLoading(false);
       });
-  }, [mode, hiddenTabs.hideTemplateTab, serviceId]);
+  }, [remoteTemplates, mode, hiddenTabs.hideTemplateTab, serviceId]);
 
   /** Whether the template selection tab should be visible. */
   const showTemplateTab = mode === 'create' && !hiddenTabs.hideTemplateTab && !templatesLoading && templates.length > 0;
@@ -209,7 +269,7 @@ const EmbeddedApp = ({
    * whether a policy is being created or edited. Controlled by the
    * `hide-template-create-tab` attribute.
    */
-  const showManageTemplatesTab = !hiddenTabs.hideTemplateCreateTab;
+  const showManageTemplatesTab = remoteTemplates && !hiddenTabs.hideTemplateCreateTab;
 
   // --- Determine the default active tab based on visibility ---
   /**
@@ -222,10 +282,10 @@ const EmbeddedApp = ({
     }
     if (!hiddenTabs.hideBuilderTab) return TAB_KEY_BUILDER;
     if (!hiddenTabs.hideRawTab) return TAB_KEY_ODRL;
-    if (!hiddenTabs.hideTemplateCreateTab) return TAB_KEY_MANAGE_TEMPLATES;
+    if (showManageTemplatesTab) return TAB_KEY_MANAGE_TEMPLATES;
     // Nothing is visible (all tabs hidden) — fall back to the builder key.
     return TAB_KEY_BUILDER;
-  }, [hiddenTabs, mode, templates.length]);
+  }, [hiddenTabs, mode, templates.length, showManageTemplatesTab]);
 
   /** Returns whether the tab with the given key is currently rendered. */
   const isTabVisible = useCallback(
@@ -239,11 +299,13 @@ const EmbeddedApp = ({
           return !hiddenTabs.hideRawTab;
         case TAB_KEY_MANAGE_TEMPLATES:
           return showManageTemplatesTab;
+        case TAB_KEY_SUMMARY:
+          return summaryPlacement === 'tab';
         default:
           return false;
       }
     },
-    [showTemplateTab, showManageTemplatesTab, hiddenTabs.hideBuilderTab, hiddenTabs.hideRawTab],
+    [showTemplateTab, showManageTemplatesTab, summaryPlacement, hiddenTabs.hideBuilderTab, hiddenTabs.hideRawTab],
   );
 
   // --- Editor tab state ---
@@ -366,6 +428,15 @@ const EmbeddedApp = ({
    * @param odrl - The ODRL policy JSON with placeholders replaced.
    */
   const handleCreateFromTemplate = useCallback((odrl: Record<string, unknown>) => {
+    // Without a remote save there is nothing to create: hand the filled-in
+    // policy to the editor (and, through `policy-changed`, to the host).
+    if (!remoteSave) {
+      setPolicy(odrl as OdrlPolicyJson);
+      userSelectedTabRef.current = true;
+      setActiveTab(hiddenTabs.hideBuilderTab ? TAB_KEY_ODRL : TAB_KEY_BUILDER);
+      return;
+    }
+
     setIsCreatingFromTemplate(true);
 
     // Ensure the policy has a UID; generate one if the template did not include it.
@@ -395,7 +466,7 @@ const EmbeddedApp = ({
       .finally(() => {
         setIsCreatingFromTemplate(false);
       });
-  }, [serviceId, onEvent]);
+  }, [remoteSave, hiddenTabs.hideBuilderTab, serviceId, onEvent]);
 
   /**
    * Saves the policy and emits the appropriate event.
@@ -490,7 +561,11 @@ const EmbeddedApp = ({
   return (
     <EmbeddedProvider config={config}>
       <I18nProvider locale={locale} strings={i18nOverrides}>
-        <div ref={effectiveRef} className="odrl-embedded-root p-3">
+        <div
+          ref={effectiveRef}
+          className={`odrl-embedded-root${variant === 'card' ? ' p-3' : ''}`}
+          data-variant={variant}
+        >
           {/* Editor Tabs */}
           <Tabs
             id="embedded-editor-tabs"
@@ -535,7 +610,13 @@ const EmbeddedApp = ({
                 title={tabStrings.tabBuilder}
                 disabled={createdFromTemplate}
               >
-                <PolicyBuilder policy={policy} setPolicy={setPolicy} fieldTemplate={fieldTemplate} />
+                <PolicyBuilder
+                  policy={policy}
+                  setPolicy={setPolicy}
+                  fieldTemplate={fieldTemplate}
+                  mappings={builderMappings}
+                  showSummary={summaryPlacement === 'side'}
+                />
               </Tab>
             )}
             {!hiddenTabs.hideRawTab && (
@@ -618,6 +699,13 @@ const EmbeddedApp = ({
               </Tab>
             )}
 
+            {/* Policy summary tab — only when the summary is placed as a tab */}
+            {summaryPlacement === 'tab' && (
+              <Tab eventKey={TAB_KEY_SUMMARY} title={tabStrings.tabSummary}>
+                <PolicySummary policy={policy} />
+              </Tab>
+            )}
+
             {/* Template management tab — create/edit/delete templates */}
             {showManageTemplatesTab && (
               <Tab eventKey={TAB_KEY_MANAGE_TEMPLATES} title={tabStrings.tabManageTemplates}>
@@ -629,20 +717,26 @@ const EmbeddedApp = ({
           {/* Policy action buttons — shown only while editing a policy.
               Hidden in template-created read-only mode and on the template
               management tab, where policy save/validate is not applicable. */}
-          {!createdFromTemplate && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (
+          {!createdFromTemplate && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (remoteSave || remoteValidate || !hideCancelButton) && (
             <div className="d-flex gap-2 mt-3 mb-3">
-              <Button variant="primary" onClick={handleSave}>
-                Save
-              </Button>
-              <Button variant="secondary" onClick={handleCancel}>
-                Cancel
-              </Button>
-              <Button
-                variant="info"
-                onClick={() => setShowValidation(!showValidation)}
-              >
-                {showValidation ? 'Hide Validation' : 'Validate'}
-              </Button>
+              {remoteSave && (
+                <Button variant="primary" onClick={handleSave}>
+                  Save
+                </Button>
+              )}
+              {!hideCancelButton && (
+                <Button variant="secondary" onClick={handleCancel}>
+                  Cancel
+                </Button>
+              )}
+              {remoteValidate && (
+                <Button
+                  variant="info"
+                  onClick={() => setShowValidation(!showValidation)}
+                >
+                  {showValidation ? 'Hide Validation' : 'Validate'}
+                </Button>
+              )}
             </div>
           )}
 
@@ -653,7 +747,7 @@ const EmbeddedApp = ({
           )}
 
           {/* Inline validation panel (no modal — avoids portal issues in Shadow DOM) */}
-          {showValidation && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (
+          {remoteValidate && showValidation && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (
             <div className="border rounded p-3 mt-3" data-testid="validation-panel">
               <h5>Validate Policy</h5>
 
