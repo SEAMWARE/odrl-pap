@@ -13,6 +13,8 @@ import EmbeddedApp from './EmbeddedApp';
 import type { EmbeddedConfig } from './EmbeddedContext';
 import { TemplateService } from '../api/services/TemplateService';
 import { PolicyService } from '../api/services/PolicyService';
+import { UiService } from '../api/services/UiService';
+import { DEFAULT_CAPABILITIES, type CapabilityModes } from './capabilities';
 import type { Template } from '../api/models/Template';
 import { isValidPolicyId } from '../utils/policyId';
 
@@ -25,6 +27,14 @@ vi.mock('../api/services/TemplateService', () => ({
 vi.mock('../api/services/PolicyService', () => ({
   PolicyService: {
     createPolicyWithId: vi.fn(),
+    getPolicyById: vi.fn(),
+  },
+}));
+
+vi.mock('../api/services/UiService', () => ({
+  UiService: {
+    getMappings: vi.fn().mockResolvedValue({}),
+    validatePolicy: vi.fn(),
   },
 }));
 
@@ -99,6 +109,7 @@ const CONFIG: EmbeddedConfig = {
     hideTemplateTab: false,
     hideTemplateCreateTab: false,
   },
+  capabilities: DEFAULT_CAPABILITIES,
 };
 
 describe('EmbeddedApp template selection', () => {
@@ -143,5 +154,123 @@ describe('EmbeddedApp save', () => {
     expect(isValidPolicyId(id)).toBe(true);
     expect((policy as Record<string, unknown>)['odrl:uid']).toMatch(/-/);
     expect(onEvent).toHaveBeenCalledWith('policy-created', { policy, id });
+  });
+});
+
+/** Config with the given capabilities switched off. */
+function withNone(...names: (keyof CapabilityModes)[]): EmbeddedConfig {
+  const capabilities = { ...DEFAULT_CAPABILITIES };
+  for (const name of names) capabilities[name] = 'none';
+  return { ...CONFIG, onEvent: vi.fn(), capabilities };
+}
+
+describe('EmbeddedApp capabilities', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(TemplateService.getTemplates).mockResolvedValue([]);
+    vi.mocked(UiService.getMappings).mockResolvedValue({});
+  });
+
+  it('shows Save and Validate when they are remote', () => {
+    render(<EmbeddedApp config={CONFIG} />);
+
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Validate' })).toBeInTheDocument();
+  });
+
+  it('hides Save when save is none', () => {
+    render(<EmbeddedApp config={withNone('save')} />);
+
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Validate' })).toBeInTheDocument();
+  });
+
+  it('hides Validate when validate is none', () => {
+    render(<EmbeddedApp config={withNone('validate')} />);
+
+    expect(screen.queryByRole('button', { name: 'Validate' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+  });
+
+  it('does not list templates when templates is none', () => {
+    render(<EmbeddedApp config={withNone('templates')} />);
+
+    expect(TemplateService.getTemplates).not.toHaveBeenCalled();
+  });
+
+  it('does not fetch the policy in edit mode when load is none', () => {
+    const config = { ...withNone('load'), mode: 'edit' as const, policyId: 'p1' };
+    render(<EmbeddedApp config={config} />);
+
+    expect(PolicyService.getPolicyById).not.toHaveBeenCalled();
+  });
+
+  it('fetches the policy in edit mode when load is remote', () => {
+    vi.mocked(PolicyService.getPolicyById).mockResolvedValue({ odrl: '{}' } as never);
+    render(<EmbeddedApp config={{ ...CONFIG, mode: 'edit', policyId: 'p1' }} />);
+
+    expect(PolicyService.getPolicyById).toHaveBeenCalledWith('p1');
+  });
+
+  it('does not fetch mappings when mappings is none', () => {
+    render(<EmbeddedApp config={withNone('mappings')} />);
+
+    expect(UiService.getMappings).not.toHaveBeenCalled();
+  });
+
+  it('uses host-supplied mappings instead of fetching them', () => {
+    render(<EmbeddedApp config={CONFIG} mappings={{ actions: [] }} />);
+
+    expect(UiService.getMappings).not.toHaveBeenCalled();
+  });
+
+  it('makes no backend call at all with every capability off', () => {
+    const everything = Object.keys(DEFAULT_CAPABILITIES) as (keyof CapabilityModes)[];
+    render(<EmbeddedApp config={{ ...withNone(...everything), mode: 'edit', policyId: 'p1' }} />);
+
+    expect(TemplateService.getTemplates).not.toHaveBeenCalled();
+    expect(PolicyService.getPolicyById).not.toHaveBeenCalled();
+    expect(UiService.getMappings).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Validate' })).not.toBeInTheDocument();
+  });
+});
+
+describe('EmbeddedApp policy value', () => {
+  const POLICY = { '@type': 'odrl:Policy', 'odrl:uid': 'urn:p:1' } as never;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(TemplateService.getTemplates).mockResolvedValue([]);
+    vi.mocked(UiService.getMappings).mockResolvedValue({});
+  });
+
+  it('does not emit policy-changed for the initial or host-supplied policy', () => {
+    // Builder tab hidden: the builder normalises the policy it mounts with
+    // (e.g. adds an empty constraint list), which is reported as an edit.
+    const config = {
+      ...withNone('mappings'),
+      hiddenTabs: { ...CONFIG.hiddenTabs, hideBuilderTab: true },
+    };
+    const { rerender } = render(<EmbeddedApp config={config} policy={POLICY} />);
+    rerender(<EmbeddedApp config={config} policy={{ ...(POLICY as object), '@type': 'odrl:Set' } as never} />);
+
+    expect(config.onEvent).not.toHaveBeenCalledWith('policy-changed', expect.anything());
+  });
+
+  it('emits policy-changed when the user edits the raw policy', async () => {
+    const config = withNone('mappings');
+    render(<EmbeddedApp config={config} policy={POLICY} />);
+    (config.onEvent as ReturnType<typeof vi.fn>).mockClear();
+
+    await userEvent.click(screen.getByRole('tab', { name: /raw/i }));
+    const textarea = screen.getByRole('textbox', { name: '' });
+    await userEvent.clear(textarea);
+    await userEvent.click(textarea);
+    await userEvent.paste('{"@type":"odrl:Agreement"}');
+
+    expect(config.onEvent).toHaveBeenCalledWith('policy-changed', {
+      policy: { '@type': 'odrl:Agreement' },
+    });
   });
 });

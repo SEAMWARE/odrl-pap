@@ -9,6 +9,7 @@
  * running in embedded mode and read the host-supplied configuration.
  */
 import { createContext, useContext, type ReactNode } from 'react';
+import type { CapabilityModes } from './capabilities';
 
 /** Editor operating mode: create a new policy or edit an existing one. */
 export type EditorMode = 'create' | 'edit';
@@ -39,6 +40,7 @@ export interface TabVisibility {
  * The Web Component host listens for these events on the custom element.
  */
 export interface EmbeddedEventMap {
+  'policy-changed': { policy: Record<string, unknown> };
   /** Fired after a new policy is successfully saved. */
   'policy-created': { policy: Record<string, unknown>; id: string };
   /** Fired after an existing policy is successfully updated. */
@@ -98,6 +100,8 @@ export interface EmbeddedConfig {
    * Defaults to all tabs visible.
    */
   hiddenTabs: TabVisibility;
+  /** Where each backend operation is served from (see `capabilities.ts`). */
+  capabilities: CapabilityModes;
 }
 
 /** Full context value including an `isEmbedded` flag. */

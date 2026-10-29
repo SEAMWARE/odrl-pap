@@ -21,11 +21,17 @@
  * | `hide-raw-tab`           | Boolean — hides the raw ODRL JSON editor tab         | absent     |
  * | `hide-template-tab`      | Boolean — hides the template selection tab           | absent     |
  * | `hide-template-create-tab` | Boolean — hides the template management tab        | absent     |
+ * | `load`                   | `"remote"` or `"none"` — fetch the policy in edit mode | `"remote"` |
+ * | `save`                   | `"remote"` or `"none"` — store the policy in the PAP  | `"remote"` |
+ * | `validate`               | `"remote"` or `"none"` — validate against the PAP     | `"remote"` |
+ * | `templates`              | `"remote"` or `"none"` — list/manage PAP templates    | `"remote"` |
+ * | `mappings`               | `"remote"` or `"none"` — fetch builder mappings       | `"remote"` |
  *
  * ## Custom Events
  *
  * | Event              | Detail                                      |
  * |--------------------|---------------------------------------------|
+ * | `policy-changed`   | `{ policy: OdrlPolicyJson }`                |
  * | `policy-created`   | `{ policy: OdrlPolicyJson, id: string }`    |
  * | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string }`    |
  * | `policy-validated` | `{ result: ValidationResponse }`            |
@@ -40,6 +46,8 @@
  * - `fieldTemplate` — a {@link FieldTemplate} object to pre-fill and constrain the editor
  * - `policyContext` — custom JSON-LD `@context` object/string for new policies
  * - `serviceId` — service ID string for service-scoped policy operations
+ * - `policy` — the working policy (object or JSON text); read it back for the current value
+ * - `mappings` — builder dropdown mappings, used instead of fetching them
  *
  * @example
  * ```html
@@ -68,6 +76,9 @@ import type { DeepPartial } from '../i18n/I18nContext';
 import type { I18nStrings } from '../i18n/en';
 import type { ThemeConfig } from '../theme/defaultTheme';
 import type { FieldTemplate } from '../types';
+import type { OdrlPolicyJson } from '../services/api';
+import type { Mappings } from '../api';
+import { CAPABILITIES, resolveCapabilities } from './capabilities';
 
 // Bootstrap CSS imported as a string for shadow-DOM injection.
 // The `?inline` suffix tells Vite to return the CSS text, not inject it
@@ -134,6 +145,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       'api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale',
       'policy-context', 'service-id',
       'hide-builder-tab', 'hide-raw-tab', 'hide-template-tab', 'hide-template-create-tab',
+      ...CAPABILITIES,
     ];
   }
 
@@ -160,6 +172,61 @@ export class OdrlPolicyEditorElement extends HTMLElement {
 
   /** Service ID for service-scoped policy operations, set via JS property. */
   private _serviceId: string | undefined;
+
+  /** Working policy: set by the host, then kept up to date from `policy-changed`. */
+  private _policy: OdrlPolicyJson | undefined;
+
+  /** Mappings supplied by the host, set via JS property. */
+  private _mappings: Mappings | undefined;
+
+  /**
+   * Sets the policy shown in the editor (JS property, not HTML attribute).
+   *
+   * Accepts the policy object or its JSON text; text that does not parse is
+   * ignored with a warning. Reading it back returns the policy as last edited,
+   * so it can be used as the editor's value.
+   *
+   * @example
+   * ```js
+   * editor.policy = { '@context': { odrl: 'http://www.w3.org/ns/odrl/2/' }, ... };
+   * editor.addEventListener('policy-changed', (e) => save(e.detail.policy));
+   * ```
+   */
+  set policy(value: OdrlPolicyJson | string | undefined) {
+    if (typeof value === 'string') {
+      try {
+        this._policy = JSON.parse(value) as OdrlPolicyJson;
+      } catch {
+        console.warn(`<${TAG_NAME}>: ignoring \`policy\`, it is not valid JSON`);
+        return;
+      }
+    } else {
+      this._policy = value;
+    }
+    this.renderReact();
+  }
+
+  /** Returns the policy as last set by the host or edited by the user. */
+  get policy(): OdrlPolicyJson | undefined {
+    return this._policy;
+  }
+
+  /**
+   * Sets the mappings (actions, operators, operands...) the visual builder
+   * offers in its dropdowns (JS property).
+   *
+   * When set, the builder does not fetch `/mappings` from the PAP. Required
+   * for a usable builder when `mappings="none"`.
+   */
+  set mappings(value: Mappings | undefined) {
+    this._mappings = value;
+    this.renderReact();
+  }
+
+  /** Returns the host-supplied mappings, or `undefined` if none are set. */
+  get mappings(): Mappings | undefined {
+    return this._mappings;
+  }
 
   /**
    * Sets partial i18n string overrides (JS property, not HTML attribute).
@@ -418,6 +485,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       onEvent: this.dispatchComponentEvent.bind(this),
       serviceId: this.resolveServiceId(),
       hiddenTabs: this.resolveHiddenTabs(),
+      capabilities: resolveCapabilities((name) => this.getAttribute(name)),
       ...(policyContext !== undefined && { policyContext }),
     };
   }
@@ -431,6 +499,10 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     type: K,
     detail: unknown,
   ): void {
+    // Keep the `policy` property in sync with the editor without re-rendering.
+    if (type === 'policy-changed') {
+      this._policy = (detail as { policy: OdrlPolicyJson }).policy;
+    }
     this.dispatchEvent(
       new CustomEvent(type, {
         detail,
@@ -473,6 +545,8 @@ export class OdrlPolicyEditorElement extends HTMLElement {
           themeOverrides: this._themeConfig,
           containerRef: this.containerRef,
           fieldTemplate: this._fieldTemplate,
+          policy: this._policy,
+          mappings: this._mappings,
         }),
       );
     });

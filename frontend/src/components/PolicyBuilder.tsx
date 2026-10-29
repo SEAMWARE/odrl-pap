@@ -25,6 +25,7 @@ import { useTemplateMode } from '../hooks/useTemplateMode';
 import { useI18n } from '../i18n';
 import type { FieldTemplate } from '../types';
 import type { OdrlPolicyJson } from '../services/api';
+import type { Mappings } from '../api';
 import ConstraintBuilder from './ConstraintBuilder';
 import TargetEditor from './TargetEditor';
 import AssigneeEditor from './AssigneeEditor';
@@ -50,6 +51,11 @@ interface PolicyBuilderProps {
   setPolicy: (policy: OdrlPolicyJson) => void;
   /** Optional field template to pre-fill and constrain the policy form. */
   fieldTemplate?: FieldTemplate;
+  /**
+   * Mappings supplied by the host. When set, the builder does not fetch
+   * `/mappings` from the backend and uses these instead.
+   */
+  mappings?: Mappings;
 }
 
 /**
@@ -112,8 +118,8 @@ const SectionHeader = ({
  * Visual policy builder with guided steps, namespace-grouped dropdowns,
  * contextual help, loading/error states, and optional template support.
  */
-const PolicyBuilder = ({ policy, setPolicy, fieldTemplate }: PolicyBuilderProps) => {
-  const { mappings, loading, error, retry } = useMappings();
+const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMappings }: PolicyBuilderProps) => {
+  const { mappings, loading, error, retry } = useMappings(providedMappings);
   const { strings } = useI18n();
   const t = strings.policyBuilder;
   const tt = strings.templateMode;

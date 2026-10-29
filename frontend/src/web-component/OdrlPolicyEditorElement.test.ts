@@ -174,6 +174,11 @@ describe('OdrlPolicyEditorElement', () => {
       'hide-raw-tab',
       'hide-template-tab',
       'hide-template-create-tab',
+      'load',
+      'save',
+      'validate',
+      'templates',
+      'mappings',
     ]);
   });
 
@@ -489,5 +494,103 @@ describe('OdrlPolicyEditorElement', () => {
     expect(hidden.hideBuilderTab).toBe(false);
     expect(hidden.hideRawTab).toBe(false);
     expect(hidden.hideTemplateCreateTab).toBe(false);
+  });
+
+  // -----------------------------------------------------------
+  // Capabilities, policy and mappings
+  // -----------------------------------------------------------
+  const mockRenderConfig = (_el: unknown) =>
+    (mockRender.mock.calls.at(-1)?.[0] as { props: { config: unknown } }).props.config;
+  type RenderedProps = {
+    config: { capabilities: Record<string, string> };
+    policy?: Record<string, unknown>;
+    mappings?: Record<string, unknown>;
+  };
+  const lastProps = () =>
+    (mockRender.mock.calls.at(-1)![0] as { props: RenderedProps }).props;
+
+  it('observes the capability attributes', () => {
+    for (const name of ['load', 'save', 'validate', 'templates', 'mappings']) {
+      expect(OdrlPolicyEditorElement.observedAttributes).toContain(name);
+    }
+  });
+
+  it('serves every capability remotely by default', async () => {
+    document.body.appendChild(document.createElement(TAG_NAME));
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().config.capabilities).toEqual({
+      load: 'remote', save: 'remote', validate: 'remote', templates: 'remote', mappings: 'remote',
+    });
+  });
+
+  it('reads each capability independently from its attribute', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    el.setAttribute('save', 'none');
+    el.setAttribute('validate', 'none');
+    el.setAttribute('templates', 'bogus');
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().config.capabilities).toMatchObject({
+      save: 'none', validate: 'none', templates: 'remote', load: 'remote', mappings: 'remote',
+    });
+  });
+
+  it('passes the policy property to the editor and re-renders', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    await vi.dynamicImportSettled();
+    mockRender.mockClear();
+
+    const policy = { '@type': 'odrl:Policy' };
+    el.policy = policy as never;
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().policy).toBe(policy);
+    expect(el.policy).toBe(policy);
+  });
+
+  it('parses a JSON string assigned to policy and ignores invalid text', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    document.body.appendChild(el);
+
+    el.policy = '{"@type":"odrl:Policy"}';
+    expect(el.policy).toEqual({ '@type': 'odrl:Policy' });
+
+    el.policy = '{not json';
+    expect(el.policy).toEqual({ '@type': 'odrl:Policy' });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('keeps the policy property in sync with policy-changed without re-rendering', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    await vi.dynamicImportSettled();
+    const { onEvent } = mockRenderConfig(el) as { onEvent: (t: string, d: unknown) => void };
+    mockRender.mockClear();
+
+    const onChange = vi.fn();
+    el.addEventListener('policy-changed', onChange);
+    const edited = { '@type': 'odrl:Agreement' };
+    onEvent('policy-changed', { policy: edited });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(el.policy).toBe(edited);
+    expect(mockRender).not.toHaveBeenCalled();
+  });
+
+  it('passes the mappings property to the editor', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    await vi.dynamicImportSettled();
+
+    const mappings = { actions: [{ value: 'odrl:use', label: 'Use' }] };
+    el.mappings = mappings as never;
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().mappings).toBe(mappings);
   });
 });

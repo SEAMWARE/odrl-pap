@@ -335,6 +335,11 @@ at runtime triggers a re-render automatically.
 | `hide-raw-tab`  | Boolean — hides the raw ODRL JSON editor tab  | absent (visible) |
 | `hide-template-tab` | Boolean — hides the template selection tab | absent (visible) |
 | `hide-template-create-tab` | Boolean — hides the template management tab (create/edit/delete templates) | absent (visible) |
+| `load`          | `"remote"` \| `"none"` — fetch the policy when `mode="edit"` | `"remote"` |
+| `save`          | `"remote"` \| `"none"` — store the policy in the PAP; `none` removes the Save button | `"remote"` |
+| `validate`      | `"remote"` \| `"none"` — validate against the PAP; `none` removes the Validate button and panel | `"remote"` |
+| `templates`     | `"remote"` \| `"none"` — list and manage PAP templates; `none` removes both template tabs | `"remote"` |
+| `mappings`      | `"remote"` \| `"none"` — fetch the visual builder's dropdown mappings | `"remote"` |
 
 Boolean attributes follow the HTML convention: their **presence** means `true`
 (the tab is hidden) and their **absence** means `false` (the tab is visible).
@@ -358,6 +363,31 @@ editor.setAttribute('locale', 'de');
 editor.setAttribute('api-base-url', 'https://new-api.example.com');
 ```
 
+#### Backend capabilities
+
+`load`, `save`, `validate`, `templates` and `mappings` decide, one by one,
+whether the editor talks to the PAP. Each defaults to `remote` (the behaviour
+of earlier versions); `none` makes no request and hides the UI that depends on
+it. Unknown values fall back to `remote`.
+
+Used as a form control — the host owns the policy and nothing goes to the PAP:
+
+```html
+<odrl-policy-editor
+  load="none" save="none" validate="none" templates="none" mappings="none"
+></odrl-policy-editor>
+```
+
+```javascript
+editor.policy = existingPolicy;            // object or JSON text
+editor.mappings = { actions: [...], operators: [...], leftOperands: [...] };
+editor.addEventListener('policy-changed', (e) => store(e.detail.policy));
+```
+
+With `mappings="none"` the visual builder needs the `mappings` property to
+populate its dropdowns; the raw JSON tab works without it. With `save="none"`,
+filling in a template loads the result into the editor instead of storing it.
+
 ### JavaScript Properties
 
 For richer configuration that cannot be expressed as string attributes, use
@@ -370,6 +400,8 @@ JavaScript properties on the element:
 | `fieldTemplate` | `FieldTemplate`            | Pre-fills the builder form and optionally locks fields (client-side; distinct from stored templates) |
 | `policyContext` | `Record<string, string>`   | Default `@context` for new policies (takes precedence over attribute) |
 | `serviceId`   | `string`                     | Service scope for policy/template operations (takes precedence over attribute) |
+| `policy`      | `object \| string`           | The working policy (object or JSON text); reads back the latest edit |
+| `mappings`    | `Mappings`                   | Builder dropdown mappings; when set, `/mappings` is not fetched |
 
 ```javascript
 const editor = document.querySelector('odrl-policy-editor');
@@ -419,6 +451,7 @@ Events bubble and cross Shadow DOM boundaries (`composed: true`).
 | `editor-cancelled` | `{}`                                        | The user clicks Cancel           |
 | `template-created` | `{ template: object, id: string }`          | A new template is created in the management tab |
 | `template-updated` | `{ template: object, id: string }`          | An existing template is updated in the management tab |
+| `policy-changed`   | `{ policy: OdrlPolicyJson }`                | The policy is edited (builder, raw JSON or template); not for the initial or host-set policy |
 
 ```javascript
 const editor = document.querySelector('odrl-policy-editor');
