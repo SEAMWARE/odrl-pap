@@ -33,15 +33,24 @@
     "node": ">=20.19"
   },
   "scripts": {
+    "prepare": "node scripts/generate-default-mappings.mjs --if-present",
+    "predev": "node scripts/generate-default-mappings.mjs --if-present",
     "dev": "vite",
+    "prebuild": "node scripts/generate-default-mappings.mjs --if-present",
     "build": "tsc -b && vite build",
+    "prebuild:component": "node scripts/generate-default-mappings.mjs",
     "build:component": "vite build --config vite.component.config.ts && cp src/web-component/types.d.ts dist-component/odrl-policy-editor.d.ts",
     "lint": "eslint .",
     "preview": "vite preview",
+    "pretest": "node scripts/generate-default-mappings.mjs --if-present",
     "test": "vitest run",
+    "pretest:watch": "node scripts/generate-default-mappings.mjs --if-present",
     "test:watch": "vitest",
+    "pretest:coverage": "node scripts/generate-default-mappings.mjs --if-present",
     "test:coverage": "vitest run --coverage",
+    "pretest:ci": "node scripts/generate-default-mappings.mjs --if-present",
     "test:ci": "vitest run --reporter=verbose",
+    "generate-default-mappings": "node scripts/generate-default-mappings.mjs",
     "generate-api": "openapi --input ../api/odrl.yaml --output ./src/api --client axios"
   },
   "dependencies": {

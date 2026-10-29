@@ -14,6 +14,7 @@ your stack.
 - [Vue 2](#vue-2)
 - [Vue 3](#vue-3)
 - [Svelte](#svelte)
+- [Without the PAP Backend](#without-the-pap-backend)
 - [Server-Side Rendering (SSR)](#server-side-rendering-ssr)
 - [Security Considerations](#security-considerations)
 - [Performance Optimization](#performance-optimization)
@@ -435,6 +436,41 @@ is needed.
 
 ---
 
+## Without the PAP Backend
+
+Each operation that talks to the PAP can be switched off on its own with an
+attribute set to `none` (the default is `remote`): `load`, `save`, `validate`,
+`templates` and `mappings`. With all of them off the editor is a plain form
+control — you set the policy and read it back from `policy-changed`; no
+`api-base-url` or `auth-token` is needed.
+
+```html
+<odrl-policy-editor
+  load="none" save="none" validate="none" templates="none" mappings="none"
+></odrl-policy-editor>
+```
+
+```javascript
+editor.policy = existingPolicy;               // object or JSON text
+editor.addEventListener('policy-changed', (e) => store(e.detail.policy));
+```
+
+In Angular (with `CUSTOM_ELEMENTS_SCHEMA`) the same thing reads:
+
+```html
+<odrl-policy-editor
+  load="none" save="none" validate="none" templates="none" mappings="none"
+  [policy]="policy"
+  (policy-changed)="policy = $event.detail.policy"
+></odrl-policy-editor>
+```
+
+The visual builder offers the mappings the PAP ships with. Set the `mappings`
+property to add to them or, with the same `name`, replace them. See the
+[README](../README.md#backend-capabilities) for details.
+
+---
+
 ## Server-Side Rendering (SSR)
 
 The `<odrl-policy-editor>` custom element requires a browser DOM
@@ -606,6 +642,14 @@ via versioned URLs.
 | `theme` | `"light" \| "dark"` | `"light"` | Theme preset |
 | `locale` | `string` | `"en"` | Language code |
 | `policy-context` | `string` (JSON) | `null` | Default JSON-LD `@context` for new policies |
+| `summary` | `"side" \| "tab" \| "none"` | `"side"` | Where the policy summary is shown; `tab` suits narrow containers |
+| `hide-cancel-button` | boolean | absent | Hides the Cancel button |
+| `variant` | `"card" \| "plain"` | `"card"` | Editor framed as a card, or without chrome (for hosts that already provide one) |
+| `load` | `"remote" \| "none"` | `"remote"` | Fetch the policy when `mode="edit"` |
+| `save` | `"remote" \| "none"` | `"remote"` | Store the policy in the PAP; `none` hides Save |
+| `validate` | `"remote" \| "none"` | `"remote"` | Validate against the PAP; `none` hides Validate |
+| `templates` | `"remote" \| "none"` | `"remote"` | List/manage PAP templates; `none` hides both template tabs |
+| `mappings` | `"remote" \| "none"` | `"remote"` | Fetch the builder's mappings; `none` uses the built-in ones |
 
 ### JavaScript Properties
 
@@ -615,6 +659,8 @@ via versioned URLs.
 | `themeConfig` | `object \| undefined` | CSS custom property overrides |
 | `template` | `object \| undefined` | Policy template to pre-fill and constrain the editor |
 | `policyContext` | `object \| string \| undefined` | JSON-LD `@context` (JS property takes precedence over attribute) |
+| `policy` | `object \| string \| undefined` | The working policy (object or JSON text); reads back the latest edit |
+| `mappings` | `object \| undefined` | Builder mappings, layered over the PAP's built-in ones (same `name` wins) |
 
 ### Custom Events
 
@@ -624,6 +670,7 @@ via versioned URLs.
 | `policy-updated` | `{ policy: object, id: string }` | An existing policy was updated |
 | `policy-validated` | `{ result: object }` | Policy validation completed |
 | `editor-cancelled` | `{}` | The user clicked Cancel |
+| `policy-changed` | `{ policy: object }` | The policy was edited (not fired for the initial or host-set policy) |
 
 For complete type definitions, see the
 [TypeScript declarations](https://www.npmjs.com/package/@seamware/odrl-policy-editor)

@@ -8,7 +8,6 @@
 import { Form, Row, Col, Button, Stack, Card, Badge } from 'react-bootstrap';
 import type { Mappings } from '../services/api';
 import type { Mapping } from '../api';
-import { useState, useEffect } from 'react';
 import { useI18n } from '../i18n';
 import NamespacedDropdown from './NamespacedDropdown';
 
@@ -49,6 +48,44 @@ interface ConstraintData {
  */
 function getParameterCount(operands: Mapping[], operandName: string): number {
   return operands.find((operand) => operand.name === operandName)?.parameterCount ?? 0;
+}
+
+/** Ordered AND: the builder has no grouping for it, so it is shown read-only instead of dropped. */
+const ANDSEQUENCE_TYPE = 'andSequence';
+
+/**
+ * Reads the constraints held by a parent's constraint property.
+ *
+ * Handles the three shapes ODRL allows: a logical constraint (`odrl:or` /
+ * `odrl:xone` / `odrl:and` / `odrl:andSequence`), a list (an implicit AND) and a lone constraint object, which
+ * templates commonly emit. Returns `undefined` when there is nothing to read.
+ */
+function readConstraints(
+  constraint: Record<string, unknown> | ConstraintData[] | undefined,
+): { logicalType: string; constraints: ConstraintData[] } | undefined {
+  if (!constraint) return undefined;
+  if (Array.isArray(constraint)) {
+    return { logicalType: 'and', constraints: constraint };
+  }
+  if (typeof constraint !== 'object') return undefined;
+  if (constraint['@type'] === 'odrl:LogicalConstraint') {
+    if (constraint['odrl:or']) {
+      return { logicalType: 'or', constraints: constraint['odrl:or'] as ConstraintData[] };
+    }
+    if (constraint['odrl:xone']) {
+      return { logicalType: 'xone', constraints: constraint['odrl:xone'] as ConstraintData[] };
+    }
+    if (constraint['odrl:and']) {
+      return { logicalType: 'and', constraints: constraint['odrl:and'] as ConstraintData[] };
+    }
+    if (constraint['odrl:andSequence']) {
+      return { logicalType: ANDSEQUENCE_TYPE, constraints: constraint['odrl:andSequence'] as ConstraintData[] };
+    }
+    return undefined;
+  }
+  // A single constraint object (a lone constraint/refinement rather than an array):
+  // load it as a one-element list so it becomes editable instead of being dropped.
+  return { logicalType: 'and', constraints: [constraint as ConstraintData] };
 }
 
 /**
@@ -99,72 +136,45 @@ const ConstraintBuilder = ({
   parent,
   setParent,
   mappings,
-  locked = false,
+  locked: lockedProp = false,
   propertyKey = DEFAULT_PROPERTY_KEY,
 }: ConstraintBuilderProps) => {
   const { strings } = useI18n();
   const t = strings.constraintBuilder;
 
-  const [internalConstraints, setInternalConstraints] = useState<ConstraintData[]>([]);
-  const [logicalType, setLogicalType] = useState('and');
+  // The parent is the single source of truth: the constraints and their logical grouping are read
+  // from it on every render and every edit is written straight back. An earlier version kept its own
+  // copy of the list in state and synced it with the parent through two effects; when both copies
+  // changed in the same render the effects swapped them back and forth forever ("Maximum update
+  // depth exceeded", the value flickering), whenever the editor opened a policy that had
+  // constraints or the user typed quickly.
+  const parentConstraint = parent[propertyKey] as Record<string, unknown> | ConstraintData[] | undefined;
+  const held = readConstraints(parentConstraint);
+  const internalConstraints: ConstraintData[] = held?.constraints ?? [];
+  const logicalType = held?.logicalType ?? 'and';
+  const locked = lockedProp || logicalType === ANDSEQUENCE_TYPE;
 
-  /** The parent's raw constraint value, extracted for dependency tracking. */
-  const parentConstraint = parent[propertyKey];
-
-  // Sync internal state from parent constraint
-  useEffect(() => {
-    const constraint = parentConstraint as Record<string, unknown> | ConstraintData[] | undefined;
-    if (constraint) {
-      if (
-        typeof constraint === 'object' &&
-        !Array.isArray(constraint) &&
-        constraint['@type'] === 'odrl:LogicalConstraint'
-      ) {
-        if (constraint['odrl:or']) {
-          setLogicalType('or');
-          setInternalConstraints(constraint['odrl:or'] as ConstraintData[]);
-        } else if (constraint['odrl:xone']) {
-          setLogicalType('xone');
-          setInternalConstraints(constraint['odrl:xone'] as ConstraintData[]);
-        }
-      } else if (Array.isArray(constraint)) {
-        setLogicalType('and');
-        setInternalConstraints(constraint);
-      } else if (typeof constraint === 'object') {
-        // A single constraint object (ODRL allows a lone constraint/refinement
-        // rather than an array). Templates commonly emit this form; load it as
-        // a one-element list so it becomes editable instead of being dropped.
-        setLogicalType('and');
-        setInternalConstraints([constraint as ConstraintData]);
-      }
-    }
-  }, [parentConstraint]);
-
-  // Propagate changes back to parent
-  useEffect(() => {
-    if (logicalType === 'and') {
-      setParent({ ...parent, [propertyKey]: internalConstraints });
-    } else {
-      const logicalKey = `odrl:${logicalType}`;
-      const logicalConstraint = {
-        '@type': 'odrl:LogicalConstraint',
-        [logicalKey]: internalConstraints,
-      };
-      setParent({ ...parent, [propertyKey]: logicalConstraint });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [internalConstraints, logicalType]);
+  /** Writes a list (and, optionally, a new logical grouping) into the parent. */
+  const write = (constraints: ConstraintData[], type: string = logicalType) => {
+    setParent({
+      ...parent,
+      [propertyKey]:
+        type === 'and'
+          ? constraints
+          : { '@type': 'odrl:LogicalConstraint', [`odrl:${type}`]: constraints },
+    });
+  };
 
   const handleConstraintChange = (index: number, field: string, value: unknown) => {
     const newConstraints = [...internalConstraints];
     newConstraints[index] = { ...newConstraints[index], [field]: value };
-    setInternalConstraints(newConstraints);
+    write(newConstraints);
   };
 
   const replaceConstraint = (index: number, constraint: ConstraintData) => {
     const newConstraints = [...internalConstraints];
     newConstraints[index] = constraint;
-    setInternalConstraints(newConstraints);
+    write(newConstraints);
   };
 
   /**
@@ -199,13 +209,13 @@ const ConstraintBuilder = ({
   };
 
   const addConstraint = () => {
-    setInternalConstraints([...internalConstraints, {} as ConstraintData]);
+    write([...internalConstraints, {} as ConstraintData]);
   };
 
   const removeConstraint = (index: number) => {
     const newConstraints = [...internalConstraints];
     newConstraints.splice(index, 1);
-    setInternalConstraints(newConstraints);
+    write(newConstraints);
   };
 
   const handleRightOperandTypeChange = (index: number, type: 'named' | 'literal') => {
@@ -247,13 +257,14 @@ const ConstraintBuilder = ({
                   <Form.Label className="fw-bold mb-1">{t.groupingLabel}</Form.Label>
                   <Form.Select
                     value={logicalType}
-                    onChange={(e) => setLogicalType(e.target.value)}
+                    onChange={(e) => write(internalConstraints, e.target.value)}
                     aria-label={t.groupingLabel}
                     disabled={locked}
                   >
                     <option value="and">{t.groupingAnd}</option>
                     <option value="or">{t.groupingOr}</option>
                     <option value="xone">{t.groupingXone}</option>
+                    {logicalType === ANDSEQUENCE_TYPE && <option value={ANDSEQUENCE_TYPE}>andSequence</option>}
                   </Form.Select>
                 </Form.Group>
               </Col>
@@ -412,7 +423,7 @@ const ConstraintBuilder = ({
 
       {/* Add constraint button */}
       <div>
-        <Button variant="success" onClick={addConstraint} disabled={locked}>
+        <Button variant="outline-primary" onClick={addConstraint} disabled={locked}>
           + {t.addConstraint}
         </Button>
       </div>
