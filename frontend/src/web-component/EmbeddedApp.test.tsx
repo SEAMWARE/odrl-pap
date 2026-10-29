@@ -285,3 +285,59 @@ describe('EmbeddedApp policy value', () => {
     });
   });
 });
+
+describe('EmbeddedApp layout flags', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(TemplateService.getTemplates).mockResolvedValue([]);
+    vi.mocked(UiService.getMappings).mockResolvedValue({});
+  });
+
+  const NO_REMOTE_ACTIONS = withNone('save', 'validate', 'mappings', 'templates');
+
+  it('shows the summary beside the builder and no summary tab by default', () => {
+    render(<EmbeddedApp config={{ ...NO_REMOTE_ACTIONS }} />);
+
+    expect(screen.queryByRole('tab', { name: 'Summary' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Policy Summary').length).toBeGreaterThan(0);
+  });
+
+  it('moves the summary to its own tab when summary is tab', () => {
+    render(<EmbeddedApp config={{ ...NO_REMOTE_ACTIONS, summaryPlacement: 'tab' }} />);
+
+    expect(screen.getByRole('tab', { name: 'Summary' })).toBeInTheDocument();
+    // Only the tab renders it now, not the builder's side column.
+    expect(screen.getAllByText('Policy Summary')).toHaveLength(1);
+  });
+
+  it('shows no summary at all when summary is none', () => {
+    render(<EmbeddedApp config={{ ...NO_REMOTE_ACTIONS, summaryPlacement: 'none' }} />);
+
+    expect(screen.queryByRole('tab', { name: 'Summary' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Policy Summary')).not.toBeInTheDocument();
+  });
+
+  it('hides the Cancel button with hide-cancel-button', () => {
+    render(<EmbeddedApp config={{ ...CONFIG, hiddenButtons: { hideCancelButton: true } }} />);
+
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+  });
+
+  it('renders no action row when every button is off', () => {
+    render(
+      <EmbeddedApp config={{ ...NO_REMOTE_ACTIONS, hiddenButtons: { hideCancelButton: true } }} />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Validate' })).not.toBeInTheDocument();
+  });
+
+  it('keeps Cancel by default', () => {
+    render(<EmbeddedApp config={NO_REMOTE_ACTIONS} />);
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+  });
+});
+

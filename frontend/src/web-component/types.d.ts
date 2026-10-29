@@ -35,6 +35,22 @@ export type CapabilityMode = 'remote' | 'none';
 export type CapabilityModes = Record<Capability, CapabilityMode>;
 
 // ---------------------------------------------------------------------------
+// Layout
+// ---------------------------------------------------------------------------
+
+/**
+ * Where the live policy summary is shown: `"side"` (a column beside the
+ * builder, wide screens only), `"tab"` (its own tab) or `"none"`.
+ */
+export type SummaryPlacement = 'side' | 'tab' | 'none';
+
+/** Action buttons the host can hide; each, when `true`, hides its button. */
+export interface ButtonVisibility {
+  /** When `true`, hides the Cancel button. */
+  hideCancelButton: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Tab visibility
 // ---------------------------------------------------------------------------
 
@@ -146,6 +162,10 @@ export interface EmbeddedConfig {
   hiddenTabs: TabVisibility;
   /** Where each backend operation is served from. All `"remote"` by default. */
   capabilities: CapabilityModes;
+  /** Where the policy summary is shown. Defaults to `"side"`. */
+  summaryPlacement: SummaryPlacement;
+  /** Which action buttons are hidden. */
+  hiddenButtons: ButtonVisibility;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,6 +194,8 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | `hide-raw-tab`             | Boolean — hides the raw ODRL JSON editor tab    | absent |
  * | `hide-template-tab`        | Boolean — hides the template selection tab      | absent |
  * | `hide-template-create-tab` | Boolean — hides the template management tab     | absent |
+ * | `summary`        | `"side"` \| `"tab"` \| `"none"` — where the policy summary is shown | `"side"` |
+ * | `hide-cancel-button` | Boolean — hides the Cancel button            | absent |
  * | `load`           | `"remote"` \| `"none"` — fetch the policy when `mode="edit"` | `"remote"` |
  * | `save`           | `"remote"` \| `"none"` — store the policy in the PAP (Save button) | `"remote"` |
  * | `validate`       | `"remote"` \| `"none"` — validate against the PAP (Validate button) | `"remote"` |

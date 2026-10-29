@@ -335,6 +335,8 @@ at runtime triggers a re-render automatically.
 | `hide-raw-tab`  | Boolean — hides the raw ODRL JSON editor tab  | absent (visible) |
 | `hide-template-tab` | Boolean — hides the template selection tab | absent (visible) |
 | `hide-template-create-tab` | Boolean — hides the template management tab (create/edit/delete templates) | absent (visible) |
+| `summary`       | `"side"` \| `"tab"` \| `"none"` — where the live policy summary is shown | `"side"` |
+| `hide-cancel-button` | Boolean — hides the Cancel button (e.g. when the host provides its own) | absent (visible) |
 | `load`          | `"remote"` \| `"none"` — fetch the policy when `mode="edit"` | `"remote"` |
 | `save`          | `"remote"` \| `"none"` — store the policy in the PAP; `none` removes the Save button | `"remote"` |
 | `validate`      | `"remote"` \| `"none"` — validate against the PAP; `none` removes the Validate button and panel | `"remote"` |
@@ -362,6 +364,23 @@ editor.setAttribute('theme', 'dark');
 editor.setAttribute('locale', 'de');
 editor.setAttribute('api-base-url', 'https://new-api.example.com');
 ```
+
+#### Layout: summary and Cancel
+
+The live policy summary sits in a column beside the visual builder, which only
+makes sense on wide screens (the breakpoint follows the viewport, not the
+space the editor actually has, so it also misfires inside a narrow modal or
+panel). `summary="tab"` moves it to its own **Summary** tab and gives the
+builder the full width; `summary="none"` removes it.
+
+`hide-cancel-button` hides the Cancel button, for hosts that already provide
+their own (a modal's footer, say). With `save` and `validate` also `none`, no
+action row is rendered at all.
+
+The editor renders inside a Shadow DOM, but its sticky summary used
+`z-index: 1020`, which competed with the host page's own stacking contexts.
+The element now isolates its stacking context, so nothing inside it can paint
+over the host page.
 
 #### Backend capabilities
 

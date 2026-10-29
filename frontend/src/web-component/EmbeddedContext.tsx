@@ -39,6 +39,20 @@ export interface TabVisibility {
  *
  * The Web Component host listens for these events on the custom element.
  */
+/**
+ * Where the live policy summary is shown: `side` is a column beside the
+ * builder (wide screens only), `tab` is an extra tab, `none` hides it.
+ */
+export type SummaryPlacement = 'side' | 'tab' | 'none';
+
+/** Default placement, the layout of earlier versions. */
+export const DEFAULT_SUMMARY_PLACEMENT: SummaryPlacement = 'side';
+
+/** Action buttons the host can hide; each, when `true`, hides its button. */
+export interface ButtonVisibility {
+  hideCancelButton: boolean;
+}
+
 export interface EmbeddedEventMap {
   'policy-changed': { policy: Record<string, unknown> };
   /** Fired after a new policy is successfully saved. */
@@ -102,6 +116,10 @@ export interface EmbeddedConfig {
   hiddenTabs: TabVisibility;
   /** Where each backend operation is served from (see `capabilities.ts`). */
   capabilities: CapabilityModes;
+  /** Where the policy summary is shown. */
+  summaryPlacement: SummaryPlacement;
+  /** Which action buttons are hidden. */
+  hiddenButtons: ButtonVisibility;
 }
 
 /** Full context value including an `isEmbedded` flag. */

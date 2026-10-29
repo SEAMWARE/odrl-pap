@@ -174,6 +174,8 @@ describe('OdrlPolicyEditorElement', () => {
       'hide-raw-tab',
       'hide-template-tab',
       'hide-template-create-tab',
+      'summary',
+      'hide-cancel-button',
       'load',
       'save',
       'validate',
@@ -592,5 +594,58 @@ describe('OdrlPolicyEditorElement', () => {
 
     await vi.dynamicImportSettled();
     expect(lastProps().mappings).toBe(mappings);
+  });
+
+  // -----------------------------------------------------------
+  // Summary placement, cancel button, stacking
+  // -----------------------------------------------------------
+  type LayoutConfig = { summaryPlacement: string; hiddenButtons: { hideCancelButton: boolean } };
+  const lastLayout = () =>
+    (mockRender.mock.calls.at(-1)![0] as { props: { config: LayoutConfig } }).props.config;
+
+  it('places the summary at the side by default', async () => {
+    document.body.appendChild(document.createElement(TAG_NAME));
+
+    await vi.dynamicImportSettled();
+    expect(lastLayout().summaryPlacement).toBe('side');
+  });
+
+  it('reads the summary placement and falls back to side for unknown values', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    el.setAttribute('summary', ' TAB ');
+    document.body.appendChild(el);
+    await vi.dynamicImportSettled();
+    expect(lastLayout().summaryPlacement).toBe('tab');
+
+    el.setAttribute('summary', 'none');
+    await vi.dynamicImportSettled();
+    expect(lastLayout().summaryPlacement).toBe('none');
+
+    el.setAttribute('summary', 'bottom');
+    await vi.dynamicImportSettled();
+    expect(lastLayout().summaryPlacement).toBe('side');
+  });
+
+  it('reads hide-cancel-button as a boolean attribute', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+    await vi.dynamicImportSettled();
+    expect(lastLayout().hiddenButtons.hideCancelButton).toBe(false);
+
+    el.setAttribute('hide-cancel-button', '');
+    await vi.dynamicImportSettled();
+    expect(lastLayout().hiddenButtons.hideCancelButton).toBe(true);
+
+    el.setAttribute('hide-cancel-button', 'false');
+    await vi.dynamicImportSettled();
+    expect(lastLayout().hiddenButtons.hideCancelButton).toBe(false);
+  });
+
+  it('isolates its stacking context so internal z-indexes cannot cover the host page', () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+
+    const css = el.shadowRoot!.querySelector('style')!.textContent!;
+    expect(css).toMatch(/:host\s*\{[^}]*isolation:\s*isolate/);
   });
 });

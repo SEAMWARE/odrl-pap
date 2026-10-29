@@ -37,6 +37,7 @@ import { I18nProvider, resolveStrings, type DeepPartial } from '../i18n';
 import type { I18nStrings } from '../i18n';
 import { lightTheme, darkTheme, type ThemeConfig } from '../theme/defaultTheme';
 import {
+  DEFAULT_SUMMARY_PLACEMENT,
   EmbeddedProvider,
   type EmbeddedConfig,
   type EmbeddedThemePreset,
@@ -49,6 +50,7 @@ import {
 } from '../utils/jsonLdContext';
 import { toPolicyId } from '../utils/policyId';
 import { DEFAULT_CAPABILITIES, isRemote } from './capabilities';
+import PolicySummary from '../components/PolicySummary';
 import { DEFAULT_MAPPINGS, mergeMappings } from './defaultMappings';
 
 /** Tab key for the template selection tab. */
@@ -57,6 +59,8 @@ const TAB_KEY_TEMPLATE = 'template';
 const TAB_KEY_BUILDER = 'builder';
 /** Tab key for the raw ODRL JSON editor tab. */
 const TAB_KEY_ODRL = 'odrl';
+/** Tab key for the policy summary tab (summary="tab"). */
+const TAB_KEY_SUMMARY = 'summary';
 /** Tab key for the template management (create/edit/delete) tab. */
 const TAB_KEY_MANAGE_TEMPLATES = 'manage-templates';
 
@@ -138,6 +142,8 @@ const EmbeddedApp = ({
 }: EmbeddedAppProps) => {
   const { apiBaseUrl, authToken, mode, policyId, locale, theme, onEvent, policyContext, serviceId, hiddenTabs } = config;
   const capabilities = config.capabilities ?? DEFAULT_CAPABILITIES;
+  const summaryPlacement = config.summaryPlacement ?? DEFAULT_SUMMARY_PLACEMENT;
+  const hideCancelButton = config.hiddenButtons?.hideCancelButton ?? false;
   const remoteLoad = isRemote(capabilities, 'load');
   const remoteSave = isRemote(capabilities, 'save');
   const remoteValidate = isRemote(capabilities, 'validate');
@@ -288,11 +294,13 @@ const EmbeddedApp = ({
           return !hiddenTabs.hideRawTab;
         case TAB_KEY_MANAGE_TEMPLATES:
           return showManageTemplatesTab;
+        case TAB_KEY_SUMMARY:
+          return summaryPlacement === 'tab';
         default:
           return false;
       }
     },
-    [showTemplateTab, showManageTemplatesTab, hiddenTabs.hideBuilderTab, hiddenTabs.hideRawTab],
+    [showTemplateTab, showManageTemplatesTab, summaryPlacement, hiddenTabs.hideBuilderTab, hiddenTabs.hideRawTab],
   );
 
   // --- Editor tab state ---
@@ -598,6 +606,7 @@ const EmbeddedApp = ({
                   setPolicy={setPolicy}
                   fieldTemplate={fieldTemplate}
                   mappings={builderMappings}
+                  showSummary={summaryPlacement === 'side'}
                 />
               </Tab>
             )}
@@ -681,6 +690,13 @@ const EmbeddedApp = ({
               </Tab>
             )}
 
+            {/* Policy summary tab — only when the summary is placed as a tab */}
+            {summaryPlacement === 'tab' && (
+              <Tab eventKey={TAB_KEY_SUMMARY} title={tabStrings.tabSummary}>
+                <PolicySummary policy={policy} />
+              </Tab>
+            )}
+
             {/* Template management tab — create/edit/delete templates */}
             {showManageTemplatesTab && (
               <Tab eventKey={TAB_KEY_MANAGE_TEMPLATES} title={tabStrings.tabManageTemplates}>
@@ -692,16 +708,18 @@ const EmbeddedApp = ({
           {/* Policy action buttons — shown only while editing a policy.
               Hidden in template-created read-only mode and on the template
               management tab, where policy save/validate is not applicable. */}
-          {!createdFromTemplate && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (
+          {!createdFromTemplate && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (remoteSave || remoteValidate || !hideCancelButton) && (
             <div className="d-flex gap-2 mt-3 mb-3">
               {remoteSave && (
                 <Button variant="primary" onClick={handleSave}>
                   Save
                 </Button>
               )}
-              <Button variant="secondary" onClick={handleCancel}>
-                Cancel
-              </Button>
+              {!hideCancelButton && (
+                <Button variant="secondary" onClick={handleCancel}>
+                  Cancel
+                </Button>
+              )}
               {remoteValidate && (
                 <Button
                   variant="info"

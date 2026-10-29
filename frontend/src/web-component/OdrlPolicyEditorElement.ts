@@ -21,6 +21,8 @@
  * | `hide-raw-tab`           | Boolean — hides the raw ODRL JSON editor tab         | absent     |
  * | `hide-template-tab`      | Boolean — hides the template selection tab           | absent     |
  * | `hide-template-create-tab` | Boolean — hides the template management tab        | absent     |
+ * | `summary`                | `"side"`, `"tab"` or `"none"` — where the policy summary is shown | `"side"` |
+ * | `hide-cancel-button`     | Boolean — hides the Cancel button                    | absent     |
  * | `load`                   | `"remote"` or `"none"` — fetch the policy in edit mode | `"remote"` |
  * | `save`                   | `"remote"` or `"none"` — store the policy in the PAP  | `"remote"` |
  * | `validate`               | `"remote"` or `"none"` — validate against the PAP     | `"remote"` |
@@ -79,6 +81,7 @@ import type { FieldTemplate } from '../types';
 import type { OdrlPolicyJson } from '../services/api';
 import type { Mappings } from '../api';
 import { CAPABILITIES, resolveCapabilities } from './capabilities';
+import { DEFAULT_SUMMARY_PLACEMENT, type ButtonVisibility, type SummaryPlacement } from './EmbeddedContext';
 
 // Bootstrap CSS imported as a string for shadow-DOM injection.
 // The `?inline` suffix tells Vite to return the CSS text, not inject it
@@ -121,7 +124,7 @@ const CONTAINER_CLASS = 'odrl-wc-container';
 function scopeCssForShadowDom(css: string): string {
   const rescoped = css.replace(/:root\b/g, ':host');
   const surface = `
-:host { display: block; }
+:host { display: block; isolation: isolate; }
 .${CONTAINER_CLASS} {
   font-family: var(--odrl-font-family);
   color: var(--odrl-text-color);
@@ -145,6 +148,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       'api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale',
       'policy-context', 'service-id',
       'hide-builder-tab', 'hide-raw-tab', 'hide-template-tab', 'hide-template-create-tab',
+      'summary', 'hide-cancel-button',
       ...CAPABILITIES,
     ];
   }
@@ -474,6 +478,17 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     };
   }
 
+  /** Resolves which action buttons are hidden from the `hide-*-button` boolean attributes. */
+  private resolveHiddenButtons(): ButtonVisibility {
+    return { hideCancelButton: this.readBooleanAttribute('hide-cancel-button') };
+  }
+
+  /** Reads the `summary` attribute; unknown values fall back to the default placement. */
+  private resolveSummaryPlacement(): SummaryPlacement {
+    const value = this.getAttribute('summary')?.trim().toLowerCase();
+    return value === 'side' || value === 'tab' || value === 'none' ? value : DEFAULT_SUMMARY_PLACEMENT;
+  }
+
   /** Builds the {@link EmbeddedConfig} from the current attribute values. */
   private buildConfig(): EmbeddedConfig {
     const policyContext = this.resolvePolicyContextAttr();
@@ -488,6 +503,8 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       serviceId: this.resolveServiceId(),
       hiddenTabs: this.resolveHiddenTabs(),
       capabilities: resolveCapabilities((name) => this.getAttribute(name)),
+      summaryPlacement: this.resolveSummaryPlacement(),
+      hiddenButtons: this.resolveHiddenButtons(),
       ...(policyContext !== undefined && { policyContext }),
     };
   }
