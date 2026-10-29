@@ -39,10 +39,21 @@ export interface TabVisibility {
  * The Web Component host listens for these events on the custom element.
  */
 export interface EmbeddedEventMap {
-  /** Fired after a new policy is successfully saved. */
-  'policy-created': { policy: Record<string, unknown>; id: string };
-  /** Fired after an existing policy is successfully updated. */
-  'policy-updated': { policy: Record<string, unknown>; id: string };
+  /**
+   * Fired after a new policy has been accepted by the editor.
+   *
+   * With `persist` enabled (the default) this follows a successful write to
+   * the PAP and `persisted` is `true`. With `persist` disabled the policy is
+   * never sent to the PAP, the event fires immediately and `persisted` is
+   * `false` — the host is then responsible for storing the policy.
+   */
+  'policy-created': { policy: Record<string, unknown>; id: string; persisted: boolean };
+  /**
+   * Fired after an existing policy has been updated in the editor.
+   *
+   * See {@link EmbeddedEventMap#policy-created} for the meaning of `persisted`.
+   */
+  'policy-updated': { policy: Record<string, unknown>; id: string; persisted: boolean };
   /** Fired after a policy validation completes. */
   'policy-validated': { result: Record<string, unknown> };
   /** Fired when the user clicks Cancel. */
@@ -98,6 +109,21 @@ export interface EmbeddedConfig {
    * Defaults to all tabs visible.
    */
   hiddenTabs: TabVisibility;
+  /**
+   * Whether saving a policy writes it to the PAP.
+   *
+   * When `true` (the default), the editor stores the policy through the
+   * policy API and emits `policy-created` / `policy-updated` with
+   * `persisted: true` afterwards.
+   *
+   * When `false`, no write request is issued: the editor emits the same
+   * events with `persisted: false` and the fully built ODRL policy in
+   * `detail.policy`, leaving storage to the host application. Read-only
+   * calls are unaffected — loading an existing policy in `edit` mode,
+   * fetching `/mappings` for the builder and running `/validate` still
+   * reach the PAP.
+   */
+  persist: boolean;
 }
 
 /** Full context value including an `isEmbedded` flag. */

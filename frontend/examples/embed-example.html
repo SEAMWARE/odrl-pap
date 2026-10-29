@@ -93,6 +93,12 @@
       />
     </div>
     <div>
+      <label for="persist-checkbox">
+        <input id="persist-checkbox" type="checkbox" />
+        Emit only (do not store in the PAP)
+      </label>
+    </div>
+    <div>
       <button id="apply-btn">Apply</button>
     </div>
   </div>
@@ -152,6 +158,15 @@
       editor.setAttribute('theme', theme);
       editor.setAttribute('locale', locale);
       editor.setAttribute('api-base-url', apiUrl);
+
+      // Emit-only mode: the editor builds the policy but never writes it.
+      // The resulting policy arrives in the `policy-created` event below
+      // with `detail.persisted === false`.
+      if (document.getElementById('persist-checkbox').checked) {
+        editor.setAttribute('persist', 'false');
+      } else {
+        editor.removeAttribute('persist');
+      }
     });
 
     // --- Demo: set i18n strings via JS property ---

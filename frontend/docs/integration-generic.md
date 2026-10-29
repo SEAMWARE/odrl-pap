@@ -17,6 +17,7 @@ your stack.
 - [Server-Side Rendering (SSR)](#server-side-rendering-ssr)
 - [Security Considerations](#security-considerations)
 - [Performance Optimization](#performance-optimization)
+- [Emit-Only Mode (No PAP Storage)](#emit-only-mode-no-pap-storage)
 - [Attributes & Events Reference](#attributes--events-reference)
 
 ---
@@ -593,6 +594,63 @@ via versioned URLs.
 
 ---
 
+## Emit-Only Mode (No PAP Storage)
+
+By default the editor writes the policy to the PAP and then reports it. If the
+host application wants to own storage — keeping the policy in its own database,
+attaching it to a draft contract, or reviewing it before it ever reaches a PAP —
+add `persist="false"`. The editor then issues no write request: on Save the
+finished ODRL policy is delivered through the usual `policy-created` /
+`policy-updated` events with `detail.persisted === false`.
+
+```html
+<odrl-policy-editor
+  id="editor"
+  api-base-url="https://pap.example.com"
+  persist="false"
+  hide-template-tab
+></odrl-policy-editor>
+
+<script type="module">
+  document.getElementById('editor').addEventListener('policy-created', async (e) => {
+    if (!e.detail.persisted) {
+      // Nothing was stored in the PAP — it is ours to keep.
+      await fetch('/api/drafts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: e.detail.id, policy: e.detail.policy }),
+      });
+    }
+  });
+</script>
+```
+
+The emitted `detail.id` is the policy's `odrl:uid` (generated when the user did
+not set one), so it can be used as the storage key.
+
+### Still requires a reachable PAP
+
+`persist="false"` suppresses **writes only**. These read-only calls still go to
+`api-base-url`:
+
+| Call | When | Required? |
+|------|------|-----------|
+| `GET /mappings` | always | **Yes** — the builder's vocabulary dropdowns come from it |
+| `GET /policy/{id}` | `mode="edit"` | only in edit mode |
+| `POST /validate` | user runs a validation | optional |
+| `GET /templates` | template picker visible | optional (`hide-template-tab` to skip) |
+
+Validation in particular cannot be done offline: policy evaluation is performed
+server-side by the PAP's OPA engine.
+
+### Template management is hidden
+
+The template management tab creates and edits templates through the PAP's
+template API. Since that contradicts "no writes", the tab is hidden whenever
+`persist="false"`, regardless of `hide-template-create-tab`.
+
+---
+
 ## Attributes & Events Reference
 
 ### HTML Attributes
@@ -606,6 +664,8 @@ via versioned URLs.
 | `theme` | `"light" \| "dark"` | `"light"` | Theme preset |
 | `locale` | `string` | `"en"` | Language code |
 | `policy-context` | `string` (JSON) | `null` | Default JSON-LD `@context` for new policies |
+| `service-id` | `string` | `null` | Service ID for service-scoped policy/template operations |
+| `persist` | `boolean` | `true` | `"false"` emits the built policy instead of storing it in the PAP |
 
 ### JavaScript Properties
 
@@ -620,8 +680,8 @@ via versioned URLs.
 
 | Event | Detail | Description |
 |-------|--------|-------------|
-| `policy-created` | `{ policy: object, id: string }` | A new policy was saved |
-| `policy-updated` | `{ policy: object, id: string }` | An existing policy was updated |
+| `policy-created` | `{ policy: object, id: string, persisted: boolean }` | A new policy was saved — or, with `persist="false"`, built and handed over |
+| `policy-updated` | `{ policy: object, id: string, persisted: boolean }` | An existing policy was updated |
 | `policy-validated` | `{ result: object }` | Policy validation completed |
 | `editor-cancelled` | `{}` | The user clicked Cancel |
 

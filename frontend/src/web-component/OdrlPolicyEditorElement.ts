@@ -17,6 +17,7 @@
  * | `locale`                 | Language code (e.g., `"en"`, `"de"`)                 | `"en"`     |
  * | `policy-context`         | JSON-LD `@context` for new policies (JSON)           | `null`     |
  * | `service-id`             | Service ID for service-scoped policy ops              | `null`     |
+ * | `persist`                | Boolean — `"false"` emits the policy without storing it | `true`   |
  * | `hide-builder-tab`       | Boolean — hides the visual policy builder tab        | absent     |
  * | `hide-raw-tab`           | Boolean — hides the raw ODRL JSON editor tab         | absent     |
  * | `hide-template-tab`      | Boolean — hides the template selection tab           | absent     |
@@ -24,10 +25,10 @@
  *
  * ## Custom Events
  *
- * | Event              | Detail                                      |
- * |--------------------|---------------------------------------------|
- * | `policy-created`   | `{ policy: OdrlPolicyJson, id: string }`    |
- * | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string }`    |
+ * | Event              | Detail                                                        |
+ * |--------------------|---------------------------------------------------------------|
+ * | `policy-created`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }`  |
+ * | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }`  |
  * | `policy-validated` | `{ result: ValidationResponse }`            |
  * | `editor-cancelled` | `{}`                                        |
  * | `template-created` | `{ template: object, id: string }`          |
@@ -59,6 +60,23 @@
  *   });
  * </script>
  * ```
+ *
+ * @example Emit-only mode — the host receives the policy and stores it itself
+ * ```html
+ * <odrl-policy-editor
+ *   api-base-url="https://pap.example.com"
+ *   persist="false"
+ * ></odrl-policy-editor>
+ *
+ * <script>
+ *   document
+ *     .querySelector('odrl-policy-editor')
+ *     .addEventListener('policy-created', (e) => {
+ *       // e.detail.persisted === false — nothing was written to the PAP
+ *       myBackend.store(e.detail.policy);
+ *     });
+ * </script>
+ * ```
  */
 import { createElement, createRef, type RefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -83,6 +101,11 @@ const DEFAULT_API_BASE_URL = '';
 const DEFAULT_MODE: EditorMode = 'create';
 const DEFAULT_THEME: EmbeddedThemePreset = 'light';
 const DEFAULT_LOCALE = 'en';
+/**
+ * Default for the `persist` attribute: policies are written to the PAP
+ * unless the host opts out with `persist="false"`.
+ */
+const DEFAULT_PERSIST = true;
 
 /** CSS class of the div the React tree is mounted into. */
 const CONTAINER_CLASS = 'odrl-wc-container';
@@ -132,7 +155,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
   static get observedAttributes(): string[] {
     return [
       'api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale',
-      'policy-context', 'service-id',
+      'policy-context', 'service-id', 'persist',
       'hide-builder-tab', 'hide-raw-tab', 'hide-template-tab', 'hide-template-create-tab',
     ];
   }
@@ -381,14 +404,30 @@ export class OdrlPolicyEditorElement extends HTMLElement {
    * would otherwise hide the tab and leave the editor blank.
    *
    * @param name - The attribute name.
+   * @param defaultValue - Value to use when the attribute is absent.
    * @returns `true` when the attribute is present and not explicitly false.
    */
-  private readBooleanAttribute(name: string): boolean {
+  private readBooleanAttribute(name: string, defaultValue = false): boolean {
     if (!this.hasAttribute(name)) {
-      return false;
+      return defaultValue;
     }
     const value = (this.getAttribute(name) ?? '').trim().toLowerCase();
     return value !== 'false' && value !== '0';
+  }
+
+  /**
+   * Resolves whether saving should write the policy to the PAP.
+   *
+   * Unlike the `hide-*-tab` attributes, `persist` defaults to `true`: an
+   * embedder that never sets it keeps the original store-then-emit
+   * behaviour. Setting `persist="false"` switches the editor to emit-only
+   * mode, where the built policy is handed to the host through the
+   * `policy-created` / `policy-updated` events instead.
+   *
+   * @returns `true` when policies should be stored in the PAP.
+   */
+  private resolvePersist(): boolean {
+    return this.readBooleanAttribute('persist', DEFAULT_PERSIST);
   }
 
   /**
@@ -418,6 +457,7 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       onEvent: this.dispatchComponentEvent.bind(this),
       serviceId: this.resolveServiceId(),
       hiddenTabs: this.resolveHiddenTabs(),
+      persist: this.resolvePersist(),
       ...(policyContext !== undefined && { policyContext }),
     };
   }

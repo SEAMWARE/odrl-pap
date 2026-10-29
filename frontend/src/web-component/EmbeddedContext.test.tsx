@@ -25,6 +25,7 @@ function makeConfig(overrides: Partial<EmbeddedConfig> = {}): EmbeddedConfig {
     locale: 'en',
     theme: 'light',
     onEvent: noopOnEvent,
+    persist: true,
     ...overrides,
   };
 }
@@ -134,7 +135,7 @@ describe('EmbeddedContext', () => {
     const TestEventEmitter = () => {
       const ctx = useEmbeddedContext();
       if (ctx.isEmbedded) {
-        ctx.onEvent('policy-created', { policy: {}, id: 'test-id' });
+        ctx.onEvent('policy-created', { policy: {}, id: 'test-id', persisted: true });
       }
       return <div data-testid="emitter">done</div>;
     };
@@ -148,6 +149,7 @@ describe('EmbeddedContext', () => {
     expect(onEvent).toHaveBeenCalledWith('policy-created', {
       policy: {},
       id: 'test-id',
+      persisted: true,
     });
   });
 });
