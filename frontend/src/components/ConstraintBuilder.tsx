@@ -111,6 +111,18 @@ const ConstraintBuilder = ({
   /** The parent's raw constraint value, extracted for dependency tracking. */
   const parentConstraint = parent[propertyKey];
 
+  /**
+   * Adopts constraints from the parent unless they are the same as the ones
+   * already held. This sync and the one below feed each other, and the parent
+   * often builds an equal-but-new array (e.g. `odrl:refinement: []` when a
+   * collection is chosen). Comparing by reference would then hand the arrays
+   * back and forth forever ("Maximum update depth exceeded").
+   */
+  const adoptConstraints = (next: ConstraintData[]) =>
+    setInternalConstraints((current) =>
+      JSON.stringify(current) === JSON.stringify(next) ? current : next,
+    );
+
   // Sync internal state from parent constraint
   useEffect(() => {
     const constraint = parentConstraint as Record<string, unknown> | ConstraintData[] | undefined;
@@ -122,22 +134,23 @@ const ConstraintBuilder = ({
       ) {
         if (constraint['odrl:or']) {
           setLogicalType('or');
-          setInternalConstraints(constraint['odrl:or'] as ConstraintData[]);
+          adoptConstraints(constraint['odrl:or'] as ConstraintData[]);
         } else if (constraint['odrl:xone']) {
           setLogicalType('xone');
-          setInternalConstraints(constraint['odrl:xone'] as ConstraintData[]);
+          adoptConstraints(constraint['odrl:xone'] as ConstraintData[]);
         }
       } else if (Array.isArray(constraint)) {
         setLogicalType('and');
-        setInternalConstraints(constraint);
+        adoptConstraints(constraint);
       } else if (typeof constraint === 'object') {
         // A single constraint object (ODRL allows a lone constraint/refinement
         // rather than an array). Templates commonly emit this form; load it as
         // a one-element list so it becomes editable instead of being dropped.
         setLogicalType('and');
-        setInternalConstraints([constraint as ConstraintData]);
+        adoptConstraints([constraint as ConstraintData]);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentConstraint]);
 
   // Propagate changes back to parent

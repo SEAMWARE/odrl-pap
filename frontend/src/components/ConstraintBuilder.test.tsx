@@ -5,6 +5,7 @@
  * left operand, operator, and right operand selection, named vs
  * literal right operand toggle, and correct ODRL JSON output.
  */
+import { useState } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -612,3 +613,66 @@ describe('ConstraintBuilder propertyKey', () => {
     expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
   });
 });
+
+describe('ConstraintBuilder with a parent that owns the state', () => {
+  /** Stands in for the collection editors: the parent keeps the value and hands it back down. */
+  const StatefulParent = ({ initial, onRender }: { initial: Record<string, unknown>; onRender: () => void }) => {
+    const [parent, setParent] = useState(initial);
+    onRender();
+    return (
+      <ConstraintBuilder
+        parent={parent}
+        setParent={setParent}
+        mappings={MOCK_MAPPINGS}
+        propertyKey="odrl:refinement"
+      />
+    );
+  };
+
+  it('settles when the parent builds an equal but new empty constraint array', () => {
+    // Choosing Party/Asset Collection creates `odrl:refinement: []` — a different
+    // array from the builder's own empty state. The two syncs used to pass it
+    // back and forth forever ("Maximum update depth exceeded").
+    const onRender = vi.fn();
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    renderWithI18n(
+      <StatefulParent initial={{ '@type': 'PartyCollection', 'odrl:refinement': [] }} onRender={onRender} />,
+    );
+
+    expect(errors).not.toHaveBeenCalled();
+    expect(onRender.mock.calls.length).toBeLessThan(10);
+    errors.mockRestore();
+  });
+
+  it('still adopts constraints the parent changes to something different', () => {
+    const constraint = {
+      '@type': 'odrl:Constraint',
+      'odrl:leftOperand': { '@id': 'dome-op:role' },
+      'odrl:operator': { '@id': 'odrl:eq' },
+      'odrl:rightOperand': { '@value': 'ADMIN', '@type': 'xsd:string' },
+    };
+    const { rerender } = renderWithI18n(
+      <ConstraintBuilder
+        parent={{ 'odrl:refinement': [] }}
+        setParent={vi.fn()}
+        mappings={MOCK_MAPPINGS}
+        propertyKey="odrl:refinement"
+      />,
+    );
+
+    rerender(
+      <I18nProvider>
+        <ConstraintBuilder
+          parent={{ 'odrl:refinement': [constraint] }}
+          setParent={vi.fn()}
+          mappings={MOCK_MAPPINGS}
+          propertyKey="odrl:refinement"
+        />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
+  });
+});
+
