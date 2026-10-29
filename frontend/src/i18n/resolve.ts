@@ -5,6 +5,16 @@
  * component-only-export rule.
  */
 import { en, type I18nStrings } from './en';
+import { es } from './es';
+
+/** Locales shipped with the editor, keyed by language code. English is the fallback. */
+const builtInLocales: Record<string, I18nStrings> = { en, es };
+
+/** Built-in strings for a locale (`es-ES` resolves to `es`), or English when there are none. */
+export function baseStringsFor(locale?: string): I18nStrings {
+  const language = locale?.toLowerCase().split(/[-_]/)[0] ?? 'en';
+  return builtInLocales[language] ?? en;
+}
 
 /** Recursive partial type allowing consumers to override only specific keys. */
 export type DeepPartial<T> = {
@@ -45,11 +55,16 @@ function deepMerge<T extends Record<string, unknown>>(
 
 /**
  * Resolves the effective i18n strings by deep-merging overrides onto the
- * English defaults.
+ * built-in strings of the locale (English when the locale has none).
  *
  * @param overrides - Partial string overrides, or `undefined` for defaults.
+ * @param locale - Locale code (e.g., "es"); unknown locales fall back to English.
  * @returns The fully resolved string tree.
  */
-export function resolveStrings(overrides?: DeepPartial<I18nStrings>): I18nStrings {
-  return overrides ? deepMerge(en, overrides) : en;
+export function resolveStrings(
+  overrides?: DeepPartial<I18nStrings>,
+  locale?: string,
+): I18nStrings {
+  const base = baseStringsFor(locale);
+  return overrides ? deepMerge(base, overrides) : base;
 }

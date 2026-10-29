@@ -148,7 +148,7 @@ const EmbeddedApp = ({
 
   // EmbeddedApp renders the I18nProvider itself, so it cannot read strings via
   // useI18n(); it resolves them directly for the (translatable) tab titles.
-  const tabStrings = useMemo(() => resolveStrings(i18nOverrides).policyEditor, [i18nOverrides]);
+  const tabStrings = useMemo(() => resolveStrings(i18nOverrides, locale).policyEditor, [i18nOverrides, locale]);
 
   // --- API configuration ---
   useEffect(() => {

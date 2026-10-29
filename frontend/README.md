@@ -642,7 +642,9 @@ editor — they will not interfere with the host page's styles.
 
 ## Internationalization (i18n)
 
-The frontend ships with English (`en`) as the default and only built-in locale.
+The frontend ships with English (`en`, the default) and Spanish (`es`) as built-in locales;
+set `locale="es"` and the whole UI is translated, no `i18nStrings` needed. Other locales
+fall back to English, plus whatever you override.
 The i18n system supports runtime locale switching and partial string overrides,
 making it easy to add new languages without rebuilding.
 
