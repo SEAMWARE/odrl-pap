@@ -645,6 +645,82 @@ describe('ConstraintBuilder with a parent that owns the state', () => {
     errors.mockRestore();
   });
 
+  describe('mounting on a parent that already has constraints', () => {
+    const CONSTRAINT = {
+      '@type': 'odrl:Constraint',
+      'odrl:leftOperand': { '@id': 'dome-op:role' },
+      'odrl:operator': { '@id': 'odrl:eq' },
+      'odrl:rightOperand': { '@value': 'ADMIN', '@type': 'xsd:string' },
+    };
+
+    /** Like StatefulParent, but reports the parent's latest value so data loss is visible. */
+    const Harness = ({ initial, onValue }: { initial: Record<string, unknown>; onValue: (v: unknown) => void }) => {
+      const [parent, setParent] = useState(initial);
+      onValue(parent['odrl:refinement']);
+      return (
+        <ConstraintBuilder
+          parent={parent}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+          propertyKey="odrl:refinement"
+        />
+      );
+    };
+
+    const settle = (initial: Record<string, unknown>) => {
+      const values: unknown[] = [];
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      renderWithI18n(<Harness initial={initial} onValue={(v) => values.push(v)} />);
+      const errorCount = errors.mock.calls.length;
+      errors.mockRestore();
+      return { values, errorCount };
+    };
+
+    it('keeps a list of constraints and settles', () => {
+      // Reopening the editor on a saved policy mounts the builder with its constraints. It used
+      // to start empty, overwrite the parent with `[]`, and then fight the sync that pulled the
+      // constraints back in: the list flickered and React gave up with "Maximum update depth".
+      const { values, errorCount } = settle({ '@type': 'PartyCollection', 'odrl:refinement': [CONSTRAINT] });
+
+      expect(errorCount).toBe(0);
+      expect(values.length).toBeLessThan(10);
+      expect(values.at(-1)).toEqual([CONSTRAINT]);
+      expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
+    });
+
+    it('keeps a lone constraint object, turning it into a list once', () => {
+      const { values, errorCount } = settle({ '@type': 'PartyCollection', 'odrl:refinement': CONSTRAINT });
+
+      expect(errorCount).toBe(0);
+      expect(values.length).toBeLessThan(10);
+      expect(values.at(-1)).toEqual([CONSTRAINT]);
+    });
+
+    it('keeps a logical (OR) group and settles', () => {
+      const group = { '@type': 'odrl:LogicalConstraint', 'odrl:or': [CONSTRAINT] };
+      const { values, errorCount } = settle({ '@type': 'PartyCollection', 'odrl:refinement': group });
+
+      expect(errorCount).toBe(0);
+      expect(values.length).toBeLessThan(10);
+      expect(values.at(-1)).toEqual(group);
+    });
+
+    it('does not write an unchanged value back to the parent', () => {
+      const setParent = vi.fn();
+
+      renderWithI18n(
+        <ConstraintBuilder
+          parent={{ 'odrl:refinement': [CONSTRAINT] }}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+          propertyKey="odrl:refinement"
+        />,
+      );
+
+      expect(setParent).not.toHaveBeenCalled();
+    });
+  });
+
   it('still adopts constraints the parent changes to something different', () => {
     const constraint = {
       '@type': 'odrl:Constraint',

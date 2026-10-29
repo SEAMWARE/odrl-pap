@@ -52,6 +52,35 @@ function getParameterCount(operands: Mapping[], operandName: string): number {
 }
 
 /**
+ * Reads the constraints held by a parent's constraint property.
+ *
+ * Handles the three shapes ODRL allows: a logical constraint (`odrl:or` /
+ * `odrl:xone`), a list (an implicit AND) and a lone constraint object, which
+ * templates commonly emit. Returns `undefined` when there is nothing to read.
+ */
+function readConstraints(
+  constraint: Record<string, unknown> | ConstraintData[] | undefined,
+): { logicalType: string; constraints: ConstraintData[] } | undefined {
+  if (!constraint) return undefined;
+  if (Array.isArray(constraint)) {
+    return { logicalType: 'and', constraints: constraint };
+  }
+  if (typeof constraint !== 'object') return undefined;
+  if (constraint['@type'] === 'odrl:LogicalConstraint') {
+    if (constraint['odrl:or']) {
+      return { logicalType: 'or', constraints: constraint['odrl:or'] as ConstraintData[] };
+    }
+    if (constraint['odrl:xone']) {
+      return { logicalType: 'xone', constraints: constraint['odrl:xone'] as ConstraintData[] };
+    }
+    return undefined;
+  }
+  // A single constraint object (a lone constraint/refinement rather than an array):
+  // load it as a one-element list so it becomes editable instead of being dropped.
+  return { logicalType: 'and', constraints: [constraint as ConstraintData] };
+}
+
+/**
  * Returns the left operand selected in the given constraint.
  *
  * A left operand is either referenced by name (`"odrl:leftOperand": {"@id": "http:path"}`) or - for
@@ -105,11 +134,20 @@ const ConstraintBuilder = ({
   const { strings } = useI18n();
   const t = strings.constraintBuilder;
 
-  const [internalConstraints, setInternalConstraints] = useState<ConstraintData[]>([]);
-  const [logicalType, setLogicalType] = useState('and');
-
   /** The parent's raw constraint value, extracted for dependency tracking. */
-  const parentConstraint = parent[propertyKey];
+  const parentConstraint = parent[propertyKey] as Record<string, unknown> | ConstraintData[] | undefined;
+
+  // Start from what the parent already holds. Starting empty would, on mount, push
+  // `[]` into the parent (wiping its constraints) while the sync below pulled them
+  // back in: the two fought over the empty and the full list, which flickered and
+  // ended in "Maximum update depth exceeded" whenever the editor opened a policy
+  // that already had constraints.
+  const [internalConstraints, setInternalConstraints] = useState<ConstraintData[]>(
+    () => readConstraints(parentConstraint)?.constraints ?? [],
+  );
+  const [logicalType, setLogicalType] = useState(
+    () => readConstraints(parentConstraint)?.logicalType ?? 'and',
+  );
 
   /**
    * Adopts constraints from the parent unless they are the same as the ones
@@ -125,46 +163,23 @@ const ConstraintBuilder = ({
 
   // Sync internal state from parent constraint
   useEffect(() => {
-    const constraint = parentConstraint as Record<string, unknown> | ConstraintData[] | undefined;
-    if (constraint) {
-      if (
-        typeof constraint === 'object' &&
-        !Array.isArray(constraint) &&
-        constraint['@type'] === 'odrl:LogicalConstraint'
-      ) {
-        if (constraint['odrl:or']) {
-          setLogicalType('or');
-          adoptConstraints(constraint['odrl:or'] as ConstraintData[]);
-        } else if (constraint['odrl:xone']) {
-          setLogicalType('xone');
-          adoptConstraints(constraint['odrl:xone'] as ConstraintData[]);
-        }
-      } else if (Array.isArray(constraint)) {
-        setLogicalType('and');
-        adoptConstraints(constraint);
-      } else if (typeof constraint === 'object') {
-        // A single constraint object (ODRL allows a lone constraint/refinement
-        // rather than an array). Templates commonly emit this form; load it as
-        // a one-element list so it becomes editable instead of being dropped.
-        setLogicalType('and');
-        adoptConstraints([constraint as ConstraintData]);
-      }
+    const read = readConstraints(parentConstraint);
+    if (read) {
+      setLogicalType(read.logicalType);
+      adoptConstraints(read.constraints);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentConstraint]);
 
   // Propagate changes back to parent
   useEffect(() => {
-    if (logicalType === 'and') {
-      setParent({ ...parent, [propertyKey]: internalConstraints });
-    } else {
-      const logicalKey = `odrl:${logicalType}`;
-      const logicalConstraint = {
-        '@type': 'odrl:LogicalConstraint',
-        [logicalKey]: internalConstraints,
-      };
-      setParent({ ...parent, [propertyKey]: logicalConstraint });
-    }
+    const next =
+      logicalType === 'and'
+        ? internalConstraints
+        : { '@type': 'odrl:LogicalConstraint', [`odrl:${logicalType}`]: internalConstraints };
+    // Already what the parent holds (same content): writing it back would only churn.
+    if (JSON.stringify(parentConstraint) === JSON.stringify(next)) return;
+    setParent({ ...parent, [propertyKey]: next });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [internalConstraints, logicalType]);
 
