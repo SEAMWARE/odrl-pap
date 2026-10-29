@@ -208,7 +208,12 @@ const EmbeddedApp = ({
         : PolicyService.getPolicyById(policyId);
 
       loadPromise
-        .then((p) => setPolicy(JSON.parse(p.odrl!)))
+        .then((p) => {
+          // The loaded policy is the baseline, not an edit: don't report it as `policy-changed`.
+          const loaded = JSON.parse(p.odrl!);
+          hostPolicyRef.current = loaded;
+          setPolicy(loaded);
+        })
         .catch((err: Error) => setSaveError(err.message));
     }
   }, [remoteLoad, mode, policyId, serviceId]);

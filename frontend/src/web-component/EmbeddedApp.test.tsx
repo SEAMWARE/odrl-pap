@@ -7,7 +7,7 @@
  * while the user is still on the template tab.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import EmbeddedApp from './EmbeddedApp';
 import type { EmbeddedConfig } from './EmbeddedContext';
@@ -265,6 +265,26 @@ describe('EmbeddedApp policy value', () => {
     };
     const { rerender } = render(<EmbeddedApp config={config} policy={POLICY} />);
     rerender(<EmbeddedApp config={config} policy={{ ...(POLICY as object), '@type': 'odrl:Set' } as never} />);
+
+    expect(config.onEvent).not.toHaveBeenCalledWith('policy-changed', expect.anything());
+  });
+
+  it('does not emit policy-changed for a policy loaded remotely in edit mode', async () => {
+    vi.mocked(PolicyService.getPolicyById).mockResolvedValue({
+      odrl: '{"@type":"odrl:Set"}',
+    } as never);
+    const config = {
+      ...CONFIG,
+      mode: 'edit' as const,
+      policyId: 'p1',
+      capabilities: { ...DEFAULT_CAPABILITIES, mappings: 'none' as const },
+      hiddenTabs: { ...CONFIG.hiddenTabs, hideBuilderTab: true },
+    };
+    render(<EmbeddedApp config={config} />);
+
+    await waitFor(() => expect(PolicyService.getPolicyById).toHaveBeenCalled());
+    // Let the resolved load be applied to the state.
+    await act(async () => {});
 
     expect(config.onEvent).not.toHaveBeenCalledWith('policy-changed', expect.anything());
   });

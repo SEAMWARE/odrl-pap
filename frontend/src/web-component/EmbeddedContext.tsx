@@ -35,11 +35,6 @@ export interface TabVisibility {
 }
 
 /**
- * Map of custom event names to their `detail` payload types.
- *
- * The Web Component host listens for these events on the custom element.
- */
-/**
  * Where the live policy summary is shown: `side` is a column beside the
  * builder (wide screens only), `tab` is an extra tab, `none` hides it.
  */
@@ -63,7 +58,13 @@ export interface ButtonVisibility {
   hideCancelButton: boolean;
 }
 
+/**
+ * Map of custom event names to their `detail` payload types.
+ *
+ * The Web Component host listens for these events on the custom element.
+ */
 export interface EmbeddedEventMap {
+  /** Fired whenever the policy is edited; not for the initial or host-supplied policy. */
   'policy-changed': { policy: Record<string, unknown> };
   /** Fired after a new policy is successfully saved. */
   'policy-created': { policy: Record<string, unknown>; id: string };

@@ -792,5 +792,40 @@ describe('ConstraintBuilder with a parent that owns the state', () => {
 
     expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
   });
+  describe('logical constraints', () => {
+    const two = [
+      { 'odrl:leftOperand': { '@id': 'dome-op:role' }, 'odrl:operator': { '@id': 'odrl:eq' }, 'odrl:rightOperand': { '@value': 'ADMIN' } },
+      { 'odrl:leftOperand': { '@id': 'dome-op:role' }, 'odrl:operator': { '@id': 'odrl:eq' }, 'odrl:rightOperand': { '@value': 'USER' } },
+    ];
+
+    it('loads an odrl:and constraint as the and grouping and keeps its constraints', async () => {
+      const onWrite = vi.fn();
+      renderWithI18n(
+        <StatefulBuilder
+          initial={{ 'odrl:constraint': { '@type': 'odrl:LogicalConstraint', 'odrl:and': two } }}
+          onWrite={onWrite}
+        />,
+      );
+
+      expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('USER')).toBeInTheDocument();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: /add constraint/i }));
+      expect(onWrite.mock.calls.at(-1)![0]['odrl:constraint']).toHaveLength(3);
+    });
+
+    it('shows an odrl:andSequence constraint read-only instead of dropping it', () => {
+      renderWithI18n(
+        <StatefulBuilder
+          initial={{ 'odrl:constraint': { '@type': 'odrl:LogicalConstraint', 'odrl:andSequence': two } }}
+          onWrite={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('USER')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add constraint/i })).toBeDisabled();
+    });
+  });
 });
 

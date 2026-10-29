@@ -50,11 +50,14 @@ function getParameterCount(operands: Mapping[], operandName: string): number {
   return operands.find((operand) => operand.name === operandName)?.parameterCount ?? 0;
 }
 
+/** Ordered AND: the builder has no grouping for it, so it is shown read-only instead of dropped. */
+const ANDSEQUENCE_TYPE = 'andSequence';
+
 /**
  * Reads the constraints held by a parent's constraint property.
  *
  * Handles the three shapes ODRL allows: a logical constraint (`odrl:or` /
- * `odrl:xone`), a list (an implicit AND) and a lone constraint object, which
+ * `odrl:xone` / `odrl:and` / `odrl:andSequence`), a list (an implicit AND) and a lone constraint object, which
  * templates commonly emit. Returns `undefined` when there is nothing to read.
  */
 function readConstraints(
@@ -71,6 +74,12 @@ function readConstraints(
     }
     if (constraint['odrl:xone']) {
       return { logicalType: 'xone', constraints: constraint['odrl:xone'] as ConstraintData[] };
+    }
+    if (constraint['odrl:and']) {
+      return { logicalType: 'and', constraints: constraint['odrl:and'] as ConstraintData[] };
+    }
+    if (constraint['odrl:andSequence']) {
+      return { logicalType: ANDSEQUENCE_TYPE, constraints: constraint['odrl:andSequence'] as ConstraintData[] };
     }
     return undefined;
   }
@@ -127,7 +136,7 @@ const ConstraintBuilder = ({
   parent,
   setParent,
   mappings,
-  locked = false,
+  locked: lockedProp = false,
   propertyKey = DEFAULT_PROPERTY_KEY,
 }: ConstraintBuilderProps) => {
   const { strings } = useI18n();
@@ -143,6 +152,7 @@ const ConstraintBuilder = ({
   const held = readConstraints(parentConstraint);
   const internalConstraints: ConstraintData[] = held?.constraints ?? [];
   const logicalType = held?.logicalType ?? 'and';
+  const locked = lockedProp || logicalType === ANDSEQUENCE_TYPE;
 
   /** Writes a list (and, optionally, a new logical grouping) into the parent. */
   const write = (constraints: ConstraintData[], type: string = logicalType) => {
@@ -254,6 +264,7 @@ const ConstraintBuilder = ({
                     <option value="and">{t.groupingAnd}</option>
                     <option value="or">{t.groupingOr}</option>
                     <option value="xone">{t.groupingXone}</option>
+                    {logicalType === ANDSEQUENCE_TYPE && <option value={ANDSEQUENCE_TYPE}>andSequence</option>}
                   </Form.Select>
                 </Form.Group>
               </Col>
