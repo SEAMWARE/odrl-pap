@@ -331,11 +331,18 @@ at runtime triggers a re-render automatically.
 | `locale`        | Language code (e.g., `"en"`, `"de"`)          | `"en"`     |
 | `policy-context`| Default `@context` for new policies (JSON string) | `{"odrl":"http://www.w3.org/ns/odrl/2/"}` |
 | `service-id`    | Service ID for service-scoped policy/template operations | `null` |
-| `persist`       | Boolean — set to `"false"` to emit policies instead of storing them | `true` (stores) |
 | `hide-builder-tab` | Boolean — hides the visual policy builder tab | absent (visible) |
 | `hide-raw-tab`  | Boolean — hides the raw ODRL JSON editor tab  | absent (visible) |
 | `hide-template-tab` | Boolean — hides the template selection tab | absent (visible) |
 | `hide-template-create-tab` | Boolean — hides the template management tab (create/edit/delete templates) | absent (visible) |
+| `summary`       | `"side"` \| `"tab"` \| `"none"` — where the live policy summary is shown | `"side"` |
+| `hide-cancel-button` | Boolean — hides the Cancel button (e.g. when the host provides its own) | absent (visible) |
+| `variant`       | `"card"` \| `"plain"` — editor framed as a card, or with no chrome | `"card"` |
+| `load`          | `"remote"` \| `"none"` — fetch the policy when `mode="edit"` | `"remote"` |
+| `save`          | `"remote"` \| `"event"` \| `"none"` — store the policy in the PAP, hand it to the host instead (see [Emit-Only Mode](#emit-only-mode-saveevent)), or remove the Save button | `"remote"` |
+| `validate`      | `"remote"` \| `"none"` — validate against the PAP; `none` removes the Validate button and panel | `"remote"` |
+| `templates`     | `"remote"` \| `"none"` — list and manage PAP templates; `none` removes both template tabs | `"remote"` |
+| `mappings`      | `"remote"` \| `"none"` — fetch the visual builder's dropdown mappings | `"remote"` |
 
 Boolean attributes follow the HTML convention: their **presence** means `true`
 (the tab is hidden) and their **absence** means `false` (the tab is visible).
@@ -359,6 +366,103 @@ editor.setAttribute('locale', 'de');
 editor.setAttribute('api-base-url', 'https://new-api.example.com');
 ```
 
+#### Look: variant and theme tokens
+
+By default the editor is drawn as a card (background, border, radius, shadow
+and padding). `variant="plain"` removes that frame, for hosts that already
+put it inside a card or a modal.
+
+Tabs, buttons, cards and the step badges follow the `--odrl-*` theme tokens
+instead of Bootstrap's own colors, so setting tokens restyles them: the tabs
+are an underlined strip in the primary color, primary buttons are filled with
+it, secondary and info buttons are outlined, and danger and success buttons use
+their tokens. Besides the existing tokens there are two new ones:
+
+| Token | Meaning |
+|-------|---------|
+| `odrl-primary-text-color` | Text on a primary-colored fill (primary buttons, step badges) |
+| `odrl-card-radius` | Border radius of cards, the outer one and the step cards |
+| `odrl-input-bg` | Background of text fields, selects and checkboxes |
+
+The light and dark presets are plain CSS on the host (`theme="light"` /
+`theme="dark"`), so a page can override any token with a normal rule instead
+of `themeConfig`; no JavaScript needed, and it keeps following the page's own
+theme:
+
+```css
+odrl-policy-editor {
+  --odrl-primary-color: var(--my-brand-color);
+  --odrl-card-radius: 1rem;
+}
+```
+
+`themeConfig` still works and wins over both.
+
+Set them with the `themeConfig` property:
+
+```javascript
+editor.themeConfig = {
+  'odrl-primary-color': '#1a3461',
+  'odrl-primary-text-color': '#ffffff',
+  'odrl-card-radius': '1rem',
+};
+```
+
+#### Layout: summary and Cancel
+
+The live policy summary sits in a column beside the visual builder, which only
+makes sense on wide screens (the breakpoint follows the viewport, not the
+space the editor actually has, so it also misfires inside a narrow modal or
+panel). `summary="tab"` moves it to its own **Summary** tab and gives the
+builder the full width; `summary="none"` removes it.
+
+`hide-cancel-button` hides the Cancel button, for hosts that already provide
+their own (a modal's footer, say). With `save` and `validate` also `none`, no
+action row is rendered at all.
+
+The editor renders inside a Shadow DOM, but its sticky summary used
+`z-index: 1020`, which competed with the host page's own stacking contexts.
+The element now isolates its stacking context, so nothing inside it can paint
+over the host page.
+
+#### Backend capabilities
+
+`load`, `save`, `validate`, `templates` and `mappings` decide, one by one,
+whether the editor talks to the PAP. Each defaults to `remote` (the behaviour
+of earlier versions); `none` makes no request and hides the UI that depends on
+it. `save` has a third mode, `event`, which keeps the Save button but hands
+the finished policy to the host instead of writing it — see
+[Emit-Only Mode](#emit-only-mode-saveevent). Unknown values, and modes a
+capability does not support, fall back to `remote`, so a typo never silently
+disables (or silently enables) a backend call.
+
+Used as a form control — the host owns the policy and nothing goes to the PAP:
+
+```html
+<odrl-policy-editor
+  load="none" save="none" validate="none" templates="none" mappings="none"
+></odrl-policy-editor>
+```
+
+```javascript
+editor.policy = existingPolicy;            // object or JSON text
+editor.mappings = { actions: [...], operators: [...], leftOperands: [...] };
+editor.addEventListener('policy-changed', (e) => store(e.detail.policy));
+```
+
+With `mappings="none"` the visual builder offers the mappings the PAP ships
+with (generated from the backend's `mapping.json` at build time, so they match
+the PAP of the same release). Set the `mappings` property to extend or override
+them: its entries are layered over the built-in ones per attribute, and an
+entry with the same `name` replaces the built-in one. Mappings an operator adds
+through the PAP's `paths.mapping` are only visible with `mappings="remote"`. With `save="none"`,
+filling in a template loads the result into the editor instead of storing it.
+
+Because the capability modes are string attributes, framework bindings work as
+written: React's `<odrl-policy-editor save="event" />`, Angular's
+`[attr.save]="'event'"` and Vue's `:save="'event'"` all set the attribute the
+element reads.
+
 ### JavaScript Properties
 
 For richer configuration that cannot be expressed as string attributes, use
@@ -371,6 +475,8 @@ JavaScript properties on the element:
 | `fieldTemplate` | `FieldTemplate`            | Pre-fills the builder form and optionally locks fields (client-side; distinct from stored templates) |
 | `policyContext` | `Record<string, string>`   | Default `@context` for new policies (takes precedence over attribute) |
 | `serviceId`   | `string`                     | Service scope for policy/template operations (takes precedence over attribute) |
+| `policy`      | `object \| string`           | The working policy (object or JSON text); reads back the latest edit |
+| `mappings`    | `Mappings`                   | Builder dropdown mappings; when set, `/mappings` is not fetched. Layered over the PAP's built-in mappings (same `name` wins); with `mappings="none"` the built-ins are used as they are |
 
 ```javascript
 const editor = document.querySelector('odrl-policy-editor');
@@ -414,12 +520,13 @@ Events bubble and cross Shadow DOM boundaries (`composed: true`).
 
 | Event              | Detail payload                              | Fired when                       |
 |--------------------|---------------------------------------------|----------------------------------|
-| `policy-created`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` | A new policy is saved (or, with `persist="false"`, completed) |
+| `policy-created`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` | A new policy is saved (or, with `save="event"`, completed) |
 | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` | An existing policy is updated |
 | `policy-validated` | `{ result: ValidationResponse }`            | Policy validation completes      |
 | `editor-cancelled` | `{}`                                        | The user clicks Cancel           |
 | `template-created` | `{ template: object, id: string }`          | A new template is created in the management tab |
 | `template-updated` | `{ template: object, id: string }`          | An existing template is updated in the management tab |
+| `policy-changed`   | `{ policy: OdrlPolicyJson }`                | The policy is edited (builder, raw JSON or template); not for the initial or host-set policy |
 
 ```javascript
 const editor = document.querySelector('odrl-policy-editor');
@@ -440,54 +547,82 @@ editor.addEventListener('editor-cancelled', () => {
 });
 ```
 
-### Emit-Only Mode (`persist="false"`)
+### Emit-Only Mode (`save="event"`)
 
 By default the editor stores a policy in the PAP and *then* emits
-`policy-created` / `policy-updated`. Set `persist="false"` to turn the
-component into a pure policy *builder*: the user configures the policy as
-usual, but on Save nothing is written — the finished ODRL JSON is handed to
-the host application through the very same events, with
-`detail.persisted === false`.
+`policy-created` / `policy-updated`. Set `save="event"` to turn the component
+into a pure policy *builder*: the user configures the policy as usual, but on
+Save nothing is written — the finished ODRL JSON is handed to the host
+application through the very same events, with `detail.persisted === false`.
+
+`save` is one of the [capability modes](#capability-modes): `"remote"` (the
+default) writes to the PAP, `"event"` emits instead, `"none"` removes the Save
+button altogether.
 
 ```html
 <odrl-policy-editor
   id="editor"
   api-base-url="https://pap.example.com"
-  persist="false"
+  save="event"
 ></odrl-policy-editor>
 
 <script>
   document.getElementById('editor').addEventListener('policy-created', (e) => {
     // e.detail.persisted === false — the PAP has not stored anything
     console.log('Policy built:', e.detail.policy);
-    console.log('Suggested id:', e.detail.id); // the policy's odrl:uid
-    myOwnBackend.save(e.detail.policy);
+    console.log('Suggested id:', e.detail.id); // derived from the odrl:uid
+    myOwnBackend.save(e.detail.id, e.detail.policy);
   });
 </script>
 ```
 
-Because listener code is identical in both modes, switching between them is a
+Because listener code is identical in all modes, switching between them is a
 single attribute change — check `detail.persisted` if the host needs to tell
 them apart.
 
+**Editing a policy the host stores itself**
+
+`save="event"` only governs writing. With `mode="edit"` the editor would still
+*load* the policy from the PAP, which 404s for a policy the host keeps in its
+own store. Combine it with `load="none"` and hand the policy in through the
+`policy` JS property:
+
+```javascript
+const editor = document.querySelector('odrl-policy-editor');
+editor.setAttribute('mode', 'edit');
+editor.setAttribute('load', 'none');
+editor.setAttribute('save', 'event');
+
+// The host supplies the policy; the property accepts an object or JSON text.
+editor.policy = await myOwnBackend.load(id);
+
+editor.addEventListener('policy-updated', (e) => {
+  myOwnBackend.save(e.detail.id, e.detail.policy);
+});
+```
+
 **What emit-only mode changes**
 
-| Behaviour | `persist` (default) | `persist="false"` |
-|-----------|---------------------|-------------------|
-| Save button | `PUT /policy/{id}` (or the service-scoped variant), then event | event only |
-| Create from template | stores, then event | event only |
-| `detail.persisted` | `true` | `false` |
-| Template management tab | visible (unless hidden) | always hidden — it can only write to the PAP |
+| Behaviour | `save="remote"` (default) | `save="event"` | `save="none"` |
+|-----------|---------------------------|----------------|---------------|
+| Save button | `PUT /policy/{id}` (or the service-scoped variant), then event | event only | not rendered |
+| Create from template | stores, then event | event only | policy adopted into the editor, `policy-changed` only |
+| `detail.persisted` | `true` | `false` | — |
 
-**What it does not change** — emit-only only suppresses *writes*. The
-component still needs a reachable PAP for read-only calls:
+**What it does not change** — `save="event"` suppresses *policy writes* only.
+Every other capability is configured on its own, and by default still talks to
+the PAP:
 
-- `GET /mappings` — **required**; the visual builder's vocabulary dropdowns
-  are built from it.
-- `GET /policy/{id}` — when `mode="edit"`, to load the policy being edited.
-- `POST /validate` — only when the user runs a validation.
-- `GET /templates` — to populate the template picker (hide it with
-  `hide-template-tab` if unwanted).
+- `GET /mappings` — the visual builder's vocabulary dropdowns; switch off with
+  `mappings="none"` to use the mappings bundled in the package, or supply your
+  own through the `mappings` property.
+- `GET /policy/{id}` — when `mode="edit"`; switch off with `load="none"` and
+  use the `policy` property.
+- `POST /validate` — only when the user runs a validation; switch off with
+  `validate="none"`.
+- `GET /templates` — the template picker *and* the template management tab,
+  which writes templates to the PAP. Switch both off with `templates="none"`
+  if the component must issue no requests at all.
 
 A policy emitted this way carries an `odrl:uid` (generated if the user did not
 set one) and `detail.id` mirrors it, so the host can store the policy under a
@@ -597,7 +732,9 @@ editor — they will not interfere with the host page's styles.
 
 ## Internationalization (i18n)
 
-The frontend ships with English (`en`) as the default and only built-in locale.
+The frontend ships with English (`en`, the default) and Spanish (`es`) as built-in locales;
+set `locale="es"` and the whole UI is translated, no `i18nStrings` needed. Other locales
+fall back to English, plus whatever you override.
 The i18n system supports runtime locale switching and partial string overrides,
 making it easy to add new languages without rebuilding.
 

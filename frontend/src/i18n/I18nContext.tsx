@@ -42,8 +42,8 @@ export const I18nProvider = ({
   children,
 }: I18nProviderProps) => {
   const merged = useMemo<I18nStrings>(
-    () => resolveStrings(overrides),
-    [overrides],
+    () => resolveStrings(overrides, locale),
+    [overrides, locale],
   );
 
   const value = useMemo<I18nContextValue>(

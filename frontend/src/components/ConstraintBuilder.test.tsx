@@ -5,6 +5,7 @@
  * left operand, operator, and right operand selection, named vs
  * literal right operand toggle, and correct ODRL JSON output.
  */
+import { useState } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -40,6 +41,30 @@ const MOCK_MAPPINGS: Mappings = {
 /** Wraps a component with the required I18nProvider. */
 const renderWithI18n = (ui: React.ReactElement) =>
   render(<I18nProvider>{ui}</I18nProvider>);
+
+/** A parent that keeps the value (as the real editors do) and reports every write. */
+const StatefulBuilder = ({
+  initial,
+  onWrite,
+  propertyKey,
+}: {
+  initial: Record<string, unknown>;
+  onWrite: (value: Record<string, unknown>) => void;
+  propertyKey?: string;
+}) => {
+  const [parent, setParent] = useState(initial);
+  return (
+    <ConstraintBuilder
+      parent={parent}
+      setParent={(value) => {
+        onWrite(value);
+        setParent(value);
+      }}
+      mappings={MOCK_MAPPINGS}
+      propertyKey={propertyKey}
+    />
+  );
+};
 
 describe('ConstraintBuilder', () => {
   let parent: Record<string, unknown>;
@@ -88,13 +113,7 @@ describe('ConstraintBuilder', () => {
   it('renders constraint cards after adding constraints', async () => {
     const user = userEvent.setup();
 
-    renderWithI18n(
-      <ConstraintBuilder
-        parent={parent}
-        setParent={setParent}
-        mappings={MOCK_MAPPINGS}
-      />,
-    );
+    renderWithI18n(<StatefulBuilder initial={parent} onWrite={setParent} />);
 
     await user.click(screen.getByRole('button', { name: /add constraint/i }));
 
@@ -500,11 +519,7 @@ describe('ConstraintBuilder propertyKey', () => {
       const user = userEvent.setup();
 
       renderWithI18n(
-        <ConstraintBuilder
-          parent={{ 'odrl:constraint': [{ 'http:bodyValue': '' }] }}
-          setParent={setParent}
-          mappings={MOCK_MAPPINGS}
-        />,
+        <StatefulBuilder initial={{ 'odrl:constraint': [{ 'http:bodyValue': '' }] }} onWrite={setParent} />,
       );
 
       await user.type(screen.getByLabelText(/operand parameter 1/i), '$.numNodes.value');
@@ -612,3 +627,205 @@ describe('ConstraintBuilder propertyKey', () => {
     expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
   });
 });
+
+describe('ConstraintBuilder with a parent that owns the state', () => {
+  /** Stands in for the collection editors: the parent keeps the value and hands it back down. */
+  const StatefulParent = ({ initial, onRender }: { initial: Record<string, unknown>; onRender: () => void }) => {
+    const [parent, setParent] = useState(initial);
+    onRender();
+    return (
+      <ConstraintBuilder
+        parent={parent}
+        setParent={setParent}
+        mappings={MOCK_MAPPINGS}
+        propertyKey="odrl:refinement"
+      />
+    );
+  };
+
+  it('settles when the parent builds an equal but new empty constraint array', () => {
+    // Choosing Party/Asset Collection creates `odrl:refinement: []` — a different
+    // array from the builder's own empty state. The two syncs used to pass it
+    // back and forth forever ("Maximum update depth exceeded").
+    const onRender = vi.fn();
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    renderWithI18n(
+      <StatefulParent initial={{ '@type': 'PartyCollection', 'odrl:refinement': [] }} onRender={onRender} />,
+    );
+
+    expect(errors).not.toHaveBeenCalled();
+    expect(onRender.mock.calls.length).toBeLessThan(10);
+    errors.mockRestore();
+  });
+
+  describe('mounting on a parent that already has constraints', () => {
+    const CONSTRAINT = {
+      '@type': 'odrl:Constraint',
+      'odrl:leftOperand': { '@id': 'dome-op:role' },
+      'odrl:operator': { '@id': 'odrl:eq' },
+      'odrl:rightOperand': { '@value': 'ADMIN', '@type': 'xsd:string' },
+    };
+
+    /** Like StatefulParent, but reports the parent's latest value so data loss is visible. */
+    const Harness = ({ initial, onValue }: { initial: Record<string, unknown>; onValue: (v: unknown) => void }) => {
+      const [parent, setParent] = useState(initial);
+      onValue(parent['odrl:refinement']);
+      return (
+        <ConstraintBuilder
+          parent={parent}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+          propertyKey="odrl:refinement"
+        />
+      );
+    };
+
+    const settle = (initial: Record<string, unknown>) => {
+      const values: unknown[] = [];
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      renderWithI18n(<Harness initial={initial} onValue={(v) => values.push(v)} />);
+      const errorCount = errors.mock.calls.length;
+      errors.mockRestore();
+      return { values, errorCount };
+    };
+
+    it('keeps a list of constraints and settles', () => {
+      // Reopening the editor on a saved policy mounts the builder with its constraints. It used
+      // to start empty, overwrite the parent with `[]`, and then fight the sync that pulled the
+      // constraints back in: the list flickered and React gave up with "Maximum update depth".
+      const { values, errorCount } = settle({ '@type': 'PartyCollection', 'odrl:refinement': [CONSTRAINT] });
+
+      expect(errorCount).toBe(0);
+      expect(values.length).toBeLessThan(10);
+      expect(values.at(-1)).toEqual([CONSTRAINT]);
+      expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
+    });
+
+    it('shows a lone constraint object as editable and leaves it untouched until edited', () => {
+      const { values, errorCount } = settle({ '@type': 'PartyCollection', 'odrl:refinement': CONSTRAINT });
+
+      expect(errorCount).toBe(0);
+      expect(values).toEqual([CONSTRAINT]);
+      expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
+    });
+
+    it('keeps a logical (OR) group and settles', () => {
+      const group = { '@type': 'odrl:LogicalConstraint', 'odrl:or': [CONSTRAINT] };
+      const { values, errorCount } = settle({ '@type': 'PartyCollection', 'odrl:refinement': group });
+
+      expect(errorCount).toBe(0);
+      expect(values.length).toBeLessThan(10);
+      expect(values.at(-1)).toEqual(group);
+    });
+
+    it('keeps fast typing in a literal value intact while the parent echoes every write back', async () => {
+      // Typing used to be able to flicker and loop: the builder held a copy of the list and two
+      // effects synced it with the parent, which could swap the copies back and forth.
+      const user = userEvent.setup({ delay: null });
+      const writes = vi.fn();
+      const literal = (value: string) => ({
+        'odrl:leftOperand': { '@id': 'dome-op:role' },
+        'odrl:operator': { '@id': 'odrl:eq' },
+        'odrl:rightOperand': { '@value': value, '@type': '' },
+      });
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      renderWithI18n(
+        <StatefulBuilder
+          initial={{ 'odrl:refinement': [literal('test'), literal('abc'), literal('asd')] }}
+          onWrite={writes}
+          propertyKey="odrl:refinement"
+        />,
+      );
+      await user.type(screen.getByLabelText(/value for constraint 3/i), 'xyz');
+
+      expect(errors).not.toHaveBeenCalled();
+      expect(screen.getByLabelText(/value for constraint 3/i)).toHaveValue('asdxyz');
+      expect(writes).toHaveBeenCalledTimes(3);
+      expect(screen.getByLabelText(/value for constraint 1/i)).toHaveValue('test');
+      errors.mockRestore();
+    });
+
+    it('does not write an unchanged value back to the parent', () => {
+      const setParent = vi.fn();
+
+      renderWithI18n(
+        <ConstraintBuilder
+          parent={{ 'odrl:refinement': [CONSTRAINT] }}
+          setParent={setParent}
+          mappings={MOCK_MAPPINGS}
+          propertyKey="odrl:refinement"
+        />,
+      );
+
+      expect(setParent).not.toHaveBeenCalled();
+    });
+  });
+
+  it('still adopts constraints the parent changes to something different', () => {
+    const constraint = {
+      '@type': 'odrl:Constraint',
+      'odrl:leftOperand': { '@id': 'dome-op:role' },
+      'odrl:operator': { '@id': 'odrl:eq' },
+      'odrl:rightOperand': { '@value': 'ADMIN', '@type': 'xsd:string' },
+    };
+    const { rerender } = renderWithI18n(
+      <ConstraintBuilder
+        parent={{ 'odrl:refinement': [] }}
+        setParent={vi.fn()}
+        mappings={MOCK_MAPPINGS}
+        propertyKey="odrl:refinement"
+      />,
+    );
+
+    rerender(
+      <I18nProvider>
+        <ConstraintBuilder
+          parent={{ 'odrl:refinement': [constraint] }}
+          setParent={vi.fn()}
+          mappings={MOCK_MAPPINGS}
+          propertyKey="odrl:refinement"
+        />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
+  });
+  describe('logical constraints', () => {
+    const two = [
+      { 'odrl:leftOperand': { '@id': 'dome-op:role' }, 'odrl:operator': { '@id': 'odrl:eq' }, 'odrl:rightOperand': { '@value': 'ADMIN' } },
+      { 'odrl:leftOperand': { '@id': 'dome-op:role' }, 'odrl:operator': { '@id': 'odrl:eq' }, 'odrl:rightOperand': { '@value': 'USER' } },
+    ];
+
+    it('loads an odrl:and constraint as the and grouping and keeps its constraints', async () => {
+      const onWrite = vi.fn();
+      renderWithI18n(
+        <StatefulBuilder
+          initial={{ 'odrl:constraint': { '@type': 'odrl:LogicalConstraint', 'odrl:and': two } }}
+          onWrite={onWrite}
+        />,
+      );
+
+      expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('USER')).toBeInTheDocument();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: /add constraint/i }));
+      expect(onWrite.mock.calls.at(-1)![0]['odrl:constraint']).toHaveLength(3);
+    });
+
+    it('shows an odrl:andSequence constraint read-only instead of dropping it', () => {
+      renderWithI18n(
+        <StatefulBuilder
+          initial={{ 'odrl:constraint': { '@type': 'odrl:LogicalConstraint', 'odrl:andSequence': two } }}
+          onWrite={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('USER')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add constraint/i })).toBeDisabled();
+    });
+  });
+});
+

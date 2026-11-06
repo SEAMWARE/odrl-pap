@@ -25,6 +25,7 @@ import { useTemplateMode } from '../hooks/useTemplateMode';
 import { useI18n } from '../i18n';
 import type { FieldTemplate } from '../types';
 import type { OdrlPolicyJson } from '../services/api';
+import type { Mappings } from '../api';
 import ConstraintBuilder from './ConstraintBuilder';
 import TargetEditor from './TargetEditor';
 import AssigneeEditor from './AssigneeEditor';
@@ -50,6 +51,17 @@ interface PolicyBuilderProps {
   setPolicy: (policy: OdrlPolicyJson) => void;
   /** Optional field template to pre-fill and constrain the policy form. */
   fieldTemplate?: FieldTemplate;
+  /**
+   * Mappings supplied by the host. When set, the builder does not fetch
+   * `/mappings` from the backend and uses these instead.
+   */
+  mappings?: Mappings;
+  /**
+   * Whether to show the live policy summary in a column beside the form.
+   * Set to false when the summary is placed elsewhere (e.g. its own tab) or
+   * hidden; the form then takes the full width. Defaults to true.
+   */
+  showSummary?: boolean;
 }
 
 /**
@@ -112,8 +124,8 @@ const SectionHeader = ({
  * Visual policy builder with guided steps, namespace-grouped dropdowns,
  * contextual help, loading/error states, and optional template support.
  */
-const PolicyBuilder = ({ policy, setPolicy, fieldTemplate }: PolicyBuilderProps) => {
-  const { mappings, loading, error, retry } = useMappings();
+const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMappings, showSummary = true }: PolicyBuilderProps) => {
+  const { mappings, loading, error, retry } = useMappings(providedMappings);
   const { strings } = useI18n();
   const t = strings.policyBuilder;
   const tt = strings.templateMode;
@@ -191,7 +203,7 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate }: PolicyBuilderProps)
 
   return (
     <Row>
-      <Col lg={8}>
+      <Col lg={showSummary ? 8 : 12}>
         <div className="d-flex flex-column gap-3">
           {/* Template banner */}
           {isTemplateMode && fieldTemplate && (
@@ -309,11 +321,13 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate }: PolicyBuilderProps)
         </div>
       </Col>
 
-      <Col lg={4}>
-        <div className="sticky-top" style={{ top: '1rem' }}>
-          <PolicySummary policy={policy} />
-        </div>
-      </Col>
+      {showSummary && (
+        <Col lg={4}>
+          <div className="sticky-top" style={{ top: '1rem' }}>
+            <PolicySummary policy={policy} />
+          </div>
+        </Col>
+      )}
     </Row>
   );
 };

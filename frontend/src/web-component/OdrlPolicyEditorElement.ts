@@ -17,18 +17,26 @@
  * | `locale`                 | Language code (e.g., `"en"`, `"de"`)                 | `"en"`     |
  * | `policy-context`         | JSON-LD `@context` for new policies (JSON)           | `null`     |
  * | `service-id`             | Service ID for service-scoped policy ops              | `null`     |
- * | `persist`                | Boolean — `"false"` emits the policy without storing it | `true`   |
  * | `hide-builder-tab`       | Boolean — hides the visual policy builder tab        | absent     |
  * | `hide-raw-tab`           | Boolean — hides the raw ODRL JSON editor tab         | absent     |
  * | `hide-template-tab`      | Boolean — hides the template selection tab           | absent     |
  * | `hide-template-create-tab` | Boolean — hides the template management tab        | absent     |
+ * | `summary`                | `"side"`, `"tab"` or `"none"` — where the policy summary is shown | `"side"` |
+ * | `hide-cancel-button`     | Boolean — hides the Cancel button                    | absent     |
+ * | `variant`                | `"card"` or `"plain"` — editor drawn as a card, or without chrome | `"card"` |
+ * | `load`                   | `"remote"` or `"none"` — fetch the policy in edit mode | `"remote"` |
+ * | `save`                   | `"remote"`, `"event"` or `"none"` — store the policy in the PAP, hand it to the host, or hide Save | `"remote"` |
+ * | `validate`               | `"remote"` or `"none"` — validate against the PAP     | `"remote"` |
+ * | `templates`              | `"remote"` or `"none"` — list/manage PAP templates    | `"remote"` |
+ * | `mappings`               | `"remote"` or `"none"` — fetch builder mappings       | `"remote"` |
  *
  * ## Custom Events
  *
- * | Event              | Detail                                                        |
- * |--------------------|---------------------------------------------------------------|
- * | `policy-created`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }`  |
- * | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }`  |
+ * | Event              | Detail                                      |
+ * |--------------------|---------------------------------------------|
+ * | `policy-changed`   | `{ policy: OdrlPolicyJson }`                |
+ * | `policy-created`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` |
+ * | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` |
  * | `policy-validated` | `{ result: ValidationResponse }`            |
  * | `editor-cancelled` | `{}`                                        |
  * | `template-created` | `{ template: object, id: string }`          |
@@ -41,6 +49,8 @@
  * - `fieldTemplate` — a {@link FieldTemplate} object to pre-fill and constrain the editor
  * - `policyContext` — custom JSON-LD `@context` object/string for new policies
  * - `serviceId` — service ID string for service-scoped policy operations
+ * - `policy` — the working policy (object or JSON text); read it back for the current value
+ * - `mappings` — builder dropdown mappings, used instead of fetching them
  *
  * @example
  * ```html
@@ -61,20 +71,28 @@
  * </script>
  * ```
  *
- * @example Emit-only mode — the host receives the policy and stores it itself
+ * @example Emit-only mode — the host owns storage
+ *
+ * `save="event"` keeps the Save button but writes nothing: the finished
+ * policy arrives through `policy-created` / `policy-updated` with
+ * `persisted: false`. Pair it with `load="none"` and the `policy` property to
+ * reopen a policy the host stored itself.
+ *
  * ```html
  * <odrl-policy-editor
  *   api-base-url="https://pap.example.com"
- *   persist="false"
+ *   mode="edit"
+ *   save="event"
+ *   load="none"
  * ></odrl-policy-editor>
  *
  * <script>
- *   document
- *     .querySelector('odrl-policy-editor')
- *     .addEventListener('policy-created', (e) => {
- *       // e.detail.persisted === false — nothing was written to the PAP
- *       myBackend.store(e.detail.policy);
- *     });
+ *   const editor = document.querySelector('odrl-policy-editor');
+ *   editor.policy = await myBackend.load(id);
+ *   editor.addEventListener('policy-updated', (e) => {
+ *     // e.detail.persisted === false — nothing was written to the PAP
+ *     myBackend.store(e.detail.id, e.detail.policy);
+ *   });
  * </script>
  * ```
  */
@@ -86,6 +104,10 @@ import type { DeepPartial } from '../i18n/I18nContext';
 import type { I18nStrings } from '../i18n/en';
 import type { ThemeConfig } from '../theme/defaultTheme';
 import type { FieldTemplate } from '../types';
+import type { OdrlPolicyJson } from '../services/api';
+import type { Mappings } from '../api';
+import { CAPABILITIES, resolveCapabilities } from './capabilities';
+import { DEFAULT_SUMMARY_PLACEMENT, DEFAULT_VARIANT, type ButtonVisibility, type EditorVariant, type SummaryPlacement } from './EmbeddedContext';
 
 // Bootstrap CSS imported as a string for shadow-DOM injection.
 // The `?inline` suffix tells Vite to return the CSS text, not inject it
@@ -101,11 +123,6 @@ const DEFAULT_API_BASE_URL = '';
 const DEFAULT_MODE: EditorMode = 'create';
 const DEFAULT_THEME: EmbeddedThemePreset = 'light';
 const DEFAULT_LOCALE = 'en';
-/**
- * Default for the `persist` attribute: policies are written to the PAP
- * unless the host opts out with `persist="false"`.
- */
-const DEFAULT_PERSIST = true;
 
 /** CSS class of the div the React tree is mounted into. */
 const CONTAINER_CLASS = 'odrl-wc-container';
@@ -133,11 +150,10 @@ const CONTAINER_CLASS = 'odrl-wc-container';
 function scopeCssForShadowDom(css: string): string {
   const rescoped = css.replace(/:root\b/g, ':host');
   const surface = `
-:host { display: block; }
+:host { display: block; isolation: isolate; }
 .${CONTAINER_CLASS} {
   font-family: var(--odrl-font-family);
   color: var(--odrl-text-color);
-  background-color: var(--odrl-bg-color);
 }`;
   return `${rescoped}\n${surface}`;
 }
@@ -155,8 +171,10 @@ export class OdrlPolicyEditorElement extends HTMLElement {
   static get observedAttributes(): string[] {
     return [
       'api-base-url', 'auth-token', 'mode', 'policy-id', 'theme', 'locale',
-      'policy-context', 'service-id', 'persist',
+      'policy-context', 'service-id',
       'hide-builder-tab', 'hide-raw-tab', 'hide-template-tab', 'hide-template-create-tab',
+      'summary', 'hide-cancel-button', 'variant',
+      ...CAPABILITIES,
     ];
   }
 
@@ -183,6 +201,63 @@ export class OdrlPolicyEditorElement extends HTMLElement {
 
   /** Service ID for service-scoped policy operations, set via JS property. */
   private _serviceId: string | undefined;
+
+  /** Working policy: set by the host, then kept up to date from `policy-changed`. */
+  private _policy: OdrlPolicyJson | undefined;
+
+  /** Mappings supplied by the host, set via JS property. */
+  private _mappings: Mappings | undefined;
+
+  /**
+   * Sets the policy shown in the editor (JS property, not HTML attribute).
+   *
+   * Accepts the policy object or its JSON text; text that does not parse is
+   * ignored with a warning. Reading it back returns the policy as last edited,
+   * so it can be used as the editor's value.
+   *
+   * @example
+   * ```js
+   * editor.policy = { '@context': { odrl: 'http://www.w3.org/ns/odrl/2/' }, ... };
+   * editor.addEventListener('policy-changed', (e) => save(e.detail.policy));
+   * ```
+   */
+  set policy(value: OdrlPolicyJson | string | undefined) {
+    if (typeof value === 'string') {
+      try {
+        this._policy = JSON.parse(value) as OdrlPolicyJson;
+      } catch {
+        console.warn(`<${TAG_NAME}>: ignoring \`policy\`, it is not valid JSON`);
+        return;
+      }
+    } else {
+      this._policy = value;
+    }
+    this.renderReact();
+  }
+
+  /** Returns the policy as last set by the host or edited by the user. */
+  get policy(): OdrlPolicyJson | undefined {
+    return this._policy;
+  }
+
+  /**
+   * Sets the mappings (actions, operators, operands...) the visual builder
+   * offers in its dropdowns (JS property).
+   *
+   * When set, the builder does not fetch `/mappings` from the PAP; the values
+   * are layered over the PAP's built-in mappings, and one with the same `name`
+   * replaces the built-in one. With `mappings="none"` and nothing set, the
+   * built-in mappings are used as they are.
+   */
+  set mappings(value: Mappings | undefined) {
+    this._mappings = value;
+    this.renderReact();
+  }
+
+  /** Returns the host-supplied mappings, or `undefined` if none are set. */
+  get mappings(): Mappings | undefined {
+    return this._mappings;
+  }
 
   /**
    * Sets partial i18n string overrides (JS property, not HTML attribute).
@@ -404,30 +479,14 @@ export class OdrlPolicyEditorElement extends HTMLElement {
    * would otherwise hide the tab and leave the editor blank.
    *
    * @param name - The attribute name.
-   * @param defaultValue - Value to use when the attribute is absent.
    * @returns `true` when the attribute is present and not explicitly false.
    */
-  private readBooleanAttribute(name: string, defaultValue = false): boolean {
+  private readBooleanAttribute(name: string): boolean {
     if (!this.hasAttribute(name)) {
-      return defaultValue;
+      return false;
     }
     const value = (this.getAttribute(name) ?? '').trim().toLowerCase();
     return value !== 'false' && value !== '0';
-  }
-
-  /**
-   * Resolves whether saving should write the policy to the PAP.
-   *
-   * Unlike the `hide-*-tab` attributes, `persist` defaults to `true`: an
-   * embedder that never sets it keeps the original store-then-emit
-   * behaviour. Setting `persist="false"` switches the editor to emit-only
-   * mode, where the built policy is handed to the host through the
-   * `policy-created` / `policy-updated` events instead.
-   *
-   * @returns `true` when policies should be stored in the PAP.
-   */
-  private resolvePersist(): boolean {
-    return this.readBooleanAttribute('persist', DEFAULT_PERSIST);
   }
 
   /**
@@ -444,6 +503,23 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     };
   }
 
+  /** Resolves which action buttons are hidden from the `hide-*-button` boolean attributes. */
+  private resolveHiddenButtons(): ButtonVisibility {
+    return { hideCancelButton: this.readBooleanAttribute('hide-cancel-button') };
+  }
+
+  /** Reads the `summary` attribute; unknown values fall back to the default placement. */
+  private resolveSummaryPlacement(): SummaryPlacement {
+    const value = this.getAttribute('summary')?.trim().toLowerCase();
+    return value === 'side' || value === 'tab' || value === 'none' ? value : DEFAULT_SUMMARY_PLACEMENT;
+  }
+
+  /** Reads the `variant` attribute; unknown values fall back to the default. */
+  private resolveVariant(): EditorVariant {
+    const value = this.getAttribute('variant')?.trim().toLowerCase();
+    return value === 'card' || value === 'plain' ? value : DEFAULT_VARIANT;
+  }
+
   /** Builds the {@link EmbeddedConfig} from the current attribute values. */
   private buildConfig(): EmbeddedConfig {
     const policyContext = this.resolvePolicyContextAttr();
@@ -457,7 +533,10 @@ export class OdrlPolicyEditorElement extends HTMLElement {
       onEvent: this.dispatchComponentEvent.bind(this),
       serviceId: this.resolveServiceId(),
       hiddenTabs: this.resolveHiddenTabs(),
-      persist: this.resolvePersist(),
+      capabilities: resolveCapabilities((name) => this.getAttribute(name)),
+      summaryPlacement: this.resolveSummaryPlacement(),
+      variant: this.resolveVariant(),
+      hiddenButtons: this.resolveHiddenButtons(),
       ...(policyContext !== undefined && { policyContext }),
     };
   }
@@ -471,6 +550,10 @@ export class OdrlPolicyEditorElement extends HTMLElement {
     type: K,
     detail: unknown,
   ): void {
+    // Keep the `policy` property in sync with the editor without re-rendering.
+    if (type === 'policy-changed') {
+      this._policy = (detail as { policy: OdrlPolicyJson }).policy;
+    }
     this.dispatchEvent(
       new CustomEvent(type, {
         detail,
@@ -513,6 +596,8 @@ export class OdrlPolicyEditorElement extends HTMLElement {
           themeOverrides: this._themeConfig,
           containerRef: this.containerRef,
           fieldTemplate: this._fieldTemplate,
+          policy: this._policy,
+          mappings: this._mappings,
         }),
       );
     });

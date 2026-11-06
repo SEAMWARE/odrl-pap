@@ -130,6 +130,34 @@ public class OdrlApiTest extends OdrlTest {
         assertValidPolicy(policyResponse);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"energy-report-read", "1policy", "my.policy", "urn:policy:1", "my policy", "if", "contains", "data", "input"})
+    public void testCreationOfPolicyWithInvalidId(String id) throws IOException {
+        Map<String, Object> theOdrl = getJsonFromResource(objectMapper, "/examples/ngsi-ld/types/types.json");
+        Response policyResponse = policyResource.createPolicyWithId(id, theOdrl);
+        assertEquals(HttpStatus.SC_BAD_REQUEST, policyResponse.getStatus(), "An id that is not a valid rego identifier should be rejected.");
+        assertEquals(HttpStatus.SC_NOT_FOUND, policyResource.getPolicyById(id).getStatus(), "The rejected policy should not have been persisted.");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"energy-report-read", "1policy", "if"})
+    public void testCreationOfServicePolicyWithInvalidId(String id) throws IOException {
+        serviceResource.createService(new ServiceCreate().id("myservice"));
+        Map<String, Object> theOdrl = getJsonFromResource(objectMapper, "/examples/ngsi-ld/types/types.json");
+        Response policyResponse = serviceResource.createServicePolicyWithId("myservice", id, theOdrl);
+        assertEquals(HttpStatus.SC_BAD_REQUEST, policyResponse.getStatus(), "An id that is not a valid rego identifier should be rejected.");
+        assertEquals(HttpStatus.SC_NOT_FOUND, serviceResource.getServicePolicyById("myservice", id).getStatus(), "The rejected policy should not have been persisted.");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"_policy", "EnergyReportRead", "energy_report_read", "policy1", "rego"})
+    public void testCreationOfPolicyWithValidIdEdgeCases(String id) throws IOException {
+        Map<String, Object> theOdrl = getJsonFromResource(objectMapper, "/examples/ngsi-ld/types/types.json");
+        // The policy module only shows up in OPA once the bundle activated, which it would not if
+        // the generated rego (the policy or the main policy importing it) failed to parse.
+        assertValidPolicy(policyResource.createPolicyWithId(id, theOdrl));
+    }
+
     private String getIdFromPolicy(Map<String, Object> thePolicy) {
         if (thePolicy.containsKey(ODRL_UID_KEY) && thePolicy.get(ODRL_UID_KEY) instanceof String uidString) {
             return uidString;

@@ -14,10 +14,11 @@ your stack.
 - [Vue 2](#vue-2)
 - [Vue 3](#vue-3)
 - [Svelte](#svelte)
+- [Without the PAP Backend](#without-the-pap-backend)
+- [Host-Owned Storage (Emit-Only)](#host-owned-storage-emit-only)
 - [Server-Side Rendering (SSR)](#server-side-rendering-ssr)
 - [Security Considerations](#security-considerations)
 - [Performance Optimization](#performance-optimization)
-- [Emit-Only Mode (No PAP Storage)](#emit-only-mode-no-pap-storage)
 - [Attributes & Events Reference](#attributes--events-reference)
 
 ---
@@ -436,6 +437,92 @@ is needed.
 
 ---
 
+## Without the PAP Backend
+
+Each operation that talks to the PAP can be switched off on its own with an
+attribute set to `none` (the default is `remote`): `load`, `save`, `validate`,
+`templates` and `mappings`. With all of them off the editor is a plain form
+control — you set the policy and read it back from `policy-changed`; no
+`api-base-url` or `auth-token` is needed.
+
+```html
+<odrl-policy-editor
+  load="none" save="none" validate="none" templates="none" mappings="none"
+></odrl-policy-editor>
+```
+
+```javascript
+editor.policy = existingPolicy;               // object or JSON text
+editor.addEventListener('policy-changed', (e) => store(e.detail.policy));
+```
+
+In Angular (with `CUSTOM_ELEMENTS_SCHEMA`) the same thing reads:
+
+```html
+<odrl-policy-editor
+  load="none" save="none" validate="none" templates="none" mappings="none"
+  [policy]="policy"
+  (policy-changed)="policy = $event.detail.policy"
+></odrl-policy-editor>
+```
+
+The visual builder offers the mappings the PAP ships with. Set the `mappings`
+property to add to them or, with the same `name`, replace them. See the
+[README](../README.md#backend-capabilities) for details.
+
+---
+
+## Host-Owned Storage (Emit-Only)
+
+When the host keeps the policies in its own store but still wants the PAP's
+vocabulary and validation, set `save="event"`. The Save button stays, but
+pressing it writes nothing: the finished policy arrives through
+`policy-created` / `policy-updated` with `persisted: false`, under an `id`
+derived from its `odrl:uid`.
+
+```html
+<odrl-policy-editor
+  api-base-url="https://pap.example.com"
+  save="event"
+></odrl-policy-editor>
+```
+
+```javascript
+editor.addEventListener('policy-created', (e) => {
+  // e.detail.persisted === false — nothing was written to the PAP
+  myBackend.store(e.detail.id, e.detail.policy);
+});
+```
+
+To *reopen* a policy the host stored, add `load="none"` and hand it in through
+the `policy` property — otherwise the editor would try to fetch it from the
+PAP, which does not have it:
+
+```javascript
+editor.setAttribute('mode', 'edit');
+editor.setAttribute('load', 'none');
+editor.setAttribute('save', 'event');
+editor.policy = await myBackend.load(id);    // object or JSON text
+editor.addEventListener('policy-updated', (e) => myBackend.store(e.detail.id, e.detail.policy));
+```
+
+`save="event"` governs policy writes only. The template management tab writes
+templates to the PAP and is controlled by `templates`; switch it off with
+`templates="none"` if the component must issue no write at all.
+
+Since the capability modes are plain string attributes, framework bindings
+need no special handling:
+
+| Framework | Binding |
+|-----------|---------|
+| Plain HTML | `save="event"` |
+| React | `<odrl-policy-editor save="event" />` |
+| Angular | `save="event"` or `[attr.save]="saveMode"` — *not* `[save]="..."`, which would set a property the element does not read |
+| Vue 2/3 | `save="event"` or `:save="saveMode"` |
+| Svelte | `save="event"` or `save={saveMode}` |
+
+---
+
 ## Server-Side Rendering (SSR)
 
 The `<odrl-policy-editor>` custom element requires a browser DOM
@@ -594,63 +681,6 @@ via versioned URLs.
 
 ---
 
-## Emit-Only Mode (No PAP Storage)
-
-By default the editor writes the policy to the PAP and then reports it. If the
-host application wants to own storage — keeping the policy in its own database,
-attaching it to a draft contract, or reviewing it before it ever reaches a PAP —
-add `persist="false"`. The editor then issues no write request: on Save the
-finished ODRL policy is delivered through the usual `policy-created` /
-`policy-updated` events with `detail.persisted === false`.
-
-```html
-<odrl-policy-editor
-  id="editor"
-  api-base-url="https://pap.example.com"
-  persist="false"
-  hide-template-tab
-></odrl-policy-editor>
-
-<script type="module">
-  document.getElementById('editor').addEventListener('policy-created', async (e) => {
-    if (!e.detail.persisted) {
-      // Nothing was stored in the PAP — it is ours to keep.
-      await fetch('/api/drafts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id: e.detail.id, policy: e.detail.policy }),
-      });
-    }
-  });
-</script>
-```
-
-The emitted `detail.id` is the policy's `odrl:uid` (generated when the user did
-not set one), so it can be used as the storage key.
-
-### Still requires a reachable PAP
-
-`persist="false"` suppresses **writes only**. These read-only calls still go to
-`api-base-url`:
-
-| Call | When | Required? |
-|------|------|-----------|
-| `GET /mappings` | always | **Yes** — the builder's vocabulary dropdowns come from it |
-| `GET /policy/{id}` | `mode="edit"` | only in edit mode |
-| `POST /validate` | user runs a validation | optional |
-| `GET /templates` | template picker visible | optional (`hide-template-tab` to skip) |
-
-Validation in particular cannot be done offline: policy evaluation is performed
-server-side by the PAP's OPA engine.
-
-### Template management is hidden
-
-The template management tab creates and edits templates through the PAP's
-template API. Since that contradicts "no writes", the tab is hidden whenever
-`persist="false"`, regardless of `hide-template-create-tab`.
-
----
-
 ## Attributes & Events Reference
 
 ### HTML Attributes
@@ -664,8 +694,14 @@ template API. Since that contradicts "no writes", the tab is hidden whenever
 | `theme` | `"light" \| "dark"` | `"light"` | Theme preset |
 | `locale` | `string` | `"en"` | Language code |
 | `policy-context` | `string` (JSON) | `null` | Default JSON-LD `@context` for new policies |
-| `service-id` | `string` | `null` | Service ID for service-scoped policy/template operations |
-| `persist` | `boolean` | `true` | `"false"` emits the built policy instead of storing it in the PAP |
+| `summary` | `"side" \| "tab" \| "none"` | `"side"` | Where the policy summary is shown; `tab` suits narrow containers |
+| `hide-cancel-button` | boolean | absent | Hides the Cancel button |
+| `variant` | `"card" \| "plain"` | `"card"` | Editor framed as a card, or without chrome (for hosts that already provide one) |
+| `load` | `"remote" \| "none"` | `"remote"` | Fetch the policy when `mode="edit"` |
+| `save` | `"remote" \| "event" \| "none"` | `"remote"` | Store the policy in the PAP; `event` emits it to the host instead (see [Host-Owned Storage](#host-owned-storage-emit-only)); `none` hides Save |
+| `validate` | `"remote" \| "none"` | `"remote"` | Validate against the PAP; `none` hides Validate |
+| `templates` | `"remote" \| "none"` | `"remote"` | List/manage PAP templates; `none` hides both template tabs |
+| `mappings` | `"remote" \| "none"` | `"remote"` | Fetch the builder's mappings; `none` uses the built-in ones |
 
 ### JavaScript Properties
 
@@ -675,15 +711,18 @@ template API. Since that contradicts "no writes", the tab is hidden whenever
 | `themeConfig` | `object \| undefined` | CSS custom property overrides |
 | `template` | `object \| undefined` | Policy template to pre-fill and constrain the editor |
 | `policyContext` | `object \| string \| undefined` | JSON-LD `@context` (JS property takes precedence over attribute) |
+| `policy` | `object \| string \| undefined` | The working policy (object or JSON text); reads back the latest edit |
+| `mappings` | `object \| undefined` | Builder mappings, layered over the PAP's built-in ones (same `name` wins) |
 
 ### Custom Events
 
 | Event | Detail | Description |
 |-------|--------|-------------|
-| `policy-created` | `{ policy: object, id: string, persisted: boolean }` | A new policy was saved — or, with `persist="false"`, built and handed over |
-| `policy-updated` | `{ policy: object, id: string, persisted: boolean }` | An existing policy was updated |
+| `policy-created` | `{ policy: object, id: string, persisted: boolean }` | A new policy was saved (`persisted: false` with `save="event"`) |
+| `policy-updated` | `{ policy: object, id: string, persisted: boolean }` | An existing policy was updated (`persisted: false` with `save="event"`) |
 | `policy-validated` | `{ result: object }` | Policy validation completed |
 | `editor-cancelled` | `{}` | The user clicked Cancel |
+| `policy-changed` | `{ policy: object }` | The policy was edited (not fired for the initial or host-set policy) |
 
 For complete type definitions, see the
 [TypeScript declarations](https://www.npmjs.com/package/@seamware/odrl-policy-editor)

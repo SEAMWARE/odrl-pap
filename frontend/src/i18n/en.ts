@@ -183,6 +183,7 @@ export const en = {
     tabBuilder: 'Policy Builder',
     tabRawOdrl: 'Raw ODRL',
     tabManageTemplates: 'Manage Templates',
+    tabSummary: 'Summary',
     validate: 'Validate',
     jsonValid: 'Valid JSON',
     jsonInvalid: 'Invalid JSON',

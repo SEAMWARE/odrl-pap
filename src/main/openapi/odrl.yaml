@@ -148,6 +148,8 @@ paths:
               schema:
                 type: string
               description: location of the created policy
+        '400':
+          description: Should be returned in case the id is not a valid rego identifier ([a-zA-Z_][a-zA-Z0-9_]*, not a rego keyword), since it becomes the rego package of the policy.
         '409':
           description: Should be returned in case the policy is not allowed to be modified
     get:
@@ -279,6 +281,8 @@ paths:
               schema:
                 type: string
               description: location of the created policy
+        '400':
+          description: Should be returned in case the id is not a valid rego identifier ([a-zA-Z_][a-zA-Z0-9_]*, not a rego keyword), since it becomes the rego package of the policy.
         '409':
           description: Should be returned in case the policy is not allowed to be modified
     get:

@@ -25,7 +25,6 @@ function makeConfig(overrides: Partial<EmbeddedConfig> = {}): EmbeddedConfig {
     locale: 'en',
     theme: 'light',
     onEvent: noopOnEvent,
-    persist: true,
     ...overrides,
   };
 }

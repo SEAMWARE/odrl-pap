@@ -24,6 +24,36 @@
   --odrl-danger-color: #dc3545;
   --odrl-info-color: #0dcaf0;
   --odrl-card-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+  --odrl-primary-text-color: #FFFFFF;
+  --odrl-card-radius: 0.375rem;
+  --odrl-input-bg: #FFFFFF;
+}
+
+/*
+ * Dark preset of the embedded editor, selected by the host's `theme="dark"`.
+ * Declared on the host rather than set inline, so a page can still override
+ * any token with a plain CSS rule on the element
+ * (`odrl-policy-editor { --odrl-primary-color: ... }`). Keep in step with
+ * `darkTheme` in defaultTheme.ts (a test checks it).
+ */
+:host([theme="dark"]) {
+  --odrl-primary-color: #1a4a6b;
+  --odrl-secondary-color: #F07D00;
+  --odrl-bg-color: #1a1a2e;
+  --odrl-text-color: #e0e0e0;
+  --odrl-text-muted: #adb5bd;
+  --odrl-card-bg: #16213e;
+  --odrl-border-color: #2a2a4a;
+  --odrl-font-family: 'Lato', sans-serif;
+  --odrl-border-radius: 0.375rem;
+  --odrl-section-header-bg: #0f3460;
+  --odrl-success-color: #20c997;
+  --odrl-danger-color: #e74c3c;
+  --odrl-info-color: #17a2b8;
+  --odrl-card-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.3);
+  --odrl-primary-text-color: #FFFFFF;
+  --odrl-card-radius: 0.375rem;
+  --odrl-input-bg: #1a1a2e;
 }
 
 body {
@@ -34,4 +64,318 @@ body {
 
 .navbar-dark {
   background-color: var(--odrl-primary-color) !important;
+}
+
+/*
+ * Embedded editor (<odrl-policy-editor>): Bootstrap, driven by the --odrl-*
+ * tokens.
+ *
+ * Bootstrap paints tabs, buttons and cards from its own --bs-* variables.
+ * Everything below re-points those at the --odrl-* tokens, so a host can
+ * restyle the editor by setting tokens (themeConfig, or CSS custom properties
+ * on the element) instead of overriding Bootstrap. Scoped to
+ * `.odrl-embedded-root`, so the standalone SPA is not affected.
+ */
+/* Bootstrap's grid rows have negative side margins that the container's padding
+   normally absorbs. Without that padding (variant="plain") they would stick out
+   and give the host a horizontal scrollbar, so the overflow is clipped. */
+.odrl-embedded-root {
+  overflow-x: clip;
+  --bs-primary: var(--odrl-primary-color);
+  --bs-body-color: var(--odrl-text-color);
+  --bs-secondary-color: var(--odrl-text-muted);
+  --bs-border-color: var(--odrl-border-color);
+  --bs-border-radius: var(--odrl-border-radius);
+  --bs-link-color: var(--odrl-primary-color);
+  --bs-link-hover-color: color-mix(in srgb, var(--odrl-primary-color) 80%, black);
+}
+
+/* variant="card" (default): the editor is itself a card. variant="plain": no
+   chrome, for hosts that already sit it inside a card or a modal. */
+.odrl-embedded-root[data-variant="card"] {
+  background-color: var(--odrl-bg-color);
+  border: 1px solid var(--odrl-border-color);
+  border-radius: var(--odrl-card-radius);
+  box-shadow: var(--odrl-card-shadow);
+}
+
+/* Cards inside the editor (builder steps, summary). */
+.odrl-embedded-root .card {
+  --bs-card-bg: var(--odrl-card-bg);
+  --bs-card-color: var(--odrl-text-color);
+  --bs-card-border-color: var(--odrl-border-color);
+  --bs-card-border-radius: var(--odrl-card-radius);
+  --bs-card-inner-border-radius: calc(var(--odrl-card-radius) - 1px);
+  --bs-card-cap-bg: var(--odrl-section-header-bg);
+  --bs-card-cap-color: var(--odrl-text-color);
+}
+
+/* Underlined tab strip instead of Bootstrap's boxed tabs. */
+.odrl-embedded-root .nav-tabs {
+  border-bottom: 1px solid var(--odrl-border-color);
+  gap: 0.25rem;
+}
+
+.odrl-embedded-root .nav-tabs .nav-link {
+  margin-bottom: -1px;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--odrl-text-muted);
+  font-weight: 500;
+}
+
+.odrl-embedded-root .nav-tabs .nav-link:hover:not(.active):not(.disabled) {
+  border-bottom-color: var(--odrl-border-color);
+  color: var(--odrl-text-color);
+}
+
+.odrl-embedded-root .nav-tabs .nav-link.active {
+  border-bottom-color: var(--odrl-primary-color);
+  background: transparent;
+  color: var(--odrl-primary-color);
+}
+
+.odrl-embedded-root .nav-tabs .nav-link.disabled {
+  opacity: 0.5;
+}
+
+.odrl-embedded-root .nav-tabs .nav-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--odrl-primary-color) 50%, transparent);
+  outline-offset: -2px;
+}
+
+/* Buttons. Primary is filled; secondary and info are outlined and neutral; the
+   outline variants take the primary or danger color. */
+.odrl-embedded-root .btn {
+  --bs-btn-border-radius: var(--odrl-border-radius);
+  font-weight: 500;
+}
+
+.odrl-embedded-root .btn:focus-visible {
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--odrl-primary-color) 40%, transparent);
+}
+
+.odrl-embedded-root .btn-primary {
+  --bs-btn-color: var(--odrl-primary-text-color);
+  --bs-btn-bg: var(--odrl-primary-color);
+  --bs-btn-border-color: var(--odrl-primary-color);
+  --bs-btn-hover-color: var(--odrl-primary-text-color);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--odrl-primary-color) 88%, black);
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--odrl-primary-color) 88%, black);
+  --bs-btn-active-color: var(--odrl-primary-text-color);
+  --bs-btn-active-bg: color-mix(in srgb, var(--odrl-primary-color) 78%, black);
+  --bs-btn-active-border-color: color-mix(in srgb, var(--odrl-primary-color) 78%, black);
+  --bs-btn-disabled-color: var(--odrl-primary-text-color);
+  --bs-btn-disabled-bg: var(--odrl-primary-color);
+  --bs-btn-disabled-border-color: var(--odrl-primary-color);
+}
+
+.odrl-embedded-root .btn-secondary,
+.odrl-embedded-root .btn-outline-secondary {
+  --bs-btn-color: var(--odrl-text-color);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: var(--odrl-border-color);
+  --bs-btn-hover-color: var(--odrl-text-color);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--odrl-text-color) 7%, transparent);
+  --bs-btn-hover-border-color: var(--odrl-border-color);
+  --bs-btn-active-color: var(--odrl-text-color);
+  --bs-btn-active-bg: color-mix(in srgb, var(--odrl-text-color) 12%, transparent);
+  --bs-btn-active-border-color: var(--odrl-border-color);
+  --bs-btn-disabled-color: var(--odrl-text-color);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: var(--odrl-border-color);
+}
+
+.odrl-embedded-root .btn-info,
+.odrl-embedded-root .btn-outline-primary {
+  --bs-btn-color: var(--odrl-primary-color);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: var(--odrl-primary-color);
+  --bs-btn-hover-color: var(--odrl-primary-text-color);
+  --bs-btn-hover-bg: var(--odrl-primary-color);
+  --bs-btn-hover-border-color: var(--odrl-primary-color);
+  --bs-btn-active-color: var(--odrl-primary-text-color);
+  --bs-btn-active-bg: color-mix(in srgb, var(--odrl-primary-color) 88%, black);
+  --bs-btn-active-border-color: color-mix(in srgb, var(--odrl-primary-color) 88%, black);
+  --bs-btn-disabled-color: var(--odrl-primary-color);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: var(--odrl-primary-color);
+}
+
+.odrl-embedded-root .btn-outline-danger {
+  --bs-btn-color: var(--odrl-danger-color);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: var(--odrl-danger-color);
+  --bs-btn-hover-color: var(--odrl-primary-text-color);
+  --bs-btn-hover-bg: var(--odrl-danger-color);
+  --bs-btn-hover-border-color: var(--odrl-danger-color);
+  --bs-btn-active-color: var(--odrl-primary-text-color);
+  --bs-btn-active-bg: color-mix(in srgb, var(--odrl-danger-color) 88%, black);
+  --bs-btn-active-border-color: color-mix(in srgb, var(--odrl-danger-color) 88%, black);
+  --bs-btn-disabled-color: var(--odrl-danger-color);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: var(--odrl-danger-color);
+}
+
+.odrl-embedded-root .btn-danger {
+  --bs-btn-color: var(--odrl-primary-text-color);
+  --bs-btn-bg: var(--odrl-danger-color);
+  --bs-btn-border-color: var(--odrl-danger-color);
+  --bs-btn-hover-color: var(--odrl-primary-text-color);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--odrl-danger-color) 88%, black);
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--odrl-danger-color) 88%, black);
+  --bs-btn-active-color: var(--odrl-primary-text-color);
+  --bs-btn-active-bg: color-mix(in srgb, var(--odrl-danger-color) 78%, black);
+  --bs-btn-active-border-color: color-mix(in srgb, var(--odrl-danger-color) 78%, black);
+  --bs-btn-disabled-color: var(--odrl-primary-text-color);
+  --bs-btn-disabled-bg: var(--odrl-danger-color);
+  --bs-btn-disabled-border-color: var(--odrl-danger-color);
+}
+
+.odrl-embedded-root .btn-outline-success {
+  --bs-btn-color: var(--odrl-success-color);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: var(--odrl-success-color);
+  --bs-btn-hover-color: var(--odrl-primary-text-color);
+  --bs-btn-hover-bg: var(--odrl-success-color);
+  --bs-btn-hover-border-color: var(--odrl-success-color);
+  --bs-btn-active-color: var(--odrl-primary-text-color);
+  --bs-btn-active-bg: color-mix(in srgb, var(--odrl-success-color) 88%, black);
+  --bs-btn-active-border-color: color-mix(in srgb, var(--odrl-success-color) 88%, black);
+  --bs-btn-disabled-color: var(--odrl-success-color);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: var(--odrl-success-color);
+}
+
+.odrl-embedded-root .btn-success {
+  --bs-btn-color: var(--odrl-primary-text-color);
+  --bs-btn-bg: var(--odrl-success-color);
+  --bs-btn-border-color: var(--odrl-success-color);
+  --bs-btn-hover-color: var(--odrl-primary-text-color);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--odrl-success-color) 88%, black);
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--odrl-success-color) 88%, black);
+  --bs-btn-active-color: var(--odrl-primary-text-color);
+  --bs-btn-active-bg: color-mix(in srgb, var(--odrl-success-color) 78%, black);
+  --bs-btn-active-border-color: color-mix(in srgb, var(--odrl-success-color) 78%, black);
+  --bs-btn-disabled-color: var(--odrl-primary-text-color);
+  --bs-btn-disabled-bg: var(--odrl-success-color);
+  --bs-btn-disabled-border-color: var(--odrl-success-color);
+}
+
+/* Bootstrap derives these from an rgb() triplet of its own palette, which a
+   token cannot provide, so the accents that follow the primary color are
+   re-pointed by hand: filled badges (the step numbers), checked radios and
+   checkboxes, and the focus ring of text fields. */
+.odrl-embedded-root .bg-primary {
+  background-color: var(--odrl-primary-color) !important;
+  color: var(--odrl-primary-text-color) !important;
+}
+
+.odrl-embedded-root .bg-success {
+  background-color: var(--odrl-success-color) !important;
+  color: var(--odrl-primary-text-color) !important;
+}
+
+.odrl-embedded-root .bg-secondary {
+  background-color: var(--odrl-text-muted) !important;
+  color: var(--odrl-primary-text-color) !important;
+}
+
+.odrl-embedded-root .text-primary {
+  color: var(--odrl-primary-color) !important;
+}
+
+.odrl-embedded-root .form-check-input:checked,
+.odrl-embedded-root .form-check-input[type="checkbox"]:indeterminate {
+  background-color: var(--odrl-primary-color);
+  border-color: var(--odrl-primary-color);
+}
+
+.odrl-embedded-root .form-check-input:focus,
+.odrl-embedded-root .form-control:focus,
+.odrl-embedded-root .form-select:focus {
+  border-color: color-mix(in srgb, var(--odrl-primary-color) 55%, transparent);
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--odrl-primary-color) 25%, transparent);
+}
+
+/* Text fields, selects and checkboxes. */
+.odrl-embedded-root .form-control,
+.odrl-embedded-root .form-select,
+.odrl-embedded-root .input-group-text {
+  background-color: var(--odrl-input-bg);
+  border-color: var(--odrl-border-color);
+  border-radius: var(--odrl-border-radius);
+  color: var(--odrl-text-color);
+}
+
+.odrl-embedded-root .input-group-text {
+  background-color: var(--odrl-section-header-bg);
+}
+
+.odrl-embedded-root .form-control::placeholder {
+  color: var(--odrl-text-muted);
+  opacity: 0.8;
+}
+
+.odrl-embedded-root .form-control:disabled,
+.odrl-embedded-root .form-select:disabled {
+  background-color: color-mix(in srgb, var(--odrl-input-bg) 92%, var(--odrl-text-color));
+  opacity: 0.7;
+}
+
+.odrl-embedded-root .form-check-input {
+  background-color: var(--odrl-input-bg);
+  border-color: var(--odrl-border-color);
+}
+
+/* Titles. */
+.odrl-embedded-root h1,
+.odrl-embedded-root h2,
+.odrl-embedded-root h3,
+.odrl-embedded-root h4,
+.odrl-embedded-root h5,
+.odrl-embedded-root h6 {
+  color: var(--odrl-text-color);
+  font-weight: 600;
+}
+
+.odrl-embedded-root hr {
+  border-color: var(--odrl-border-color);
+  opacity: 1;
+}
+
+/* Lists (the policy summary) and tables. */
+.odrl-embedded-root .list-group {
+  --bs-list-group-bg: var(--odrl-card-bg);
+  --bs-list-group-color: var(--odrl-text-color);
+  --bs-list-group-border-color: var(--odrl-border-color);
+  --bs-list-group-border-radius: var(--odrl-border-radius);
+}
+
+.odrl-embedded-root .table {
+  --bs-table-color: var(--odrl-text-color);
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--odrl-border-color);
+}
+
+/* Alerts follow the status tokens. */
+.odrl-embedded-root .alert-danger {
+  --bs-alert-color: var(--odrl-danger-color);
+  --bs-alert-bg: color-mix(in srgb, var(--odrl-danger-color) 10%, transparent);
+  --bs-alert-border-color: color-mix(in srgb, var(--odrl-danger-color) 35%, transparent);
+}
+
+.odrl-embedded-root .alert-success {
+  --bs-alert-color: var(--odrl-success-color);
+  --bs-alert-bg: color-mix(in srgb, var(--odrl-success-color) 10%, transparent);
+  --bs-alert-border-color: color-mix(in srgb, var(--odrl-success-color) 35%, transparent);
+}
+
+.odrl-embedded-root .alert-info {
+  --bs-alert-color: var(--odrl-info-color);
+  --bs-alert-bg: color-mix(in srgb, var(--odrl-info-color) 10%, transparent);
+  --bs-alert-border-color: color-mix(in srgb, var(--odrl-info-color) 35%, transparent);
 }

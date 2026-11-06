@@ -23,6 +23,8 @@ import org.openapi.quarkus.odrl_yaml.model.Policy;
 import java.io.ByteArrayInputStream;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 @Slf4j
 public abstract class ApiResource {
@@ -30,6 +32,19 @@ public abstract class ApiResource {
     private static final String MAIN_POLICY_ID = "main";
     private static final String LOCATION_HEADER = "Location";
     private static final String POLICY_PACKAGE = "policy";
+
+    /**
+     * A policy id becomes the rego package of its policy and the alias it is imported under in the
+     * main policy, so it has to be a valid rego identifier. A single invalid one makes OPA reject the
+     * whole bundle.
+     */
+    private static final Pattern REGO_IDENTIFIER = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]*");
+    /**
+     * Rego keywords, plus the root documents, which cannot be used as an import alias.
+     */
+    private static final Set<String> REGO_RESERVED_WORDS = Set.of(
+            "as", "contains", "default", "else", "every", "false", "if", "import", "in", "not", "null",
+            "package", "some", "true", "with", "data", "input");
 
     protected final ObjectMapper objectMapper;
     protected final JsonLdHandler jsonLdHandler;
@@ -62,6 +77,11 @@ public abstract class ApiResource {
         if (id.equals(MAIN_POLICY_ID)) {
             return Response.status(HttpStatus.SC_CONFLICT).entity("Policy `main` cannot be manually modified.").build();
         }
+        if (!isValidPolicyId(id)) {
+            return Response.status(HttpStatus.SC_BAD_REQUEST)
+                    .entity(String.format("Policy id `%s` is not a valid rego identifier. It has to match %s and must not be a rego keyword.", id, REGO_IDENTIFIER.pattern()))
+                    .build();
+        }
         byte[] policyBytes;
         try {
             policyBytes = objectMapper.writeValueAsBytes(policy);
@@ -93,6 +113,10 @@ public abstract class ApiResource {
             throw new IllegalArgumentException("Was not able to persist the odrl representation.", e);
         }
         return Response.ok(regoPolicy).header(LOCATION_HEADER, id).build();
+    }
+
+    static boolean isValidPolicyId(String id) {
+        return REGO_IDENTIFIER.matcher(id).matches() && !REGO_RESERVED_WORDS.contains(id);
     }
 
     protected Policy toPolicy(PolicyWrapper policyWrapper) {

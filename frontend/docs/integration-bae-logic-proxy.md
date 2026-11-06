@@ -202,6 +202,34 @@ editor.addEventListener('policy-created', (e) => {
 
 ---
 
+### 5. Use the Editor Without the PAP Backend (Optional)
+
+By default the editor stores, validates and loads through the PAP. Each of
+those operations can be switched off with its own attribute (`load`, `save`,
+`validate`, `templates`, `mappings`, each `remote` or `none`), which turns the
+editor into a plain form control: the host sets the policy and reads it back
+from `policy-changed`.
+
+```html
+<odrl-policy-editor
+  load="none" save="none" validate="none" templates="none" mappings="none"
+></odrl-policy-editor>
+```
+
+```javascript
+editor.policy = currentPolicyJson;
+// Optional: the PAP's built-in mappings are used as they are. Set any to add
+// to them or, with the same `name`, replace them.
+// editor.mappings = { actions: [{ name: 'dome-op:buy', description: '...' }] };
+editor.addEventListener('policy-changed', (e) => {
+  textarea.value = JSON.stringify(e.detail.policy, null, 2);
+});
+```
+
+No `api-base-url` or `auth-token` is needed in this mode.
+
+---
+
 ## Event Handling
 
 The Web Component dispatches Custom Events to communicate with the host
