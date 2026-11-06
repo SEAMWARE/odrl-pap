@@ -25,7 +25,7 @@
  * | `hide-cancel-button`     | Boolean — hides the Cancel button                    | absent     |
  * | `variant`                | `"card"` or `"plain"` — editor drawn as a card, or without chrome | `"card"` |
  * | `load`                   | `"remote"` or `"none"` — fetch the policy in edit mode | `"remote"` |
- * | `save`                   | `"remote"` or `"none"` — store the policy in the PAP  | `"remote"` |
+ * | `save`                   | `"remote"`, `"event"` or `"none"` — store the policy in the PAP, hand it to the host, or hide Save | `"remote"` |
  * | `validate`               | `"remote"` or `"none"` — validate against the PAP     | `"remote"` |
  * | `templates`              | `"remote"` or `"none"` — list/manage PAP templates    | `"remote"` |
  * | `mappings`               | `"remote"` or `"none"` — fetch builder mappings       | `"remote"` |
@@ -35,8 +35,8 @@
  * | Event              | Detail                                      |
  * |--------------------|---------------------------------------------|
  * | `policy-changed`   | `{ policy: OdrlPolicyJson }`                |
- * | `policy-created`   | `{ policy: OdrlPolicyJson, id: string }`    |
- * | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string }`    |
+ * | `policy-created`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` |
+ * | `policy-updated`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` |
  * | `policy-validated` | `{ result: ValidationResponse }`            |
  * | `editor-cancelled` | `{}`                                        |
  * | `template-created` | `{ template: object, id: string }`          |
@@ -67,6 +67,31 @@
  *   const editor = document.querySelector('odrl-policy-editor');
  *   editor.addEventListener('policy-created', (e) => {
  *     console.log('Policy created:', e.detail);
+ *   });
+ * </script>
+ * ```
+ *
+ * @example Emit-only mode — the host owns storage
+ *
+ * `save="event"` keeps the Save button but writes nothing: the finished
+ * policy arrives through `policy-created` / `policy-updated` with
+ * `persisted: false`. Pair it with `load="none"` and the `policy` property to
+ * reopen a policy the host stored itself.
+ *
+ * ```html
+ * <odrl-policy-editor
+ *   api-base-url="https://pap.example.com"
+ *   mode="edit"
+ *   save="event"
+ *   load="none"
+ * ></odrl-policy-editor>
+ *
+ * <script>
+ *   const editor = document.querySelector('odrl-policy-editor');
+ *   editor.policy = await myBackend.load(id);
+ *   editor.addEventListener('policy-updated', (e) => {
+ *     // e.detail.persisted === false — nothing was written to the PAP
+ *     myBackend.store(e.detail.id, e.detail.policy);
  *   });
  * </script>
  * ```

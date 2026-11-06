@@ -26,10 +26,11 @@ export type EmbeddedThemePreset = 'light' | 'dark';
 export type Capability = 'load' | 'save' | 'validate' | 'templates' | 'mappings';
 
 /**
- * Where a capability is served from: `"remote"` (the PAP API, the default) or
- * `"none"` (switched off: no request is made and its UI is not rendered).
+ * Where a capability is served from: `"remote"` (the PAP API, the default),
+ * `"none"` (switched off: no request is made and its UI is not rendered) or
+ * `"event"` (the host answers through a Custom Event; supported by `save`).
  */
-export type CapabilityMode = 'remote' | 'none';
+export type CapabilityMode = 'remote' | 'none' | 'event';
 
 /** The mode of every capability. */
 export type CapabilityModes = Record<Capability, CapabilityMode>;
@@ -100,15 +101,23 @@ export interface EmbeddedEventMap {
    */
   'policy-changed': { policy: Record<string, unknown> };
   /**
-   * Fired after a new policy is successfully saved.
+   * Fired after a new policy has been accepted by the editor.
    *
    * `id` is the id the policy is stored under at the PAP (`GET /policy/{id}`).
    * It is derived from the policy's `odrl:uid`, and differs from it when the
    * uid is not a valid policy id (e.g. a UUID or an IRI).
+   *
+   * `persisted` is `true` when the policy was written to the PAP and `false`
+   * with `save="event"`, where the editor writes nothing and storing the
+   * policy under `id` is left to the host.
    */
-  'policy-created': { policy: Record<string, unknown>; id: string };
-  /** Fired after an existing policy is successfully updated. */
-  'policy-updated': { policy: Record<string, unknown>; id: string };
+  'policy-created': { policy: Record<string, unknown>; id: string; persisted: boolean };
+  /**
+   * Fired after an existing policy has been updated in the editor.
+   *
+   * See `policy-created` for the meaning of `id` and `persisted`.
+   */
+  'policy-updated': { policy: Record<string, unknown>; id: string; persisted: boolean };
   /** Fired after a policy validation completes. */
   'policy-validated': { result: Record<string, unknown> };
   /** Fired when the user clicks Cancel. */
@@ -207,7 +216,7 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | `hide-cancel-button` | Boolean — hides the Cancel button            | absent |
  * | `variant`        | `"card"` \| `"plain"` — framed as a card, or no chrome | `"card"` |
  * | `load`           | `"remote"` \| `"none"` — fetch the policy when `mode="edit"` | `"remote"` |
- * | `save`           | `"remote"` \| `"none"` — store the policy in the PAP (Save button) | `"remote"` |
+ * | `save`           | `"remote"` \| `"event"` \| `"none"` — store the policy in the PAP, emit it to the host, or hide the Save button | `"remote"` |
  * | `validate`       | `"remote"` \| `"none"` — validate against the PAP (Validate button) | `"remote"` |
  * | `templates`      | `"remote"` \| `"none"` — list and manage PAP templates | `"remote"` |
  * | `mappings`       | `"remote"` \| `"none"` — fetch the builder's dropdown mappings | `"remote"` |
@@ -227,8 +236,8 @@ export const TAG_NAME: 'odrl-policy-editor';
  * | Event              | Detail                                      |
  * |--------------------|---------------------------------------------|
  * | `policy-changed`   | `{ policy: object }`                        |
- * | `policy-created`   | `{ policy: object, id: string }`            |
- * | `policy-updated`   | `{ policy: object, id: string }`            |
+ * | `policy-created`   | `{ policy: object, id: string, persisted: boolean }` |
+ * | `policy-updated`   | `{ policy: object, id: string, persisted: boolean }` |
  * | `policy-validated` | `{ result: object }`                        |
  * | `editor-cancelled` | `{}`                                        |
  * | `template-created` | `{ template: object, id: string }`          |

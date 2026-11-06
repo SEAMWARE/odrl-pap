@@ -540,6 +540,46 @@ describe('OdrlPolicyEditorElement', () => {
     });
   });
 
+  it.each([
+    { label: 'the event mode', value: 'event', expected: 'event' },
+    { label: 'the event mode padded and upper-case', value: ' EVENT ', expected: 'event' },
+    { label: 'a typo', value: 'evnet', expected: 'remote' },
+    { label: 'a boolean-looking value', value: 'false', expected: 'remote' },
+  ])('resolves save=$value from $label to $expected', async ({ value, expected }) => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    el.setAttribute('save', value);
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().config.capabilities.save).toBe(expected);
+  });
+
+  it('rejects the event mode for capabilities that cannot emit', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    for (const name of ['load', 'validate', 'templates', 'mappings']) {
+      el.setAttribute(name, 'event');
+    }
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().config.capabilities).toMatchObject({
+      load: 'remote', validate: 'remote', templates: 'remote', mappings: 'remote',
+    });
+  });
+
+  it('re-renders when the save capability changes at runtime', async () => {
+    const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
+    document.body.appendChild(el);
+
+    await vi.dynamicImportSettled();
+    expect(lastProps().config.capabilities.save).toBe('remote');
+
+    el.setAttribute('save', 'event');
+    await vi.dynamicImportSettled();
+
+    expect(lastProps().config.capabilities.save).toBe('event');
+  });
+
   it('passes the policy property to the editor and re-renders', async () => {
     const el = document.createElement(TAG_NAME) as OdrlPolicyEditorElement;
     document.body.appendChild(el);

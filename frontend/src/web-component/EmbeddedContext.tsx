@@ -66,10 +66,21 @@ export interface ButtonVisibility {
 export interface EmbeddedEventMap {
   /** Fired whenever the policy is edited; not for the initial or host-supplied policy. */
   'policy-changed': { policy: Record<string, unknown> };
-  /** Fired after a new policy is successfully saved. */
-  'policy-created': { policy: Record<string, unknown>; id: string };
-  /** Fired after an existing policy is successfully updated. */
-  'policy-updated': { policy: Record<string, unknown>; id: string };
+  /**
+   * Fired after a new policy has been accepted by the editor.
+   *
+   * With the `save` capability set to `remote` (the default) this follows a
+   * successful write to the PAP and `persisted` is `true`. With `save="event"`
+   * the policy is never sent to the PAP, the event fires immediately and
+   * `persisted` is `false` — storing the policy is then up to the host.
+   */
+  'policy-created': { policy: Record<string, unknown>; id: string; persisted: boolean };
+  /**
+   * Fired after an existing policy has been updated in the editor.
+   *
+   * See {@link EmbeddedEventMap#policy-created} for the meaning of `persisted`.
+   */
+  'policy-updated': { policy: Record<string, unknown>; id: string; persisted: boolean };
   /** Fired after a policy validation completes. */
   'policy-validated': { result: Record<string, unknown> };
   /** Fired when the user clicks Cancel. */
