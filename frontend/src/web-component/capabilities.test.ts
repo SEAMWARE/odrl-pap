@@ -5,26 +5,47 @@ import { describe, it, expect } from 'vitest';
 import {
   CAPABILITIES,
   DEFAULT_CAPABILITIES,
+  isEnabled,
+  isEvent,
   isRemote,
   parseCapabilityMode,
   resolveCapabilities,
+  type Capability,
 } from './capabilities';
 
 describe('parseCapabilityMode', () => {
-  it('defaults to remote when the attribute is absent', () => {
-    expect(parseCapabilityMode(null)).toBe('remote');
+  it.each(CAPABILITIES)('defaults %s to remote when the attribute is absent', (capability) => {
+    expect(parseCapabilityMode(capability, null)).toBe('remote');
   });
 
-  it('accepts remote and none, ignoring case and whitespace', () => {
-    expect(parseCapabilityMode('remote')).toBe('remote');
-    expect(parseCapabilityMode('none')).toBe('none');
-    expect(parseCapabilityMode('  NONE ')).toBe('none');
+  it.each([
+    { raw: 'remote', expected: 'remote' },
+    { raw: 'none', expected: 'none' },
+    { raw: '  NONE ', expected: 'none' },
+    { raw: 'Remote', expected: 'remote' },
+  ])('reads $raw as $expected, ignoring case and whitespace', ({ raw, expected }) => {
+    expect(parseCapabilityMode('save', raw)).toBe(expected);
   });
 
-  it('falls back to remote for unknown values so a typo never disables a call', () => {
-    expect(parseCapabilityMode('nope')).toBe('remote');
-    expect(parseCapabilityMode('')).toBe('remote');
+  it.each([
+    { label: 'a typo', raw: 'nope' },
+    { label: 'an empty value', raw: '' },
+    { label: 'a boolean-looking value', raw: 'false' },
+  ])('falls back to remote for $label so a call is never silently disabled', ({ raw }) => {
+    expect(parseCapabilityMode('save', raw)).toBe('remote');
   });
+
+  it('accepts the event mode for save', () => {
+    expect(parseCapabilityMode('save', 'event')).toBe('event');
+    expect(parseCapabilityMode('save', ' EVENT ')).toBe('event');
+  });
+
+  it.each(CAPABILITIES.filter((capability) => capability !== 'save'))(
+    'rejects the event mode for %s, which has no handling for it',
+    (capability) => {
+      expect(parseCapabilityMode(capability, 'event')).toBe('remote');
+    },
+  );
 });
 
 describe('resolveCapabilities', () => {
@@ -42,5 +63,23 @@ describe('resolveCapabilities', () => {
     expect(isRemote(modes, 'load')).toBe(true);
     expect(isRemote(modes, 'templates')).toBe(true);
     expect(isRemote(modes, 'mappings')).toBe(true);
+  });
+});
+
+describe('capability predicates', () => {
+  /** Builds capability modes with a single capability overridden. */
+  const modesWith = (capability: Capability, raw: string) =>
+    resolveCapabilities((name) => (name === capability ? raw : null));
+
+  it.each([
+    { mode: 'remote', remote: true, event: false, enabled: true },
+    { mode: 'none', remote: false, event: false, enabled: false },
+    { mode: 'event', remote: false, event: true, enabled: true },
+  ])('classifies save=$mode', ({ mode, remote, event, enabled }) => {
+    const modes = modesWith('save', mode);
+
+    expect(isRemote(modes, 'save')).toBe(remote);
+    expect(isEvent(modes, 'save')).toBe(event);
+    expect(isEnabled(modes, 'save')).toBe(enabled);
   });
 });

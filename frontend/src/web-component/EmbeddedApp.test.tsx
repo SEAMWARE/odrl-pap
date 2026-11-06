@@ -1,10 +1,14 @@
 /**
  * Unit tests for the {@link EmbeddedApp} root component.
  *
- * Focused on the interplay between the template tab and the raw ODRL tab:
- * react-bootstrap keeps every tab pane mounted, so a policy adopted from a
- * template is rendered by the `@context` badge list straight away — even
- * while the user is still on the template tab.
+ * Focused on:
+ * - the interplay between the template tab and the raw ODRL tab:
+ *   react-bootstrap keeps every tab pane mounted, so a policy adopted from a
+ *   template is rendered by the `@context` badge list straight away — even
+ *   while the user is still on the template tab;
+ * - the capability modes, in particular `save`, which decides whether saving
+ *   writes the policy to the PAP, only emits it to the host, or is offered at
+ *   all.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
@@ -13,6 +17,7 @@ import EmbeddedApp from './EmbeddedApp';
 import type { EmbeddedConfig } from './EmbeddedContext';
 import { TemplateService } from '../api/services/TemplateService';
 import { PolicyService } from '../api/services/PolicyService';
+import { ServiceService } from '../api/services/ServiceService';
 import { UiService } from '../api/services/UiService';
 import { DEFAULT_MAPPINGS } from './defaultMappings';
 import { DEFAULT_CAPABILITIES, type CapabilityModes } from './capabilities';
@@ -29,6 +34,14 @@ vi.mock('../api/services/PolicyService', () => ({
   PolicyService: {
     createPolicyWithId: vi.fn(),
     getPolicyById: vi.fn(),
+  },
+}));
+
+vi.mock('../api/services/ServiceService', () => ({
+  ServiceService: {
+    createServicePolicyWithId: vi.fn(),
+    getServicePolicyById: vi.fn(),
+    getServiceTemplates: vi.fn(),
   },
 }));
 
@@ -154,7 +167,188 @@ describe('EmbeddedApp save', () => {
     const [id, policy] = vi.mocked(PolicyService.createPolicyWithId).mock.calls[0];
     expect(isValidPolicyId(id)).toBe(true);
     expect((policy as Record<string, unknown>)['odrl:uid']).toMatch(/-/);
-    expect(onEvent).toHaveBeenCalledWith('policy-created', { policy, id });
+    expect(onEvent).toHaveBeenCalledWith('policy-created', { policy, id, persisted: true });
+  });
+});
+
+/** Policy id used by the edit-mode fixtures of the emit-only tests. */
+const EXISTING_POLICY_ID = 'existingpolicy';
+
+/** Stored policy returned by the mocked policy API in edit mode. */
+const EXISTING_POLICY = {
+  '@context': { odrl: ODRL_NAMESPACE },
+  '@type': 'odrl:Policy',
+  'odrl:uid': EXISTING_POLICY_ID,
+};
+
+/** Builds a config with the `save` capability set to the given mode. */
+function withSaveMode(
+  mode: CapabilityModes['save'],
+  overrides: Partial<EmbeddedConfig> = {},
+): EmbeddedConfig {
+  return {
+    ...CONFIG,
+    capabilities: { ...DEFAULT_CAPABILITIES, save: mode },
+    // The template picker is irrelevant here and would steal the default tab.
+    hiddenTabs: { ...CONFIG.hiddenTabs, hideTemplateTab: true },
+    ...overrides,
+  };
+}
+
+describe('EmbeddedApp emit-only save', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(TemplateService.getTemplates).mockResolvedValue([]);
+    vi.mocked(UiService.getMappings).mockResolvedValue({});
+    vi.mocked(PolicyService.createPolicyWithId).mockResolvedValue('');
+    vi.mocked(PolicyService.getPolicyById).mockResolvedValue({
+      id: EXISTING_POLICY_ID,
+      odrl: JSON.stringify(EXISTING_POLICY),
+    });
+    vi.mocked(ServiceService.createServicePolicyWithId).mockResolvedValue('');
+    // The template manager lists templates on mount; with a serviceId set it
+    // goes through the service-scoped endpoint.
+    vi.mocked(ServiceService.getServiceTemplates).mockResolvedValue([]);
+  });
+
+  it.each([
+    {
+      label: 'stores and reports a new policy',
+      saveMode: 'remote' as const,
+      mode: 'create' as const,
+      expectedEvent: 'policy-created',
+      expectedWrites: 1,
+      persisted: true,
+    },
+    {
+      label: 'stores and reports an edited policy',
+      saveMode: 'remote' as const,
+      mode: 'edit' as const,
+      expectedEvent: 'policy-updated',
+      expectedWrites: 1,
+      persisted: true,
+    },
+    {
+      label: 'only reports a new policy',
+      saveMode: 'event' as const,
+      mode: 'create' as const,
+      expectedEvent: 'policy-created',
+      expectedWrites: 0,
+      persisted: false,
+    },
+    {
+      label: 'only reports an edited policy',
+      saveMode: 'event' as const,
+      mode: 'edit' as const,
+      expectedEvent: 'policy-updated',
+      expectedWrites: 0,
+      persisted: false,
+    },
+  ])('$label (save=$saveMode, mode=$mode)', async ({ saveMode, mode, expectedEvent, expectedWrites, persisted }) => {
+    const onEvent = vi.fn();
+    render(
+      <EmbeddedApp
+        config={withSaveMode(saveMode, {
+          mode,
+          policyId: mode === 'edit' ? EXISTING_POLICY_ID : null,
+          onEvent,
+        })}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(onEvent.mock.calls.some(([type]) => type === expectedEvent)).toBe(true),
+    );
+
+    expect(PolicyService.createPolicyWithId).toHaveBeenCalledTimes(expectedWrites);
+
+    const [, detail] = onEvent.mock.calls.findLast(([type]) => type === expectedEvent)!;
+    expect(detail.persisted).toBe(persisted);
+    expect(detail.policy).toBeDefined();
+    expect(detail.id).toBeTruthy();
+  });
+
+  it('emits a valid policy id so the host can store the policy under it', async () => {
+    const onEvent = vi.fn();
+    render(<EmbeddedApp config={withSaveMode('event', { onEvent })} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(onEvent.mock.calls.some(([type]) => type === 'policy-created')).toBe(true),
+    );
+
+    const [, detail] = onEvent.mock.calls.findLast(([type]) => type === 'policy-created')!;
+    expect(isValidPolicyId(detail.id)).toBe(true);
+    expect(detail.policy['odrl:uid']).toBeTruthy();
+  });
+
+  it('does not write to the service-scoped endpoint either', async () => {
+    const onEvent = vi.fn();
+    render(<EmbeddedApp config={withSaveMode('event', { serviceId: 'my-service', onEvent })} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(onEvent.mock.calls.some(([type]) => type === 'policy-created')).toBe(true),
+    );
+
+    expect(ServiceService.createServicePolicyWithId).not.toHaveBeenCalled();
+    expect(PolicyService.createPolicyWithId).not.toHaveBeenCalled();
+  });
+
+  it('still loads an existing policy for editing, which the load capability governs', async () => {
+    render(
+      <EmbeddedApp
+        config={withSaveMode('event', { mode: 'edit', policyId: EXISTING_POLICY_ID })}
+      />,
+    );
+
+    // Read access is independent of how saving is served.
+    await waitFor(() =>
+      expect(PolicyService.getPolicyById).toHaveBeenCalledWith(EXISTING_POLICY_ID),
+    );
+  });
+
+  it('reports a template-based policy without storing it', async () => {
+    vi.mocked(TemplateService.getTemplates).mockResolvedValue([TERM_DEFINITION_TEMPLATE]);
+    const onEvent = vi.fn();
+    render(
+      <EmbeddedApp
+        config={{
+          ...withSaveMode('event', { onEvent }),
+          // The template picker is what this test drives.
+          hiddenTabs: { ...CONFIG.hiddenTabs, hideTemplateTab: false },
+        }}
+      />,
+    );
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Template: Role-based entity access' }),
+    );
+
+    // The Create button stays disabled until every placeholder is filled in.
+    await userEvent.type(await screen.findByLabelText('Entity Type'), 'Product');
+    await userEvent.selectOptions(await screen.findByLabelText('Role'), 'ADMIN');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Create Policy from Template' }),
+    );
+
+    await waitFor(() =>
+      expect(onEvent.mock.calls.some(([type]) => type === 'policy-created')).toBe(true),
+    );
+    expect(PolicyService.createPolicyWithId).not.toHaveBeenCalled();
+
+    const [, detail] = onEvent.mock.calls.findLast(([type]) => type === 'policy-created')!;
+    expect(detail.persisted).toBe(false);
+    expect(isValidPolicyId(detail.id)).toBe(true);
+  });
+
+  it('offers Save, unlike save="none"', async () => {
+    render(<EmbeddedApp config={withSaveMode('event')} />);
+
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 });
 

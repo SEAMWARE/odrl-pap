@@ -9,6 +9,9 @@
  *   navigating between pages.
  * - Wraps children in `I18nProvider` and applies theme CSS custom
  *   properties on its own container (not `document.documentElement`).
+ * - Can run as a pure policy builder (`save="event"`), where the finished
+ *   policy is handed to the host through those events and never written to
+ *   the PAP.
  * - Supports template-based policy creation via a template selection tab.
  * - Supports full template management (create/edit/delete) via a dedicated
  *   tab, which can be disabled with the `hide-template-create-tab` attribute.
@@ -49,7 +52,7 @@ import {
   type JsonLdContextObject,
 } from '../utils/jsonLdContext';
 import { toPolicyId } from '../utils/policyId';
-import { DEFAULT_CAPABILITIES, isRemote } from './capabilities';
+import { DEFAULT_CAPABILITIES, isEnabled, isEvent, isRemote } from './capabilities';
 import PolicySummary from '../components/PolicySummary';
 import { DEFAULT_MAPPINGS, mergeMappings } from './defaultMappings';
 
@@ -141,7 +144,11 @@ const EmbeddedApp = ({
   const hideCancelButton = config.hiddenButtons?.hideCancelButton ?? false;
   const variant = config.variant ?? DEFAULT_VARIANT;
   const remoteLoad = isRemote(capabilities, 'load');
-  const remoteSave = isRemote(capabilities, 'save');
+  // `save="event"`: the editor keeps its Save button but hands the finished
+  // policy to the host instead of writing it to the PAP.
+  const emitOnlySave = isEvent(capabilities, 'save');
+  // Save is offered unless the capability is switched off entirely.
+  const canSave = isEnabled(capabilities, 'save');
   const remoteValidate = isRemote(capabilities, 'validate');
   const remoteTemplates = isRemote(capabilities, 'templates');
   const remoteMappings = isRemote(capabilities, 'mappings');
@@ -424,20 +431,22 @@ const EmbeddedApp = ({
    *
    * Saves the generated ODRL JSON as a new policy, locks the editor
    * to prevent further modifications, and emits the `policy-created` event.
+   * With `save="event"` nothing is written: the filled-in policy is handed to
+   * the host through the same event with `persisted: false`.
    *
    * @param odrl - The ODRL policy JSON with placeholders replaced.
    */
   const handleCreateFromTemplate = useCallback((odrl: Record<string, unknown>) => {
-    // Without a remote save there is nothing to create: hand the filled-in
+    // With saving switched off there is nothing to create: hand the filled-in
     // policy to the editor (and, through `policy-changed`, to the host).
-    if (!remoteSave) {
+    // `save="event"` is handled further down — there the host does get a
+    // `policy-created`, it is just not preceded by a write.
+    if (!canSave) {
       setPolicy(odrl as OdrlPolicyJson);
       userSelectedTabRef.current = true;
       setActiveTab(hiddenTabs.hideBuilderTab ? TAB_KEY_ODRL : TAB_KEY_BUILDER);
       return;
     }
-
-    setIsCreatingFromTemplate(true);
 
     // Ensure the policy has a UID; generate one if the template did not include it.
     if (!odrl['odrl:uid']) {
@@ -446,6 +455,18 @@ const EmbeddedApp = ({
 
     const requestBody = odrl as OdrlPolicyJson;
     const effectiveId = toPolicyId(odrl['odrl:uid'] as string);
+
+    // Emit-only mode: adopt the filled template and hand it to the host
+    // without contacting the PAP. There is no request to wait for, so the
+    // creating state is never entered.
+    if (emitOnlySave) {
+      setPolicy(requestBody);
+      setCreatedFromTemplate(true);
+      onEvent('policy-created', { policy: requestBody, id: effectiveId, persisted: false });
+      return;
+    }
+
+    setIsCreatingFromTemplate(true);
 
     // Store the policy under an id derived from its `odrl:uid` (PUT /policy/{id})
     // rather than via POST /policy, which would assign a server-generated id the
@@ -460,13 +481,13 @@ const EmbeddedApp = ({
       .then(() => {
         setPolicy(requestBody);
         setCreatedFromTemplate(true);
-        onEvent('policy-created', { policy: requestBody, id: effectiveId });
+        onEvent('policy-created', { policy: requestBody, id: effectiveId, persisted: true });
       })
       .catch((err: Error) => setSaveError(err.message))
       .finally(() => {
         setIsCreatingFromTemplate(false);
       });
-  }, [remoteSave, hiddenTabs.hideBuilderTab, serviceId, onEvent]);
+  }, [canSave, emitOnlySave, hiddenTabs.hideBuilderTab, serviceId, onEvent]);
 
   /**
    * Saves the policy and emits the appropriate event.
@@ -474,6 +495,9 @@ const EmbeddedApp = ({
    * When `serviceId` is set, uses service-scoped endpoints
    * (`POST /service/{serviceId}/policy` or `PUT /service/{serviceId}/policy/{id}`).
    * Otherwise, falls back to root-level endpoints.
+   *
+   * With `save="event"` no endpoint is contacted at all — the policy is
+   * emitted straight to the host with `persisted: false`.
    */
   const handleSave = useCallback(() => {
     setSaveError('');
@@ -488,6 +512,15 @@ const EmbeddedApp = ({
     }
     const policyToSave = body as OdrlPolicyJson;
     const effectiveId = policyId ?? toPolicyId(body['odrl:uid'] as string);
+    const eventType = mode === 'edit' ? 'policy-updated' : 'policy-created';
+
+    // Emit-only mode: the host asked for the policy, not for it to be stored.
+    // Skip the write entirely and report straight away — the generated UID is
+    // still included so the host can store the policy under a stable id.
+    if (emitOnlySave) {
+      onEvent(eventType, { policy: policyToSave, id: effectiveId, persisted: false });
+      return;
+    }
 
     // Both create and edit use the id-scoped endpoint (PUT /policy/{id}),
     // which "creates or overwrites", so the stored id always matches the
@@ -498,11 +531,10 @@ const EmbeddedApp = ({
 
     savePromise
       .then(() => {
-        const eventType = mode === 'edit' ? 'policy-updated' : 'policy-created';
-        onEvent(eventType, { policy: policyToSave, id: effectiveId });
+        onEvent(eventType, { policy: policyToSave, id: effectiveId, persisted: true });
       })
       .catch((err: Error) => setSaveError(err.message));
-  }, [policy, mode, policyId, onEvent, serviceId]);
+  }, [policy, mode, policyId, onEvent, serviceId, emitOnlySave]);
 
   /**
    * Keeps the working policy in sync with the template being filled in, so
@@ -717,9 +749,9 @@ const EmbeddedApp = ({
           {/* Policy action buttons — shown only while editing a policy.
               Hidden in template-created read-only mode and on the template
               management tab, where policy save/validate is not applicable. */}
-          {!createdFromTemplate && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (remoteSave || remoteValidate || !hideCancelButton) && (
+          {!createdFromTemplate && activeTab !== TAB_KEY_MANAGE_TEMPLATES && (canSave || remoteValidate || !hideCancelButton) && (
             <div className="d-flex gap-2 mt-3 mb-3">
-              {remoteSave && (
+              {canSave && (
                 <Button variant="primary" onClick={handleSave}>
                   Save
                 </Button>

@@ -339,7 +339,7 @@ at runtime triggers a re-render automatically.
 | `hide-cancel-button` | Boolean — hides the Cancel button (e.g. when the host provides its own) | absent (visible) |
 | `variant`       | `"card"` \| `"plain"` — editor framed as a card, or with no chrome | `"card"` |
 | `load`          | `"remote"` \| `"none"` — fetch the policy when `mode="edit"` | `"remote"` |
-| `save`          | `"remote"` \| `"none"` — store the policy in the PAP; `none` removes the Save button | `"remote"` |
+| `save`          | `"remote"` \| `"event"` \| `"none"` — store the policy in the PAP, hand it to the host instead (see [Emit-Only Mode](#emit-only-mode-saveevent)), or remove the Save button | `"remote"` |
 | `validate`      | `"remote"` \| `"none"` — validate against the PAP; `none` removes the Validate button and panel | `"remote"` |
 | `templates`     | `"remote"` \| `"none"` — list and manage PAP templates; `none` removes both template tabs | `"remote"` |
 | `mappings`      | `"remote"` \| `"none"` — fetch the visual builder's dropdown mappings | `"remote"` |
@@ -430,7 +430,11 @@ over the host page.
 `load`, `save`, `validate`, `templates` and `mappings` decide, one by one,
 whether the editor talks to the PAP. Each defaults to `remote` (the behaviour
 of earlier versions); `none` makes no request and hides the UI that depends on
-it. Unknown values fall back to `remote`.
+it. `save` has a third mode, `event`, which keeps the Save button but hands
+the finished policy to the host instead of writing it — see
+[Emit-Only Mode](#emit-only-mode-saveevent). Unknown values, and modes a
+capability does not support, fall back to `remote`, so a typo never silently
+disables (or silently enables) a backend call.
 
 Used as a form control — the host owns the policy and nothing goes to the PAP:
 
@@ -453,6 +457,11 @@ them: its entries are layered over the built-in ones per attribute, and an
 entry with the same `name` replaces the built-in one. Mappings an operator adds
 through the PAP's `paths.mapping` are only visible with `mappings="remote"`. With `save="none"`,
 filling in a template loads the result into the editor instead of storing it.
+
+Because the capability modes are string attributes, framework bindings work as
+written: React's `<odrl-policy-editor save="event" />`, Angular's
+`[attr.save]="'event'"` and Vue's `:save="'event'"` all set the attribute the
+element reads.
 
 ### JavaScript Properties
 
@@ -511,8 +520,8 @@ Events bubble and cross Shadow DOM boundaries (`composed: true`).
 
 | Event              | Detail payload                              | Fired when                       |
 |--------------------|---------------------------------------------|----------------------------------|
-| `policy-created`   | `{ policy: OdrlPolicyJson, id: string }`    | A new policy is saved            |
-| `policy-updated`   | `{ policy: OdrlPolicyJson, id: string }`    | An existing policy is updated    |
+| `policy-created`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` | A new policy is saved (or, with `save="event"`, completed) |
+| `policy-updated`   | `{ policy: OdrlPolicyJson, id: string, persisted: boolean }` | An existing policy is updated |
 | `policy-validated` | `{ result: ValidationResponse }`            | Policy validation completes      |
 | `editor-cancelled` | `{}`                                        | The user clicks Cancel           |
 | `template-created` | `{ template: object, id: string }`          | A new template is created in the management tab |
@@ -537,6 +546,87 @@ editor.addEventListener('editor-cancelled', () => {
   document.querySelector('odrl-policy-editor').remove();
 });
 ```
+
+### Emit-Only Mode (`save="event"`)
+
+By default the editor stores a policy in the PAP and *then* emits
+`policy-created` / `policy-updated`. Set `save="event"` to turn the component
+into a pure policy *builder*: the user configures the policy as usual, but on
+Save nothing is written — the finished ODRL JSON is handed to the host
+application through the very same events, with `detail.persisted === false`.
+
+`save` is one of the [capability modes](#capability-modes): `"remote"` (the
+default) writes to the PAP, `"event"` emits instead, `"none"` removes the Save
+button altogether.
+
+```html
+<odrl-policy-editor
+  id="editor"
+  api-base-url="https://pap.example.com"
+  save="event"
+></odrl-policy-editor>
+
+<script>
+  document.getElementById('editor').addEventListener('policy-created', (e) => {
+    // e.detail.persisted === false — the PAP has not stored anything
+    console.log('Policy built:', e.detail.policy);
+    console.log('Suggested id:', e.detail.id); // derived from the odrl:uid
+    myOwnBackend.save(e.detail.id, e.detail.policy);
+  });
+</script>
+```
+
+Because listener code is identical in all modes, switching between them is a
+single attribute change — check `detail.persisted` if the host needs to tell
+them apart.
+
+**Editing a policy the host stores itself**
+
+`save="event"` only governs writing. With `mode="edit"` the editor would still
+*load* the policy from the PAP, which 404s for a policy the host keeps in its
+own store. Combine it with `load="none"` and hand the policy in through the
+`policy` JS property:
+
+```javascript
+const editor = document.querySelector('odrl-policy-editor');
+editor.setAttribute('mode', 'edit');
+editor.setAttribute('load', 'none');
+editor.setAttribute('save', 'event');
+
+// The host supplies the policy; the property accepts an object or JSON text.
+editor.policy = await myOwnBackend.load(id);
+
+editor.addEventListener('policy-updated', (e) => {
+  myOwnBackend.save(e.detail.id, e.detail.policy);
+});
+```
+
+**What emit-only mode changes**
+
+| Behaviour | `save="remote"` (default) | `save="event"` | `save="none"` |
+|-----------|---------------------------|----------------|---------------|
+| Save button | `PUT /policy/{id}` (or the service-scoped variant), then event | event only | not rendered |
+| Create from template | stores, then event | event only | policy adopted into the editor, `policy-changed` only |
+| `detail.persisted` | `true` | `false` | — |
+
+**What it does not change** — `save="event"` suppresses *policy writes* only.
+Every other capability is configured on its own, and by default still talks to
+the PAP:
+
+- `GET /mappings` — the visual builder's vocabulary dropdowns; switch off with
+  `mappings="none"` to use the mappings bundled in the package, or supply your
+  own through the `mappings` property.
+- `GET /policy/{id}` — when `mode="edit"`; switch off with `load="none"` and
+  use the `policy` property.
+- `POST /validate` — only when the user runs a validation; switch off with
+  `validate="none"`.
+- `GET /templates` — the template picker *and* the template management tab,
+  which writes templates to the PAP. Switch both off with `templates="none"`
+  if the component must issue no requests at all.
+
+A policy emitted this way carries an `odrl:uid` (generated if the user did not
+set one) and `detail.id` mirrors it, so the host can store the policy under a
+stable identifier.
 
 ### Full Embedding Example
 

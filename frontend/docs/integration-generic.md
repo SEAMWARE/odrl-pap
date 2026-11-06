@@ -15,6 +15,7 @@ your stack.
 - [Vue 3](#vue-3)
 - [Svelte](#svelte)
 - [Without the PAP Backend](#without-the-pap-backend)
+- [Host-Owned Storage (Emit-Only)](#host-owned-storage-emit-only)
 - [Server-Side Rendering (SSR)](#server-side-rendering-ssr)
 - [Security Considerations](#security-considerations)
 - [Performance Optimization](#performance-optimization)
@@ -471,6 +472,57 @@ property to add to them or, with the same `name`, replace them. See the
 
 ---
 
+## Host-Owned Storage (Emit-Only)
+
+When the host keeps the policies in its own store but still wants the PAP's
+vocabulary and validation, set `save="event"`. The Save button stays, but
+pressing it writes nothing: the finished policy arrives through
+`policy-created` / `policy-updated` with `persisted: false`, under an `id`
+derived from its `odrl:uid`.
+
+```html
+<odrl-policy-editor
+  api-base-url="https://pap.example.com"
+  save="event"
+></odrl-policy-editor>
+```
+
+```javascript
+editor.addEventListener('policy-created', (e) => {
+  // e.detail.persisted === false — nothing was written to the PAP
+  myBackend.store(e.detail.id, e.detail.policy);
+});
+```
+
+To *reopen* a policy the host stored, add `load="none"` and hand it in through
+the `policy` property — otherwise the editor would try to fetch it from the
+PAP, which does not have it:
+
+```javascript
+editor.setAttribute('mode', 'edit');
+editor.setAttribute('load', 'none');
+editor.setAttribute('save', 'event');
+editor.policy = await myBackend.load(id);    // object or JSON text
+editor.addEventListener('policy-updated', (e) => myBackend.store(e.detail.id, e.detail.policy));
+```
+
+`save="event"` governs policy writes only. The template management tab writes
+templates to the PAP and is controlled by `templates`; switch it off with
+`templates="none"` if the component must issue no write at all.
+
+Since the capability modes are plain string attributes, framework bindings
+need no special handling:
+
+| Framework | Binding |
+|-----------|---------|
+| Plain HTML | `save="event"` |
+| React | `<odrl-policy-editor save="event" />` |
+| Angular | `save="event"` or `[attr.save]="saveMode"` — *not* `[save]="..."`, which would set a property the element does not read |
+| Vue 2/3 | `save="event"` or `:save="saveMode"` |
+| Svelte | `save="event"` or `save={saveMode}` |
+
+---
+
 ## Server-Side Rendering (SSR)
 
 The `<odrl-policy-editor>` custom element requires a browser DOM
@@ -646,7 +698,7 @@ via versioned URLs.
 | `hide-cancel-button` | boolean | absent | Hides the Cancel button |
 | `variant` | `"card" \| "plain"` | `"card"` | Editor framed as a card, or without chrome (for hosts that already provide one) |
 | `load` | `"remote" \| "none"` | `"remote"` | Fetch the policy when `mode="edit"` |
-| `save` | `"remote" \| "none"` | `"remote"` | Store the policy in the PAP; `none` hides Save |
+| `save` | `"remote" \| "event" \| "none"` | `"remote"` | Store the policy in the PAP; `event` emits it to the host instead (see [Host-Owned Storage](#host-owned-storage-emit-only)); `none` hides Save |
 | `validate` | `"remote" \| "none"` | `"remote"` | Validate against the PAP; `none` hides Validate |
 | `templates` | `"remote" \| "none"` | `"remote"` | List/manage PAP templates; `none` hides both template tabs |
 | `mappings` | `"remote" \| "none"` | `"remote"` | Fetch the builder's mappings; `none` uses the built-in ones |
@@ -666,8 +718,8 @@ via versioned URLs.
 
 | Event | Detail | Description |
 |-------|--------|-------------|
-| `policy-created` | `{ policy: object, id: string }` | A new policy was saved |
-| `policy-updated` | `{ policy: object, id: string }` | An existing policy was updated |
+| `policy-created` | `{ policy: object, id: string, persisted: boolean }` | A new policy was saved (`persisted: false` with `save="event"`) |
+| `policy-updated` | `{ policy: object, id: string, persisted: boolean }` | An existing policy was updated (`persisted: false` with `save="event"`) |
 | `policy-validated` | `{ result: object }` | Policy validation completed |
 | `editor-cancelled` | `{}` | The user clicked Cancel |
 | `policy-changed` | `{ policy: object }` | The policy was edited (not fired for the initial or host-set policy) |

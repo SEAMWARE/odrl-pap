@@ -93,6 +93,12 @@
       />
     </div>
     <div>
+      <label for="emit-only-checkbox">
+        <input id="emit-only-checkbox" type="checkbox" />
+        Emit only (do not store in the PAP)
+      </label>
+    </div>
+    <div>
       <button id="apply-btn">Apply</button>
     </div>
   </div>
@@ -152,6 +158,14 @@
       editor.setAttribute('theme', theme);
       editor.setAttribute('locale', locale);
       editor.setAttribute('api-base-url', apiUrl);
+
+      // Emit-only mode: `save="event"` keeps the Save button but writes
+      // nothing. The resulting policy arrives in the `policy-created` event
+      // logged above, with `detail.persisted === false`.
+      editor.setAttribute(
+        'save',
+        document.getElementById('emit-only-checkbox').checked ? 'event' : 'remote',
+      );
     });
 
     // --- Demo: set i18n strings via JS property ---
