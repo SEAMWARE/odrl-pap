@@ -38,7 +38,20 @@ permissions:
   contents: read
 
 jobs:
+  # The version from the semver label, read when the job runs: X.Y.Z-PRE-<pr> on a pull request,
+  # X.Y.Z on a push (patch when no labelled pull request carries it, as before). See
+  # https://github.com/FIWARE/github-workflows
+  semver:
+    uses: FIWARE/github-workflows/.github/workflows/semver-version.yml@v1
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      tag-prefix: ""
+      default-bump: patch
+
   version:
+    needs: [ "semver" ]
     runs-on: ubuntu-latest
 
     outputs:
@@ -46,43 +59,16 @@ jobs:
       dist-tag: ${{ steps.out.outputs.dist-tag }}
 
     steps:
-      - uses: actions/checkout@v4
-
-      # --- stable release (push to main): bump from the merged PR labels ---
-      - id: merged-pr
-        if: github.event_name == 'push'
-        uses: actions-ecosystem/action-get-merged-pull-request@v1.0.1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - if: github.event_name == 'push'
-        uses: zwaldowski/semver-release-action@v2
-        with:
-          dry_run: true
-          bump: ${{ steps.merged-pr.outputs.labels || 'patch' }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      # --- pre-release (pull request): bump from the PR's semver label ---
-      - id: bump
-        if: github.event_name == 'pull_request'
-        uses: zwaldowski/match-label-action@v1
-        with:
-          allowed: major,minor,patch
-
-      - if: github.event_name == 'pull_request'
-        uses: zwaldowski/semver-release-action@v2
-        with:
-          dry_run: true
-          bump: ${{ steps.bump.outputs.match }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      # Both semver-release-action invocations export the resolved semver as the
-      # VERSION environment variable; only one of them runs per event.
+      # the run number keeps each push of a pull request unique on npm
       - name: Compute version and dist-tag
         id: out
+        env:
+          VERSION: ${{ needs.semver.outputs.version }}
+          EVENT: ${{ github.event_name }}
+          RUN: ${{ github.run_number }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "version=${VERSION}-PRE-${{ github.event.pull_request.number }}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT" = "pull_request" ]; then
+            echo "version=${VERSION}.${RUN}" >> "$GITHUB_OUTPUT"
             echo "dist-tag=next" >> "$GITHUB_OUTPUT"
           else
             echo "version=${VERSION}" >> "$GITHUB_OUTPUT"

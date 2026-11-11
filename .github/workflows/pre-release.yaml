@@ -12,35 +12,23 @@ env:
   REGISTRY: quay.io
   REPOSITORY: fiware
 
+# one run at a time per pull request: opening one with a label fires two events at once, and both
+# would publish the same pre-release
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
 
+  # The version from the semver label of the pull request, read when the job runs. See
+  # https://github.com/FIWARE/github-workflows
   generate-version:
-    runs-on: ubuntu-latest
-
-    outputs:
-      version: ${{ steps.out.outputs.version }}
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - id: bump
-        uses: zwaldowski/match-label-action@v1
-        with:
-          allowed: major,minor,patch
-
-      - uses: zwaldowski/semver-release-action@v2
-        with:
-          dry_run: true
-          bump: ${{ steps.bump.outputs.match }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get PR Number
-        id: pr_number
-        run: echo "::set-output name=nr::$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')"
-
-      - name: Set version output
-        id: out
-        run: echo "::set-output name=version::$(echo ${VERSION}-PRE-${{ steps.pr_number.outputs.nr }})"
+    uses: FIWARE/github-workflows/.github/workflows/semver-version.yml@v1
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      tag-prefix: ""
 
   # image build&push
   build-arm:
@@ -171,19 +159,15 @@ jobs:
       - name: Push frontend image
         run: docker push ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/odrl-pap-frontend:${{ needs.generate-version.outputs.version }}
 
+  # Publishes the pre-release, replacing the one of the previous push, see
+  # https://github.com/FIWARE/github-workflows
   git-release:
     needs: [ "generate-version", "multi-arch", "build-frontend-image" ]
-    runs-on: ubuntu-latest
-
-    steps:
-
-      - uses: actions/checkout@v2
-
-      - uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: ${{ needs.generate-version.outputs.version }}
-          prerelease: true
-          title: ${{ needs.generate-version.outputs.version }}
-          files: |
-            LICENSE
+    uses: FIWARE/github-workflows/.github/workflows/github-release.yml@v1
+    permissions:
+      contents: write
+    with:
+      version: ${{ needs.generate-version.outputs.version }}
+      prerelease: true
+      files: |
+        LICENSE
