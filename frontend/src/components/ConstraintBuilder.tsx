@@ -36,9 +36,9 @@ interface ConstraintBuilderProps {
 
 /** Represents a single constraint's data shape. */
 interface ConstraintData {
-  'odrl:leftOperand'?: { '@id': string };
-  'odrl:operator'?: { '@id': string };
-  'odrl:rightOperand'?: { '@id'?: string; '@value'?: string; '@type'?: string };
+  'odrl:leftOperand'?: { '@id': string } | string;
+  'odrl:operator'?: { '@id': string } | string;
+  'odrl:rightOperand'?: { '@id'?: string; '@value'?: string; '@type'?: string } | string;
   [key: string]: unknown;
 }
 
@@ -96,8 +96,11 @@ function readConstraints(
  * its value (`"http:bodyValue": "$.my.property"`).
  */
 function getLeftOperandId(constraint: ConstraintData, operands: Mapping[]): string {
-  const referenced = constraint[LEFT_OPERAND_KEY] as { '@id'?: string } | undefined;
-  if (referenced?.['@id']) {
+  const referenced = constraint[LEFT_OPERAND_KEY];
+  if (typeof referenced === 'string' && referenced) {
+    return referenced;
+  }
+  if (referenced && typeof referenced === 'object' && referenced['@id']) {
     return referenced['@id'];
   }
   return Object.keys(constraint).find((key) => operands.some((operand) => operand.name === key)) ?? '';
@@ -124,8 +127,25 @@ function getLeftOperandParameter(constraint: ConstraintData, operandName: string
 function getRightOperandType(constraint: ConstraintData): 'named' | 'literal' {
   const rightOperand = constraint['odrl:rightOperand'];
   if (!rightOperand) return 'named';
+  // A plain string is a literal value (e.g. "/items").
+  if (typeof rightOperand === 'string') return 'literal';
   if (rightOperand['@value'] !== undefined) return 'literal';
   return 'named';
+}
+
+/** Reads the right operand as a value object; a plain string becomes `{ '@value': string }`. */
+function getRightOperandObject(
+  constraint: ConstraintData,
+): { '@id'?: string; '@value'?: string; '@type'?: string } {
+  const rightOperand = constraint['odrl:rightOperand'];
+  if (typeof rightOperand === 'string') return { '@value': rightOperand };
+  return rightOperand ?? {};
+}
+
+/** Reads the `@id` of a reference property that may also be a plain string (e.g. the operator). */
+function getReferenceId(value: { '@id'?: string } | string | undefined): string {
+  if (typeof value === 'string') return value;
+  return value?.['@id'] || '';
 }
 
 /**
@@ -344,7 +364,7 @@ const ConstraintBuilder = ({
                 <Form.Label className="small fw-bold">{t.selectOperator}</Form.Label>
                 <NamespacedDropdown
                   items={operators}
-                  value={constraint['odrl:operator']?.['@id'] || ''}
+                  value={getReferenceId(constraint['odrl:operator'])}
                   onChange={(val) =>
                     handleConstraintChange(index, 'odrl:operator', { '@id': val })
                   }
@@ -375,7 +395,7 @@ const ConstraintBuilder = ({
                     {getRightOperandType(constraint) === 'named' ? (
                       <NamespacedDropdown
                         items={rightOperands}
-                        value={constraint['odrl:rightOperand']?.['@id'] || ''}
+                        value={getRightOperandObject(constraint)['@id'] || ''}
                         onChange={(val) =>
                           handleConstraintChange(index, 'odrl:rightOperand', { '@id': val })
                         }
@@ -388,10 +408,10 @@ const ConstraintBuilder = ({
                         <Form.Control
                           type="text"
                           placeholder={t.valuePlaceholder}
-                          value={constraint['odrl:rightOperand']?.['@value'] || ''}
+                          value={getRightOperandObject(constraint)['@value'] || ''}
                           onChange={(e) =>
                             handleConstraintChange(index, 'odrl:rightOperand', {
-                              ...constraint['odrl:rightOperand'],
+                              ...getRightOperandObject(constraint),
                               '@value': e.target.value,
                             })
                           }
@@ -401,10 +421,10 @@ const ConstraintBuilder = ({
                         <Form.Control
                           type="text"
                           placeholder={t.typePlaceholder}
-                          value={constraint['odrl:rightOperand']?.['@type'] || ''}
+                          value={getRightOperandObject(constraint)['@type'] || ''}
                           onChange={(e) =>
                             handleConstraintChange(index, 'odrl:rightOperand', {
-                              ...constraint['odrl:rightOperand'],
+                              ...getRightOperandObject(constraint),
                               '@type': e.target.value,
                             })
                           }

@@ -15,6 +15,7 @@ import type { Mappings } from '../services/api';
 import { useI18n } from '../i18n';
 import ConstraintBuilder from './ConstraintBuilder';
 import NamespacedDropdown from './NamespacedDropdown';
+import { isCollectionOfType, newAssetCollection } from './collectionType';
 
 interface TargetEditorProps {
   /** Current target value (string URL/identifier or AssetCollection object). */
@@ -27,13 +28,9 @@ interface TargetEditorProps {
   locked?: boolean;
 }
 
-/** Checks whether the target is an AssetCollection object. */
+/** Checks whether the target is an AssetCollection object (`AssetCollection` or `odrl:AssetCollection`). */
 function isAssetCollection(target: unknown): boolean {
-  return (
-    typeof target === 'object' &&
-    target !== null &&
-    (target as Record<string, unknown>)['@type'] === 'AssetCollection'
-  );
+  return isCollectionOfType(target, 'AssetCollection');
 }
 
 /**
@@ -58,7 +55,7 @@ const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEdi
       setTarget('');
       setSimpleTargetType('text');
     } else {
-      setTarget({ '@type': 'AssetCollection', 'odrl:refinement': [] });
+      setTarget(newAssetCollection());
     }
   };
 
