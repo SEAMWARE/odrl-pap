@@ -6,15 +6,12 @@
  * `odrl:andSequence`) whose operands may in turn be any of those. Both the Builder and the Summary
  * read them through {@link readConstraintGroup}, so they agree on what a value means.
  */
+import { findTermKey } from './odrlTerms';
+
 /** JSON-LD keyword for an ordered list. */
 const LIST_KEY = '@list';
 /** Logical grouping keys, by the name the editor uses for the group. */
-const LOGICAL_KEYS: ReadonlyArray<readonly [string, string]> = [
-  ['or', 'odrl:or'],
-  ['xone', 'odrl:xone'],
-  ['and', 'odrl:and'],
-  ['andSequence', 'odrl:andSequence'],
-];
+const LOGICAL_TERMS = ['or', 'xone', 'and', 'andSequence'] as const;
 
 export type ConstraintObject = Record<string, unknown>;
 
@@ -30,6 +27,16 @@ export interface ConstraintGroup {
    * that an edit which does not change the grouping can write it back unchanged around them.
    */
   logical?: { original: ConstraintObject; key: string };
+}
+
+/** Whether an `@type` names `LogicalConstraint`, prefixed, bare or as the full IRI. */
+function isLogicalConstraintType(type: unknown): boolean {
+  const types = Array.isArray(type) ? type : [type];
+  return types.some((t) => typeof t === 'string' && termOfType(t) === 'LogicalConstraint');
+}
+
+function termOfType(type: string): string {
+  return type.replace(/^odrl:/, '').replace(/^http:\/\/www\.w3\.org\/ns\/odrl\/2\//, '');
 }
 
 function isObject(value: unknown): value is ConstraintObject {
@@ -72,17 +79,19 @@ export function readConstraintGroup(value: unknown): ConstraintGroup | undefined
   if (isJsonLdList(value)) {
     return { logicalType: 'and', constraints: toConstraintArray(value), listWrapper: true };
   }
-  const logical = LOGICAL_KEYS.find(([, key]) => key in value);
-  if (logical) {
-    const [logicalType, key] = logical;
-    return {
-      logicalType,
-      constraints: toConstraintArray(value[key]),
-      listWrapper: isJsonLdList(value[key]),
-      logical: { original: value, key },
-    };
+  // The operand may be prefixed (`odrl:or`), bare (`or`) or the full IRI.
+  for (const logicalType of LOGICAL_TERMS) {
+    const key = findTermKey(value, logicalType);
+    if (key !== undefined) {
+      return {
+        logicalType,
+        constraints: toConstraintArray(value[key]),
+        listWrapper: isJsonLdList(value[key]),
+        logical: { original: value, key },
+      };
+    }
   }
-  if (value['@type'] === 'odrl:LogicalConstraint') return undefined;
+  if (isLogicalConstraintType(value['@type'])) return undefined;
   // A lone constraint object rather than a list: load it as a one-element group.
   return { logicalType: 'and', constraints: [value], listWrapper: false };
 }

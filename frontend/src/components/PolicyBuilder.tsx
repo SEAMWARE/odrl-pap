@@ -34,7 +34,7 @@ import PolicySummary from './PolicySummary';
 import NamespacedDropdown from './NamespacedDropdown';
 import { permissionCount, readPermission, writePermission } from '../utils/permission';
 import { findTermKey, getTerm, setTerm } from '../utils/odrlTerms';
-import { findTargetKey, writeTarget } from '../utils/target';
+import { findTargetKey, targetKeysOf, writeTarget } from '../utils/target';
 
 /** Step number constants for the guided workflow. */
 const STEP_TARGET = 1;
@@ -208,7 +208,8 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
   }
 
   const permission = readPermission(policy);
-  const targetKey = findTargetKey(permission);
+  const targetKeys = targetKeysOf(mappings);
+  const targetKey = findTargetKey(permission, targetKeys);
   const hasSeveralPermissions = permissionCount(policy) > 1;
   const unsupportedParts = ignoredParts(policy, permission);
 
@@ -277,7 +278,7 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
               <TargetEditor
                 target={targetKey === undefined ? undefined : permission[targetKey]}
                 targetKey={targetKey}
-                setTarget={(target, key) => setPermission(writeTarget(permission, target, key))}
+                setTarget={(target, key) => setPermission(writeTarget(permission, target, key, targetKeys))}
                 mappings={mappings}
                 locked={targetLocked}
               />

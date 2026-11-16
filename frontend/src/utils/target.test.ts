@@ -38,3 +38,11 @@ describe('target', () => {
     expect(input).toEqual({ 'json:uid': 'a' });
   });
 });
+
+describe('custom target mappings', () => {
+  it('finds and replaces a target key that only the mappings define', () => {
+    expect(findTargetKey({ 'custom:target': 'a' })).toBeUndefined();
+    expect(findTargetKey({ 'custom:target': 'a' }, ['custom:target'])).toBe('custom:target');
+    expect(writeTarget({ 'custom:target': 'a' }, 'b', 'json:uid', ['custom:target'])).toEqual({ 'json:uid': 'b' });
+  });
+});

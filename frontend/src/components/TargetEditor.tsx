@@ -10,7 +10,7 @@
  * improved visual separation for the AssetCollection mode.
  */
 import { Form, Row, Col, Stack, Card } from 'react-bootstrap';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Mappings } from '../services/api';
 import { useI18n } from '../i18n';
 import ConstraintBuilder from './ConstraintBuilder';
@@ -56,6 +56,13 @@ const TargetEditor = ({ target, targetKey, setTarget, mappings, locked = false }
   const [urlError, setUrlError] = useState('');
   /** Tracks the dropdown selection separately from the target value. */
   const [dropdownSelection, setDropdownSelection] = useState(optionKey);
+
+  // The policy can be replaced after mount (loaded from the backend, edited in the Raw tab), so
+  // the mode and the selection follow the key the target is stored under.
+  useEffect(() => {
+    setDropdownSelection(optionKey);
+    if (optionKey) setSimpleTargetType('dropdown');
+  }, [optionKey]);
 
   const isCollection = isAssetCollection(target);
 

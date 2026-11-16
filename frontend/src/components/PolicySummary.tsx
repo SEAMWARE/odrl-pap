@@ -12,7 +12,7 @@ import { useI18n } from '../i18n';
 import { readPermission } from '../utils/permission';
 import { findTermKey, getTerm } from '../utils/odrlTerms';
 import { findTargetKey } from '../utils/target';
-import { readConstraintGroup, toConstraintArray } from '../utils/constraints';
+import { readConstraintGroup } from '../utils/constraints';
 
 /** Delay in milliseconds before "Copied!" reverts to "Copy". */
 const COPY_FEEDBACK_DELAY_MS = 2000;
@@ -134,20 +134,22 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
   );
 
   /**
-   * Normalizes an ODRL `odrl:refinement` value into an array of constraint
-   * items. ODRL allows a refinement to be either a single constraint object
-   * or an array of them; templates commonly emit the single-object form, so
-   * both must be handled to avoid calling `.map` on a non-array.
+   * Renders an `odrl:refinement` value. Like the top-level constraints it goes through
+   * `readConstraintGroup`, so a single object, an array, an `@list` and a logical refinement
+   * (`odrl:or`, `odrl:xone`, ...) are all read as the Builder reads them, with the logical badge.
    */
-  const toRefinementArray = (refinement: unknown): Record<string, unknown>[] =>
-    toConstraintArray(refinement);
-
   const renderRefinements = (refinement: unknown) => {
-    const refinements = toRefinementArray(refinement);
-    if (refinements.length === 0) return null;
+    const group = readConstraintGroup(refinement);
+    if (!group || group.constraints.length === 0) return null;
+    const refinements = group.constraints;
     return (
       <div className="mt-2 ms-4">
-        <h6>{t.refinements}:</h6>
+        <h6>
+          {t.refinements}:
+          {group.logicalType !== 'and' && (
+            <> <Badge bg="info">{group.logicalType.toUpperCase()}</Badge></>
+          )}
+        </h6>
         <ListGroup as="ol" numbered>
           {refinements.map(renderConstraintItem)}
         </ListGroup>
