@@ -693,6 +693,7 @@ to match your brand:
 | `--odrl-success-color`      | Success indicator                 | `#198754`            | `#20c997`            |
 | `--odrl-danger-color`       | Danger / error indicator          | `#dc3545`            | `#e74c3c`            |
 | `--odrl-info-color`         | Info indicator                    | `#0dcaf0`            | `#17a2b8`            |
+| `--odrl-warning-color`      | Warning indicator                 | `#997404`            | `#ffc107`            |
 | `--odrl-card-shadow`        | Card drop shadow                  | `0 0.125rem 0.25rem rgba(0,0,0,0.075)` | `0 0.125rem 0.25rem rgba(0,0,0,0.3)` |
 
 ### Theming in Standalone Mode

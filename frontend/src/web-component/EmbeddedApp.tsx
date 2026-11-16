@@ -31,6 +31,7 @@ import { TestRequest } from '../api/models/TestRequest';
 import type { GenericJsonInput } from '../api/models/GenericJsonInput';
 import type { ValidationMode } from '../components/ValidationEditor';
 import PolicyBuilder from '../components/PolicyBuilder';
+import ErrorBoundary from '../components/ErrorBoundary';
 import ValidationEditor from '../components/ValidationEditor';
 import ValidationResult from '../components/ValidationResult';
 import TemplateSelector from '../components/TemplateSelector';
@@ -46,11 +47,7 @@ import {
   type EmbeddedConfig,
 } from './EmbeddedContext';
 import { createNewPolicy } from '../constants/policyDefaults';
-import {
-  isJsonLdContextObject,
-  jsonLdContextEntryIri,
-  type JsonLdContextObject,
-} from '../utils/jsonLdContext';
+import { addContextEntry, listContextEntries, removeContextPrefix } from '../utils/jsonLdContext';
 import { toPolicyId } from '../utils/policyId';
 import { DEFAULT_CAPABILITIES, isEnabled, isEvent, isRemote } from './capabilities';
 import PolicySummary from '../components/PolicySummary';
@@ -374,13 +371,17 @@ const EmbeddedApp = ({
   const handleRawTextChange = useCallback((text: string) => {
     setRawText(text);
     try {
-      const parsed = JSON.parse(text) as OdrlPolicyJson;
-      setPolicy(parsed);
+      const parsed: unknown = JSON.parse(text);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        setJsonError(tabStrings.jsonNotObject);
+        return;
+      }
+      setPolicy(parsed as OdrlPolicyJson);
       setJsonError('');
     } catch (err: unknown) {
       setJsonError(err instanceof Error ? err.message : 'Invalid JSON');
     }
-  }, []);
+  }, [tabStrings.jsonNotObject]);
 
   /**
    * Adds a new prefix:URI entry to the policy's `@context`.
@@ -388,20 +389,13 @@ const EmbeddedApp = ({
   const handleAddContext = useCallback(() => {
     if (!newCtxPrefix.trim() || !newCtxUri.trim()) return;
 
-    const currentCtx = (policy as Record<string, unknown>)['@context'];
-    let contextObj: JsonLdContextObject;
+    const updatedContext = addContextEntry(
+      (policy as Record<string, unknown>)['@context'],
+      newCtxPrefix.trim(),
+      newCtxUri.trim(),
+    );
 
-    if (isJsonLdContextObject(currentCtx)) {
-      contextObj = { ...currentCtx };
-    } else if (typeof currentCtx === 'string') {
-      contextObj = { odrl: currentCtx };
-    } else {
-      contextObj = {};
-    }
-
-    contextObj[newCtxPrefix.trim()] = newCtxUri.trim();
-
-    const updatedPolicy = { ...policy, '@context': contextObj } as OdrlPolicyJson;
+    const updatedPolicy = { ...policy, '@context': updatedContext } as OdrlPolicyJson;
     setPolicy(updatedPolicy);
     setRawText(JSON.stringify(updatedPolicy, null, 2));
     setJsonError('');
@@ -415,15 +409,13 @@ const EmbeddedApp = ({
    * @param prefix - The context key to remove.
    */
   const handleRemoveContext = useCallback((prefix: string) => {
-    const currentCtx = (policy as Record<string, unknown>)['@context'];
-    if (isJsonLdContextObject(currentCtx)) {
-      const copy = { ...currentCtx };
-      delete copy[prefix];
-      const updatedPolicy = { ...policy, '@context': copy } as OdrlPolicyJson;
-      setPolicy(updatedPolicy);
-      setRawText(JSON.stringify(updatedPolicy, null, 2));
-      setJsonError('');
-    }
+    const updatedPolicy = {
+      ...policy,
+      '@context': removeContextPrefix((policy as Record<string, unknown>)['@context'], prefix),
+    } as OdrlPolicyJson;
+    setPolicy(updatedPolicy);
+    setRawText(JSON.stringify(updatedPolicy, null, 2));
+    setJsonError('');
   }, [policy]);
 
   /**
@@ -642,13 +634,15 @@ const EmbeddedApp = ({
                 title={tabStrings.tabBuilder}
                 disabled={createdFromTemplate}
               >
-                <PolicyBuilder
-                  policy={policy}
-                  setPolicy={setPolicy}
-                  fieldTemplate={fieldTemplate}
-                  mappings={builderMappings}
-                  showSummary={summaryPlacement === 'side'}
-                />
+                <ErrorBoundary resetKey={policy}>
+                  <PolicyBuilder
+                    policy={policy}
+                    setPolicy={setPolicy}
+                    fieldTemplate={fieldTemplate}
+                    mappings={builderMappings}
+                    showSummary={summaryPlacement === 'side'}
+                  />
+                </ErrorBoundary>
               </Tab>
             )}
             {!hiddenTabs.hideRawTab && (
@@ -661,36 +655,34 @@ const EmbeddedApp = ({
                 <div className="mb-3 p-3 border rounded" style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
                   <h6 className="mb-2">JSON-LD Context (@context)</h6>
                   {(() => {
-                    const ctx = (policy as Record<string, unknown>)['@context'];
-                    if (isJsonLdContextObject(ctx)) {
-                      return (
-                        <div className="mb-2 d-flex flex-wrap gap-1">
-                          {Object.entries(ctx).map(([prefix, entry]) => {
-                            const uri = jsonLdContextEntryIri(entry);
-                            return (
-                              <Badge
-                                key={prefix}
-                                bg="secondary"
-                                className="d-inline-flex align-items-center gap-1 px-2 py-1"
-                                title={uri}
-                              >
-                                <strong>{prefix}</strong>: {uri}
-                                <CloseButton
-                                  variant="white"
-                                  style={{ fontSize: '0.5rem' }}
-                                  onClick={() => handleRemoveContext(prefix)}
-                                  aria-label={`Remove ${prefix}`}
-                                />
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      );
-                    }
-                    if (typeof ctx === 'string') {
-                      return <p className="text-muted small mb-2">{ctx}</p>;
-                    }
-                    return null;
+                    const entries = listContextEntries((policy as Record<string, unknown>)['@context']);
+                    if (entries.length === 0) return null;
+                    return (
+                      <div className="mb-2 d-flex flex-wrap gap-1">
+                        {entries.map(({ prefix, uri }) =>
+                          prefix === undefined ? (
+                            <Badge key={`ctx:${uri}`} bg="light" text="dark" className="px-2 py-1" title={uri}>
+                              {uri}
+                            </Badge>
+                          ) : (
+                            <Badge
+                              key={prefix}
+                              bg="secondary"
+                              className="d-inline-flex align-items-center gap-1 px-2 py-1"
+                              title={uri}
+                            >
+                              <strong>{prefix}</strong>: {uri}
+                              <CloseButton
+                                variant="white"
+                                style={{ fontSize: '0.5rem' }}
+                                onClick={() => handleRemoveContext(prefix)}
+                                aria-label={`Remove ${prefix}`}
+                              />
+                            </Badge>
+                          ),
+                        )}
+                      </div>
+                    );
                   })()}
                   <InputGroup size="sm">
                     <Form.Control
@@ -734,7 +726,9 @@ const EmbeddedApp = ({
             {/* Policy summary tab — only when the summary is placed as a tab */}
             {summaryPlacement === 'tab' && (
               <Tab eventKey={TAB_KEY_SUMMARY} title={tabStrings.tabSummary}>
-                <PolicySummary policy={policy} />
+                <ErrorBoundary resetKey={policy}>
+                  <PolicySummary policy={policy} />
+                </ErrorBoundary>
               </Tab>
             )}
 
