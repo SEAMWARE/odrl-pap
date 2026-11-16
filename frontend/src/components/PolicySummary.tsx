@@ -11,6 +11,7 @@ import type { OdrlPolicyJson } from '../services/api';
 import { useI18n } from '../i18n';
 import { readPermission } from '../utils/permission';
 import { findTermKey, getTerm } from '../utils/odrlTerms';
+import { findTargetKey } from '../utils/target';
 import { readConstraintGroup, toConstraintArray } from '../utils/constraints';
 
 /** Delay in milliseconds before "Copied!" reverts to "Copy". */
@@ -113,7 +114,8 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
   if (!policy) return null;
 
   const permission = readPermission(policy);
-  const target = getTerm(permission, 'target');
+  const targetKey = findTargetKey(permission);
+  const target = targetKey === undefined ? undefined : permission[targetKey];
   const assignee = getTerm(permission, 'assignee');
   const action = getTerm(permission, 'action');
   const constraint = getTerm(permission, 'constraint');

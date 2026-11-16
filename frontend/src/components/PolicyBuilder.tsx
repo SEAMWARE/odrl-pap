@@ -34,6 +34,7 @@ import PolicySummary from './PolicySummary';
 import NamespacedDropdown from './NamespacedDropdown';
 import { permissionCount, readPermission, writePermission } from '../utils/permission';
 import { getTerm, setTerm } from '../utils/odrlTerms';
+import { findTargetKey, writeTarget } from '../utils/target';
 
 /** Step number constants for the guided workflow. */
 const STEP_TARGET = 1;
@@ -185,6 +186,7 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
   }
 
   const permission = readPermission(policy);
+  const targetKey = findTargetKey(permission);
   const hasSeveralPermissions = permissionCount(policy) > 1;
 
   const targetLocked = isFieldLocked(PATH_TARGET);
@@ -244,8 +246,9 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
             />
             <Card.Body>
               <TargetEditor
-                target={getTerm(permission, 'target')}
-                setTarget={(target) => handlePermissionChange('target', target)}
+                target={targetKey === undefined ? undefined : permission[targetKey]}
+                targetKey={targetKey}
+                setTarget={(target, key) => setPermission(writeTarget(permission, target, key))}
                 mappings={mappings}
                 locked={targetLocked}
               />

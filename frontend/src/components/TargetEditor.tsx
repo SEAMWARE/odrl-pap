@@ -16,12 +16,21 @@ import { useI18n } from '../i18n';
 import ConstraintBuilder from './ConstraintBuilder';
 import NamespacedDropdown from './NamespacedDropdown';
 import { isCollectionOfType, newAssetCollection } from './collectionType';
+import { isPlainTargetKey, PLAIN_TARGET } from '../utils/target';
 
 interface TargetEditorProps {
   /** Current target value (string URL/identifier or AssetCollection object). */
   target: unknown;
-  /** Callback to update the target value. */
-  setTarget: (target: unknown) => void;
+  /**
+   * Key the target is stored under (`odrl:target`, `json:uid`, ...). It selects the rego rule, so
+   * the "select from available targets" mode shows and changes it.
+   */
+  targetKey?: string;
+  /**
+   * Callback to update the target. `key` is the mapping name the target is to be written under
+   * (e.g. `json:uid`); when omitted, the key already in use stays.
+   */
+  setTarget: (target: unknown, key?: string) => void;
   /** Available mappings for populating dropdowns. */
   mappings: Mappings;
   /** When `true`, all controls are disabled (set by template mode). */
@@ -37,14 +46,16 @@ function isAssetCollection(target: unknown): boolean {
  * Target editor with namespace-grouped dropdowns, help text,
  * and URL validation for custom targets.
  */
-const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEditorProps) => {
+const TargetEditor = ({ target, targetKey, setTarget, mappings, locked = false }: TargetEditorProps) => {
   const { strings } = useI18n();
   const t = strings.targetEditor;
 
-  const [simpleTargetType, setSimpleTargetType] = useState<'text' | 'dropdown'>('text');
+  /** A target stored under a mapping key other than the plain `odrl:target` is one of the options. */
+  const optionKey = targetKey && !isPlainTargetKey(targetKey) ? targetKey : '';
+  const [simpleTargetType, setSimpleTargetType] = useState<'text' | 'dropdown'>(optionKey ? 'dropdown' : 'text');
   const [urlError, setUrlError] = useState('');
   /** Tracks the dropdown selection separately from the target value. */
-  const [dropdownSelection, setDropdownSelection] = useState('');
+  const [dropdownSelection, setDropdownSelection] = useState(optionKey);
 
   const isCollection = isAssetCollection(target);
 
@@ -52,10 +63,10 @@ const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEdi
   const setType = (type: 'simple' | 'collection') => {
     setUrlError('');
     if (type === 'simple') {
-      setTarget('');
+      setTarget('', PLAIN_TARGET);
       setSimpleTargetType('text');
     } else {
-      setTarget(newAssetCollection());
+      setTarget(newAssetCollection(), PLAIN_TARGET);
     }
   };
 
@@ -106,7 +117,7 @@ const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEdi
                   checked={simpleTargetType === 'text'}
                   onChange={() => {
                     setSimpleTargetType('text');
-                    setTarget('');
+                    setTarget('', PLAIN_TARGET);
                     setUrlError('');
                   }}
                   disabled={locked}
@@ -119,7 +130,7 @@ const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEdi
                   onChange={() => {
                     setSimpleTargetType('dropdown');
                     setDropdownSelection('');
-                    setTarget('');
+                    setTarget('', PLAIN_TARGET);
                     setUrlError('');
                   }}
                   disabled={locked || availableTargets.length === 0}
@@ -149,8 +160,10 @@ const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEdi
                       items={availableTargets}
                       value={dropdownSelection}
                       onChange={(val) => {
+                        // The option is the key the target is written under; the value the user
+                        // already typed moves with it.
                         setDropdownSelection(val);
-                        setTarget(val);
+                        setTarget(typeof target === 'string' ? target : '', val || PLAIN_TARGET);
                       }}
                       placeholder={t.selectTarget}
                       ariaLabel={t.selectTarget}
@@ -160,7 +173,7 @@ const TargetEditor = ({ target, setTarget, mappings, locked = false }: TargetEdi
                       type="text"
                       placeholder={t.enterTargetValue}
                       value={typeof target === 'string' ? target : ''}
-                      onChange={(e) => setTarget(e.target.value)}
+                      onChange={(e) => setTarget(e.target.value, dropdownSelection || undefined)}
                       aria-label={t.enterTargetValue}
                       disabled={locked}
                     />
