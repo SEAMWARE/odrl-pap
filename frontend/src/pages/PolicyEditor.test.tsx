@@ -585,4 +585,36 @@ describe('PolicyEditor', () => {
       expect(screen.queryByText(/must be a JSON object/i)).not.toBeInTheDocument();
     });
   });
+  describe('Adding a @context entry (P1-6)', () => {
+    const ODRL_URL = 'http://www.w3.org/ns/odrl/2/';
+
+    /** Opens a policy with the given `@context`, adds `dome-op`, and returns the resulting raw policy. */
+    const addDomeOp = async (context: unknown) => {
+      const user = userEvent.setup();
+      vi.mocked(PolicyService.getPolicyById).mockResolvedValue({
+        id: 'p-ctx',
+        odrl: JSON.stringify({ '@context': context, '@type': 'odrl:Policy', 'odrl:permission': {} }),
+      } as unknown as Policy);
+      renderEditMode('p-ctx');
+      await user.click(await screen.findByRole('tab', { name: 'Raw ODRL' }));
+      await user.type(screen.getByLabelText('Prefix'), 'dome-op');
+      await user.type(screen.getByLabelText('Namespace URI'), 'https://example.com/ns/');
+      await user.click(screen.getByRole('button', { name: 'Add Context' }));
+      const raw = screen.getByRole('textbox', { name: 'Raw ODRL' }) as HTMLTextAreaElement;
+      return JSON.parse(raw.value)['@context'];
+    };
+
+    it('keeps the entries of an array context and appends the new one', async () => {
+      const context = [ODRL_URL, 'https://other.example/ctx.jsonld'];
+      expect(await addDomeOp(context)).toEqual([...context, { 'dome-op': 'https://example.com/ns/' }]);
+    });
+
+    it('does not rename a URL context to the odrl prefix', async () => {
+      expect(await addDomeOp(ODRL_URL)).toEqual([ODRL_URL, { 'dome-op': 'https://example.com/ns/' }]);
+    });
+
+    it('adds the prefix to an object context', async () => {
+      expect(await addDomeOp({ odrl: ODRL_URL })).toEqual({ odrl: ODRL_URL, 'dome-op': 'https://example.com/ns/' });
+    });
+  });
 });

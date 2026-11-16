@@ -53,3 +53,54 @@ export function jsonLdContextEntryIri(entry: JsonLdContextEntry): string {
   const id = entry[JSON_LD_ID_KEY];
   return typeof id === 'string' ? id : JSON.stringify(entry);
 }
+
+/** An entry shown for a `@context`: a prefix with its namespace IRI, or a remote context IRI (no prefix). */
+export interface ContextEntry {
+  prefix?: string;
+  uri: string;
+}
+
+/**
+ * Lists what a `@context` defines, whichever shape it has: a prefix map, a remote context IRI, or
+ * an array mixing both.
+ */
+export function listContextEntries(context: unknown): ContextEntry[] {
+  if (typeof context === 'string') return [{ uri: context }];
+  if (isJsonLdContextObject(context)) {
+    return Object.entries(context).map(([prefix, entry]) => ({ prefix, uri: jsonLdContextEntryIri(entry) }));
+  }
+  if (Array.isArray(context)) return context.flatMap(listContextEntries);
+  return [];
+}
+
+/**
+ * Adds a `prefix` -> `uri` entry to a `@context` without losing what it already holds.
+ *
+ * A prefix map gets the prefix. A remote context IRI becomes the first entry of an array, followed
+ * by the new prefix map. An array gets the prefix in its last prefix map, or a new one at its end.
+ */
+export function addContextEntry(context: unknown, prefix: string, uri: string): unknown {
+  if (Array.isArray(context)) {
+    const lastMap = context.map(isJsonLdContextObject).lastIndexOf(true);
+    if (lastMap === -1) return [...context, { [prefix]: uri }];
+    return context.map((entry, index) => (index === lastMap ? { ...(entry as JsonLdContextObject), [prefix]: uri } : entry));
+  }
+  if (isJsonLdContextObject(context)) return { ...context, [prefix]: uri };
+  if (typeof context === 'string') return [context, { [prefix]: uri }];
+  return { [prefix]: uri };
+}
+
+/** Removes a prefix from a `@context` (an object, or the objects of an array); other shapes are returned as they are. */
+export function removeContextPrefix(context: unknown, prefix: string): unknown {
+  if (isJsonLdContextObject(context)) {
+    const copy = { ...context };
+    delete copy[prefix];
+    return copy;
+  }
+  if (Array.isArray(context)) {
+    return context
+      .map((entry) => (isJsonLdContextObject(entry) ? removeContextPrefix(entry, prefix) : entry))
+      .filter((entry) => !(isJsonLdContextObject(entry) && Object.keys(entry).length === 0));
+  }
+  return context;
+}
