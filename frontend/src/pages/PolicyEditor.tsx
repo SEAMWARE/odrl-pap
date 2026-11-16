@@ -26,6 +26,7 @@ import { TestRequest } from '../api/models/TestRequest';
 import type { GenericJsonInput } from '../api/models/GenericJsonInput';
 import type { ValidationMode } from '../components/ValidationEditor';
 import PolicyBuilder from '../components/PolicyBuilder';
+import ErrorBoundary from '../components/ErrorBoundary';
 import ValidationEditor from '../components/ValidationEditor';
 import ValidationResult from '../components/ValidationResult';
 import TemplateSelector from '../components/TemplateSelector';
@@ -280,13 +281,17 @@ const PolicyEditor = () => {
   const handleRawTextChange = useCallback((text: string) => {
     setRawText(text);
     try {
-      const parsed = JSON.parse(text) as OdrlPolicyJson;
-      setPolicy(parsed);
+      const parsed: unknown = JSON.parse(text);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        setJsonError(t.jsonNotObject);
+        return;
+      }
+      setPolicy(parsed as OdrlPolicyJson);
       setJsonError('');
     } catch (err: unknown) {
       setJsonError(err instanceof Error ? err.message : t.jsonInvalid);
     }
-  }, [t.jsonInvalid]);
+  }, [t.jsonInvalid, t.jsonNotObject]);
 
   /**
    * Adds a new prefix:URI entry to the policy's `@context`.
@@ -544,7 +549,9 @@ const PolicyEditor = () => {
           title={t.tabBuilder}
           disabled={createdFromTemplate}
         >
-          <PolicyBuilder policy={policy} setPolicy={setPolicy} />
+          <ErrorBoundary resetKey={policy}>
+            <PolicyBuilder policy={policy} setPolicy={setPolicy} />
+          </ErrorBoundary>
         </Tab>
         <Tab
           eventKey={TAB_KEY_ODRL}

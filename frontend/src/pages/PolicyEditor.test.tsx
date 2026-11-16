@@ -5,7 +5,7 @@
  * validation modal interactions, and service dropdown integration.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PolicyEditor from './PolicyEditor';
@@ -555,6 +555,34 @@ describe('PolicyEditor', () => {
       await waitFor(() => {
         expect(screen.queryByTestId('validation-modal')).not.toBeInTheDocument();
       });
+    });
+  });
+  describe('Raw ODRL tab input that is not a policy object (P1-3)', () => {
+    /** Types `text` into the raw editor of a new policy and returns the textarea. */
+    const typeRaw = async (text: string) => {
+      const user = userEvent.setup();
+      renderCreateMode();
+      await waitFor(() => expect(screen.getByText('Raw ODRL')).toBeInTheDocument());
+      await user.click(screen.getByText('Raw ODRL'));
+      const textarea = screen
+        .getAllByRole('textbox')
+        .find((el) => el.tagName === 'TEXTAREA' && (el as HTMLTextAreaElement).value.includes('odrl:Policy')) as HTMLTextAreaElement;
+      fireEvent.change(textarea, { target: { value: text } });
+      return user;
+    };
+
+    it.each(['null', '[]', '42', '"text"', 'true'])('rejects %s and keeps the Builder usable', async (text) => {
+      const user = await typeRaw(text);
+
+      expect(screen.getByText(/must be a JSON object/i)).toBeInTheDocument();
+
+      await user.click(screen.getByText('Policy Builder'));
+      await waitFor(() => expect(screen.getByText('Target')).toBeInTheDocument());
+    });
+
+    it('accepts a JSON object', async () => {
+      await typeRaw('{"@type":"odrl:Policy","odrl:permission":{}}');
+      expect(screen.queryByText(/must be a JSON object/i)).not.toBeInTheDocument();
     });
   });
 });

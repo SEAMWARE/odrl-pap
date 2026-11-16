@@ -26,6 +26,10 @@ export const en = {
     search: 'Search...',
   },
 
+  errorBoundary: {
+    title: 'This part of the policy could not be displayed.',
+    hint: 'The policy has a shape the editor does not support here. You can still fix it in the raw ODRL editor.',
+  },
   policyBuilder: {
     title: 'Policy Builder',
     loadingMappings: 'Loading policy mappings...',
@@ -188,6 +192,7 @@ export const en = {
     validate: 'Validate',
     jsonValid: 'Valid JSON',
     jsonInvalid: 'Invalid JSON',
+    jsonNotObject: 'The policy must be a JSON object.',
     contextTitle: 'JSON-LD Context (@context)',
     contextPrefix: 'Prefix',
     contextPrefixPlaceholder: 'e.g., dome-op',

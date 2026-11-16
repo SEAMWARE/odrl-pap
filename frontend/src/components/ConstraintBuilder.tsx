@@ -10,6 +10,7 @@ import type { Mappings } from '../services/api';
 import type { Mapping } from '../api';
 import { useI18n } from '../i18n';
 import NamespacedDropdown from './NamespacedDropdown';
+import { readConstraintGroup } from '../utils/constraints';
 
 /** Default parent property that holds the constraint(s). */
 const DEFAULT_PROPERTY_KEY = 'odrl:constraint';
@@ -54,40 +55,16 @@ function getParameterCount(operands: Mapping[], operandName: string): number {
 const ANDSEQUENCE_TYPE = 'andSequence';
 
 /**
- * Reads the constraints held by a parent's constraint property.
- *
- * Handles the three shapes ODRL allows: a logical constraint (`odrl:or` /
- * `odrl:xone` / `odrl:and` / `odrl:andSequence`), a list (an implicit AND) and a lone constraint object, which
- * templates commonly emit. Returns `undefined` when there is nothing to read.
+ * Reads the constraints held by a parent's constraint property, whatever shape they were written
+ * in (see {@link readConstraintGroup}). Returns `undefined` when there is nothing to read.
  */
 function readConstraints(
-  constraint: Record<string, unknown> | ConstraintData[] | undefined,
-): { logicalType: string; constraints: ConstraintData[] } | undefined {
-  if (!constraint) return undefined;
-  if (Array.isArray(constraint)) {
-    return { logicalType: 'and', constraints: constraint };
-  }
-  if (typeof constraint !== 'object') return undefined;
-  if (constraint['@type'] === 'odrl:LogicalConstraint') {
-    if (constraint['odrl:or']) {
-      return { logicalType: 'or', constraints: constraint['odrl:or'] as ConstraintData[] };
-    }
-    if (constraint['odrl:xone']) {
-      return { logicalType: 'xone', constraints: constraint['odrl:xone'] as ConstraintData[] };
-    }
-    if (constraint['odrl:and']) {
-      return { logicalType: 'and', constraints: constraint['odrl:and'] as ConstraintData[] };
-    }
-    if (constraint['odrl:andSequence']) {
-      return { logicalType: ANDSEQUENCE_TYPE, constraints: constraint['odrl:andSequence'] as ConstraintData[] };
-    }
-    return undefined;
-  }
-  // A single constraint object (a lone constraint/refinement rather than an array):
-  // load it as a one-element list so it becomes editable instead of being dropped.
-  return { logicalType: 'and', constraints: [constraint as ConstraintData] };
+  constraint: unknown,
+): { logicalType: string; constraints: ConstraintData[]; listWrapper: boolean } | undefined {
+  return readConstraintGroup(constraint) as
+    | { logicalType: string; constraints: ConstraintData[]; listWrapper: boolean }
+    | undefined;
 }
-
 /**
  * Returns the left operand selected in the given constraint.
  *
@@ -168,7 +145,7 @@ const ConstraintBuilder = ({
   // changed in the same render the effects swapped them back and forth forever ("Maximum update
   // depth exceeded", the value flickering), whenever the editor opened a policy that had
   // constraints or the user typed quickly.
-  const parentConstraint = parent[propertyKey] as Record<string, unknown> | ConstraintData[] | undefined;
+  const parentConstraint = parent[propertyKey];
   const held = readConstraints(parentConstraint);
   const internalConstraints: ConstraintData[] = held?.constraints ?? [];
   const logicalType = held?.logicalType ?? 'and';
@@ -176,12 +153,14 @@ const ConstraintBuilder = ({
 
   /** Writes a list (and, optionally, a new logical grouping) into the parent. */
   const write = (constraints: ConstraintData[], type: string = logicalType) => {
+    // A list written as a JSON-LD `@list` stays one.
+    const operands = held?.listWrapper ? { '@list': constraints } : constraints;
     setParent({
       ...parent,
       [propertyKey]:
         type === 'and'
-          ? constraints
-          : { '@type': 'odrl:LogicalConstraint', [`odrl:${type}`]: constraints },
+          ? operands
+          : { '@type': 'odrl:LogicalConstraint', [`odrl:${type}`]: operands },
     });
   };
 

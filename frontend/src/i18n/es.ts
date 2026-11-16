@@ -26,6 +26,10 @@ export const es: I18nStrings = {
     search: 'Buscar...',
   },
 
+  errorBoundary: {
+    title: 'No se pudo mostrar esta parte de la política.',
+    hint: 'La política tiene una forma que el editor no admite aquí. Aún puedes corregirla en el editor ODRL en bruto.',
+  },
   policyBuilder: {
     title: 'Constructor de políticas',
     loadingMappings: 'Cargando los mapeos de la política...',
@@ -188,6 +192,7 @@ export const es: I18nStrings = {
     validate: 'Validar',
     jsonValid: 'JSON válido',
     jsonInvalid: 'JSON no válido',
+    jsonNotObject: 'La política debe ser un objeto JSON.',
     contextTitle: 'Contexto JSON-LD (@context)',
     contextPrefix: 'Prefijo',
     contextPrefixPlaceholder: 'p. ej., dome-op',

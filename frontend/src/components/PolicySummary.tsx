@@ -10,6 +10,7 @@ import { useState, useCallback } from 'react';
 import type { OdrlPolicyJson } from '../services/api';
 import { useI18n } from '../i18n';
 import { readPermission } from '../utils/permission';
+import { readConstraintGroup, toConstraintArray } from '../utils/constraints';
 
 /** Delay in milliseconds before "Copied!" reverts to "Copy". */
 const COPY_FEEDBACK_DELAY_MS = 2000;
@@ -107,7 +108,7 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
   const target = permission['odrl:target'];
   const assignee = permission['odrl:assignee'];
   const action = permission['odrl:action'];
-  const constraint = permission['odrl:constraint'] as Record<string, unknown> | unknown[] | undefined;
+  const constraint = permission['odrl:constraint'];
 
   const renderConstraintItem = (c: Record<string, unknown>, index: number) => (
     <ListGroup.Item key={index} as="li" className="d-flex justify-content-between align-items-start">
@@ -128,11 +129,8 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
    * or an array of them; templates commonly emit the single-object form, so
    * both must be handled to avoid calling `.map` on a non-array.
    */
-  const toRefinementArray = (refinement: unknown): Record<string, unknown>[] => {
-    if (!refinement) return [];
-    if (Array.isArray(refinement)) return refinement as Record<string, unknown>[];
-    return [refinement as Record<string, unknown>];
-  };
+  const toRefinementArray = (refinement: unknown): Record<string, unknown>[] =>
+    toConstraintArray(refinement);
 
   const renderRefinements = (refinement: unknown) => {
     const refinements = toRefinementArray(refinement);
@@ -164,54 +162,30 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
   };
 
   const renderConstraints = () => {
-    if (!constraint) return null;
-
-    // Logical Constraint
-    if (
-      typeof constraint === 'object' &&
-      !Array.isArray(constraint) &&
-      constraint['@type'] === 'odrl:LogicalConstraint'
-    ) {
-      const operator = Object.keys(constraint).find((k) => k.startsWith('odrl:'));
-      const constraints = operator ? (constraint[operator] as Record<string, unknown>[]) : [];
+    const group = readConstraintGroup(constraint);
+    if (!group || group.constraints.length === 0) return null;
+    const { logicalType, constraints } = group;
+    const isLoneConstraint =
+      logicalType === 'and' && constraints.length === 1 && constraint === constraints[0];
+    if (isLoneConstraint) {
       return (
         <>
-          <div className="fw-bold mt-3">
-            {t.constraints}{' '}
-            <Badge bg="info">{operator?.replace('odrl:', '').toUpperCase()}</Badge>
-          </div>
-          <ListGroup as="ol" numbered>
-            {constraints.map(renderConstraintItem)}
-          </ListGroup>
+          <div className="fw-bold mt-3">{t.constraint}</div>
+          <ListGroup as="ol">{renderConstraintItem(constraints[0], 0)}</ListGroup>
         </>
       );
     }
-
-    // Array of constraints (implicit AND)
-    if (Array.isArray(constraint)) {
-      return (
-        <>
-          <div className="fw-bold mt-3">
-            {t.constraints} <Badge bg="info">AND</Badge>
-          </div>
-          <ListGroup as="ol" numbered>
-            {constraint.map((c, i) => renderConstraintItem(c as Record<string, unknown>, i))}
-          </ListGroup>
-        </>
-      );
-    }
-
-    // Single constraint
     return (
       <>
-        <div className="fw-bold mt-3">{t.constraint}</div>
-        <ListGroup as="ol">
-          {renderConstraintItem(constraint as Record<string, unknown>, 0)}
+        <div className="fw-bold mt-3">
+          {t.constraints} <Badge bg="info">{logicalType.toUpperCase()}</Badge>
+        </div>
+        <ListGroup as="ol" numbered>
+          {constraints.map(renderConstraintItem)}
         </ListGroup>
       </>
     );
   };
-
   const humanSummary = buildHumanSummary(action, target, assignee, notSet);
 
   return (

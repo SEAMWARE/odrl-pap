@@ -500,6 +500,24 @@ describe('EmbeddedApp policy value', () => {
   });
 });
 
+describe('EmbeddedApp raw policy input that is not an object (P1-3)', () => {
+  const POLICY = { '@type': 'odrl:Policy', 'odrl:uid': 'urn:p:1' } as never;
+  it.each(['null', '[]', '42', '"text"'])('rejects %s without emitting a change', async (text) => {
+    const config = withNone('mappings');
+    render(<EmbeddedApp config={config} policy={POLICY} />);
+    (config.onEvent as ReturnType<typeof vi.fn>).mockClear();
+
+    await userEvent.click(screen.getByRole('tab', { name: /raw/i }));
+    const textarea = screen.getByRole('textbox', { name: '' });
+    await userEvent.clear(textarea);
+    await userEvent.click(textarea);
+    await userEvent.paste(text);
+
+    expect(screen.getByText(/must be a JSON object/i)).toBeInTheDocument();
+    expect(config.onEvent).not.toHaveBeenCalledWith('policy-changed', expect.anything());
+  });
+});
+
 describe('EmbeddedApp layout flags', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -27,6 +27,7 @@ import type { FieldTemplate } from '../types';
 import type { OdrlPolicyJson } from '../services/api';
 import type { Mappings } from '../api';
 import ConstraintBuilder from './ConstraintBuilder';
+import ErrorBoundary from './ErrorBoundary';
 import TargetEditor from './TargetEditor';
 import AssigneeEditor from './AssigneeEditor';
 import PolicySummary from './PolicySummary';
@@ -324,7 +325,9 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
       {showSummary && (
         <Col lg={4}>
           <div className="sticky-top" style={{ top: '1rem' }}>
-            <PolicySummary policy={policy} />
+            <ErrorBoundary resetKey={policy}>
+              <PolicySummary policy={policy} />
+            </ErrorBoundary>
           </div>
         </Col>
       )}

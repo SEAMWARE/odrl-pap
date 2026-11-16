@@ -31,6 +31,7 @@ import { TestRequest } from '../api/models/TestRequest';
 import type { GenericJsonInput } from '../api/models/GenericJsonInput';
 import type { ValidationMode } from '../components/ValidationEditor';
 import PolicyBuilder from '../components/PolicyBuilder';
+import ErrorBoundary from '../components/ErrorBoundary';
 import ValidationEditor from '../components/ValidationEditor';
 import ValidationResult from '../components/ValidationResult';
 import TemplateSelector from '../components/TemplateSelector';
@@ -374,13 +375,17 @@ const EmbeddedApp = ({
   const handleRawTextChange = useCallback((text: string) => {
     setRawText(text);
     try {
-      const parsed = JSON.parse(text) as OdrlPolicyJson;
-      setPolicy(parsed);
+      const parsed: unknown = JSON.parse(text);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        setJsonError(tabStrings.jsonNotObject);
+        return;
+      }
+      setPolicy(parsed as OdrlPolicyJson);
       setJsonError('');
     } catch (err: unknown) {
       setJsonError(err instanceof Error ? err.message : 'Invalid JSON');
     }
-  }, []);
+  }, [tabStrings.jsonNotObject]);
 
   /**
    * Adds a new prefix:URI entry to the policy's `@context`.
@@ -642,13 +647,15 @@ const EmbeddedApp = ({
                 title={tabStrings.tabBuilder}
                 disabled={createdFromTemplate}
               >
-                <PolicyBuilder
-                  policy={policy}
-                  setPolicy={setPolicy}
-                  fieldTemplate={fieldTemplate}
-                  mappings={builderMappings}
-                  showSummary={summaryPlacement === 'side'}
-                />
+                <ErrorBoundary resetKey={policy}>
+                  <PolicyBuilder
+                    policy={policy}
+                    setPolicy={setPolicy}
+                    fieldTemplate={fieldTemplate}
+                    mappings={builderMappings}
+                    showSummary={summaryPlacement === 'side'}
+                  />
+                </ErrorBoundary>
               </Tab>
             )}
             {!hiddenTabs.hideRawTab && (
@@ -734,7 +741,9 @@ const EmbeddedApp = ({
             {/* Policy summary tab — only when the summary is placed as a tab */}
             {summaryPlacement === 'tab' && (
               <Tab eventKey={TAB_KEY_SUMMARY} title={tabStrings.tabSummary}>
-                <PolicySummary policy={policy} />
+                <ErrorBoundary resetKey={policy}>
+                  <PolicySummary policy={policy} />
+                </ErrorBoundary>
               </Tab>
             )}
 
