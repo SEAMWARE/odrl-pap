@@ -33,6 +33,7 @@ export const en = {
   policyBuilder: {
     title: 'Policy Builder',
     loadingMappings: 'Loading policy mappings...',
+    unsupportedPartsNotice: 'This policy has parts the PAP does not evaluate ({parts}). They are kept as they are but ignored when the policy is evaluated; only permissions are enforced.',
     multiplePermissionsNotice: 'This policy has several permissions. Only the first one can be edited here; the others are kept unchanged. Use the raw ODRL editor to change them.',
     errorLoadingMappings: 'Failed to load policy mappings. Please try again.',
     stepTarget: 'Target',

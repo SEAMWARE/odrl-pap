@@ -33,6 +33,7 @@ export const es: I18nStrings = {
   policyBuilder: {
     title: 'Constructor de políticas',
     loadingMappings: 'Cargando los mapeos de la política...',
+    unsupportedPartsNotice: 'Esta política tiene partes que el PAP no evalúa ({parts}). Se conservan tal cual pero se ignoran al evaluar la política; solo se aplican los permisos.',
     multiplePermissionsNotice: 'Esta política tiene varios permisos. Aquí solo se puede editar el primero; los demás se conservan sin cambios. Usa el editor ODRL en bruto para modificarlos.',
     errorLoadingMappings: 'No se pudieron cargar los mapeos de la política. Inténtalo de nuevo.',
     stepTarget: 'Objetivo',

@@ -33,7 +33,7 @@ import AssigneeEditor from './AssigneeEditor';
 import PolicySummary from './PolicySummary';
 import NamespacedDropdown from './NamespacedDropdown';
 import { permissionCount, readPermission, writePermission } from '../utils/permission';
-import { getTerm, setTerm } from '../utils/odrlTerms';
+import { findTermKey, getTerm, setTerm } from '../utils/odrlTerms';
 import { findTargetKey, writeTarget } from '../utils/target';
 
 /** Step number constants for the guided workflow. */
@@ -66,6 +66,18 @@ interface PolicyBuilderProps {
    * hidden; the form then takes the full width. Defaults to true.
    */
   showSummary?: boolean;
+}
+
+/** Policy-level parts the PAP backend never maps (it maps `permission` only). */
+const IGNORED_POLICY_TERMS = ['prohibition', 'obligation', 'assigner', 'profile'];
+
+/** The ignored parts present in the policy, or in the permission being edited (`assigner`). */
+function ignoredParts(policy: Record<string, unknown>, permission: Record<string, unknown>): string[] {
+  const present = IGNORED_POLICY_TERMS.filter((term) => findTermKey(policy, term) !== undefined);
+  if (findTermKey(permission, 'assigner') !== undefined && !present.includes('assigner')) {
+    present.push('assigner');
+  }
+  return present;
 }
 
 /** The action as the dropdown shows it: a string, or the `@id` of an `{"@id": ...}` action. */
@@ -198,6 +210,7 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
   const permission = readPermission(policy);
   const targetKey = findTargetKey(permission);
   const hasSeveralPermissions = permissionCount(policy) > 1;
+  const unsupportedParts = ignoredParts(policy, permission);
 
   const targetLocked = isFieldLocked(PATH_TARGET);
   const assigneeLocked = isFieldLocked(PATH_ASSIGNEE);
@@ -235,6 +248,12 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
                   </div>
                 )}
               </div>
+            </Alert>
+          )}
+
+          {unsupportedParts.length > 0 && (
+            <Alert variant="warning" className="mb-0" data-testid="unsupported-parts-notice">
+              {t.unsupportedPartsNotice.replace('{parts}', unsupportedParts.join(', '))}
             </Alert>
           )}
 
