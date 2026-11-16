@@ -110,13 +110,15 @@ describe('TargetEditor asset collections', () => {
         onWrite={onWrite}
       />,
     );
-    await userEvent.setup().click(screen.getByRole('button', { name: /add constraint/i }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /add constraint/i }));
+    await user.selectOptions(screen.getByLabelText(/select left operand 2/i), 'http:path');
     const written = last(onWrite) as Record<string, unknown>;
     expect(written['@type']).toBe('AssetCollection');
     expect(written['odrl:source']).toBe('urn:custom');
     expect(written['odrl:uid']).toBe('urn:uid:1');
     // the single refinement is normalised to the list the backend accepts, nothing lost
-    expect(written['odrl:refinement']).toEqual([SINGLE_REFINEMENT, {}]);
+    expect(written['odrl:refinement']).toEqual([SINGLE_REFINEMENT, { 'odrl:leftOperand': { '@id': 'http:path' } }]);
   });
 
   it('keeps plain-string operands and the single constraint when editing its value', async () => {

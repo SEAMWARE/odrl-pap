@@ -5,12 +5,13 @@
  * namespace-grouped operand/operator dropdowns, clear logical grouping
  * labels (AND/OR/XONE), and visual card styling for each constraint.
  */
+import { useState } from 'react';
 import { Form, Row, Col, Button, Stack, Card, Badge } from 'react-bootstrap';
 import type { Mappings } from '../services/api';
 import type { Mapping } from '../api';
 import { useI18n } from '../i18n';
 import NamespacedDropdown from './NamespacedDropdown';
-import { readConstraintGroup } from '../utils/constraints';
+import { readConstraintGroup, type ConstraintGroup } from '../utils/constraints';
 import { getTerm, removeTerm, setTerm, termKey } from '../utils/odrlTerms';
 
 /** Default parent property that holds the constraint(s). */
@@ -58,11 +59,14 @@ const ANDSEQUENCE_TYPE = 'andSequence';
  */
 function readConstraints(
   constraint: unknown,
-): { logicalType: string; constraints: ConstraintData[]; listWrapper: boolean } | undefined {
+): (Omit<ConstraintGroup, 'constraints'> & { constraints: ConstraintData[] }) | undefined {
   return readConstraintGroup(constraint) as
-    | { logicalType: string; constraints: ConstraintData[]; listWrapper: boolean }
+    | (Omit<ConstraintGroup, 'constraints'> & { constraints: ConstraintData[] })
     | undefined;
 }
+
+/** Whether a constraint has anything in it; a constraint without a single key cannot be mapped by the backend. */
+const isFilled = (constraint: ConstraintData): boolean => Object.keys(constraint).length > 0;
 /**
  * Returns the left operand selected in the given constraint.
  *
@@ -159,21 +163,29 @@ const ConstraintBuilder = ({
   const constraintKey = termKey(parent, propertyKey);
   const parentConstraint = parent[constraintKey];
   const held = readConstraints(parentConstraint);
-  const internalConstraints: ConstraintData[] = held?.constraints ?? [];
+  // A constraint just added has nothing in it yet. It is shown as a blank row but only written to the
+  // policy once the user fills something in, so the policy never holds an empty constraint.
+  const [hasBlankRow, setHasBlankRow] = useState(false);
+  const internalConstraints: ConstraintData[] = [...(held?.constraints ?? []), ...(hasBlankRow ? [{}] : [])];
   const logicalType = held?.logicalType ?? 'and';
   const locked = lockedProp || logicalType === ANDSEQUENCE_TYPE;
 
   /** Writes a list (and, optionally, a new logical grouping) into the parent. */
-  const write = (constraints: ConstraintData[], type: string = logicalType) => {
+  const write = (rows: ConstraintData[], type: string = logicalType) => {
+    const constraints = rows.filter(isFilled);
+    setHasBlankRow(constraints.length !== rows.length);
     // A list written as a JSON-LD `@list` stays one.
     const operands = held?.listWrapper ? { '@list': constraints } : constraints;
-    setParent({
-      ...parent,
-      [constraintKey]:
-        type === 'and'
-          ? operands
-          : { '@type': 'odrl:LogicalConstraint', [`odrl:${type}`]: operands },
-    });
+    let written: unknown;
+    if (held?.logical && type === held.logicalType) {
+      // The grouping is unchanged: keep the group object (its @type, or none) as it was loaded.
+      written = { ...held.logical.original, [held.logical.key]: operands };
+    } else if (type === 'and') {
+      written = operands;
+    } else {
+      written = { '@type': 'odrl:LogicalConstraint', [`odrl:${type}`]: operands };
+    }
+    setParent({ ...parent, [constraintKey]: written });
   };
 
   const handleConstraintChange = (index: number, field: string, value: unknown) => {
@@ -220,7 +232,7 @@ const ConstraintBuilder = ({
   };
 
   const addConstraint = () => {
-    write([...internalConstraints, {} as ConstraintData]);
+    setHasBlankRow(true);
   };
 
   const removeConstraint = (index: number) => {
@@ -436,7 +448,7 @@ const ConstraintBuilder = ({
 
       {/* Add constraint button */}
       <div>
-        <Button variant="outline-primary" onClick={addConstraint} disabled={locked}>
+        <Button variant="outline-primary" onClick={addConstraint} disabled={locked || hasBlankRow}>
           + {t.addConstraint}
         </Button>
       </div>

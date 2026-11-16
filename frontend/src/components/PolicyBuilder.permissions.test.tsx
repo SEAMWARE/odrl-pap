@@ -83,6 +83,7 @@ describe('PolicyBuilder with an array of permissions', () => {
     const setPolicy = renderBuilder(policyWith([FIRST, SECOND]));
     await waitFor(() => expect(screen.getByRole('button', { name: /add constraint/i })).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /add constraint/i }));
+    await user.selectOptions(screen.getByLabelText(/select left operand 1/i), 'dome-op:role');
 
     const written = setPolicy.mock.calls.at(-1)![0]['odrl:permission'];
     expect(Array.isArray(written)).toBe(true);

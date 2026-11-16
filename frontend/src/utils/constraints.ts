@@ -25,6 +25,11 @@ export interface ConstraintGroup {
   constraints: ConstraintObject[];
   /** `true` when the constraints are wrapped in an `@list`, so a write can keep that shape. */
   listWrapper: boolean;
+  /**
+   * For a logical constraint, the object as it was written and the key that holds the operands, so
+   * that an edit which does not change the grouping can write it back unchanged around them.
+   */
+  logical?: { original: ConstraintObject; key: string };
 }
 
 function isObject(value: unknown): value is ConstraintObject {
@@ -70,7 +75,12 @@ export function readConstraintGroup(value: unknown): ConstraintGroup | undefined
   const logical = LOGICAL_KEYS.find(([, key]) => key in value);
   if (logical) {
     const [logicalType, key] = logical;
-    return { logicalType, constraints: toConstraintArray(value[key]), listWrapper: isJsonLdList(value[key]) };
+    return {
+      logicalType,
+      constraints: toConstraintArray(value[key]),
+      listWrapper: isJsonLdList(value[key]),
+      logical: { original: value, key },
+    };
   }
   if (value['@type'] === 'odrl:LogicalConstraint') return undefined;
   // A lone constraint object rather than a list: load it as a one-element group.

@@ -57,11 +57,13 @@ describe('AssigneeEditor party collections', () => {
         onWrite={onWrite}
       />,
     );
-    await userEvent.setup().click(screen.getByRole('button', { name: /add constraint/i }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /add constraint/i }));
+    await user.selectOptions(screen.getByLabelText(/select left operand 1/i), 'dome-op:role');
     expect(last(onWrite)).toEqual({
       '@type': 'PartyCollection',
       'odrl:source': 'urn:party',
-      'odrl:refinement': [{}],
+      'odrl:refinement': [{ 'odrl:leftOperand': { '@id': 'dome-op:role' } }],
     });
   });
 });

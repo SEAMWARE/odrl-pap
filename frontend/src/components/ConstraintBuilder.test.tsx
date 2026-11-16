@@ -101,6 +101,9 @@ describe('ConstraintBuilder', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /add constraint/i }));
+    // A blank row is shown but not written: an empty constraint is rejected by the backend.
+    expect(setParent).not.toHaveBeenCalled();
+    await user.selectOptions(screen.getByLabelText(/select left operand 1/i), 'dome-op:role');
 
     // setParent should be called with an updated constraint array
     expect(setParent).toHaveBeenCalled();
@@ -461,6 +464,7 @@ describe('ConstraintBuilder propertyKey', () => {
     );
 
     await user.click(screen.getByRole('button', { name: /add constraint/i }));
+    await user.selectOptions(screen.getByLabelText(/select left operand 1/i), 'dome-op:role');
 
     const lastCall = setParent.mock.calls[setParent.mock.calls.length - 1][0];
     // The collection type is preserved and refinement is written, not constraint.
@@ -810,8 +814,13 @@ describe('ConstraintBuilder with a parent that owns the state', () => {
       expect(screen.getByDisplayValue('ADMIN')).toBeInTheDocument();
       expect(screen.getByDisplayValue('USER')).toBeInTheDocument();
 
-      await userEvent.setup().click(screen.getByRole('button', { name: /add constraint/i }));
-      expect(onWrite.mock.calls.at(-1)![0]['odrl:constraint']).toHaveLength(3);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /add constraint/i }));
+      await user.selectOptions(screen.getByLabelText(/select left operand 3/i), 'dome-op:role');
+      const written = onWrite.mock.calls.at(-1)![0]['odrl:constraint'];
+      // still the odrl:and group it was loaded as, now with three constraints
+      expect(written['@type']).toBe('odrl:LogicalConstraint');
+      expect(written['odrl:and']).toHaveLength(3);
     });
 
     it('shows an odrl:andSequence constraint read-only instead of dropping it', () => {
