@@ -60,7 +60,9 @@ const TargetEditor = ({ target, targetKey, setTarget, mappings, locked = false }
   // The policy can be replaced after mount (loaded from the backend, edited in the Raw tab), so
   // the mode and the selection follow the key the target is stored under.
   useEffect(() => {
-    setDropdownSelection(optionKey);
+    // A plain `odrl:target` is itself a dropdown option, so a selection of it is kept rather than
+    // cleared when the stored key becomes `odrl:target`.
+    setDropdownSelection((current) => optionKey || (isPlainTargetKey(current) ? current : ''));
     if (optionKey) setSimpleTargetType('dropdown');
   }, [optionKey]);
 

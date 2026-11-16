@@ -146,3 +146,36 @@ describe('TargetEditor asset collections', () => {
     ]);
   });
 });
+
+describe('TargetEditor target option', () => {
+  const WITH_TARGETS: Mappings = {
+    ...MAPPINGS,
+    targets: [
+      { name: 'json:uid', description: 'JSON uid' },
+      { name: 'odrl:target', description: 'Plain target' },
+    ],
+  };
+
+  /** Keeps the target and its key like the real builder does. */
+  const Keyed = () => {
+    const [state, setState] = useState<{ target: unknown; key?: string }>({ target: 'a', key: 'json:uid' });
+    return (
+      <I18nProvider>
+        <TargetEditor
+          target={state.target}
+          targetKey={state.key}
+          setTarget={(target, key) => setState({ target, key: key ?? state.key })}
+          mappings={WITH_TARGETS}
+        />
+      </I18nProvider>
+    );
+  };
+
+  it('keeps odrl:target selected when switching to it from json:uid', async () => {
+    render(<Keyed />);
+    const select = screen.getByRole('combobox', { name: /select/i });
+    expect(select).toHaveValue('json:uid');
+    await userEvent.selectOptions(select, 'odrl:target');
+    expect(screen.getByRole('combobox', { name: /select/i })).toHaveValue('odrl:target');
+  });
+});
