@@ -12,7 +12,7 @@ import type { Mapping } from '../api';
 import { useI18n } from '../i18n';
 import NamespacedDropdown from './NamespacedDropdown';
 import { readConstraintGroup, type ConstraintGroup } from '../utils/constraints';
-import { getTerm, removeTerm, setTerm, termKey } from '../utils/odrlTerms';
+import { getTerm, removeTerm, setTerm, spelledLike, termKey } from '../utils/odrlTerms';
 
 /** Default parent property that holds the constraint(s). */
 const DEFAULT_PROPERTY_KEY = 'odrl:constraint';
@@ -183,7 +183,11 @@ const ConstraintBuilder = ({
     } else if (type === 'and') {
       written = operands;
     } else {
-      written = { '@type': 'odrl:LogicalConstraint', [`odrl:${type}`]: operands };
+      // A new group follows the spelling the policy already uses for the constraint key.
+      written = {
+        '@type': spelledLike(constraintKey, 'LogicalConstraint'),
+        [spelledLike(constraintKey, type)]: operands,
+      };
     }
     setParent({ ...parent, [constraintKey]: written });
   };

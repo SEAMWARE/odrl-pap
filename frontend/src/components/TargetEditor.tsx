@@ -63,7 +63,11 @@ const TargetEditor = ({ target, targetKey, setTarget, mappings, locked = false }
     // A plain `odrl:target` is itself a dropdown option, so a selection of it is kept rather than
     // cleared when the stored key becomes `odrl:target`.
     setDropdownSelection((current) => optionKey || (isPlainTargetKey(current) ? current : ''));
+    // A mapping key shows the dropdown. When the key stops being one (the policy was replaced) and
+    // the selection was a mapping key, the target is a plain one now and shows as text.
     if (optionKey) setSimpleTargetType('dropdown');
+    else if (dropdownSelection && !isPlainTargetKey(dropdownSelection)) setSimpleTargetType('text');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the effect follows the stored key only
   }, [optionKey]);
 
   const isCollection = isAssetCollection(target);

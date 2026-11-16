@@ -179,3 +179,18 @@ describe('TargetEditor target option', () => {
     expect(screen.getByRole('combobox', { name: /select/i })).toHaveValue('odrl:target');
   });
 });
+
+describe('TargetEditor replaced policy', () => {
+  it('shows the text field when the stored key changes from a mapping key to odrl:target', () => {
+    const mappings: Mappings = { ...MAPPINGS, targets: [{ name: 'json:uid', description: 'JSON uid' }] };
+    const ui = (key: string) => (
+      <I18nProvider>
+        <TargetEditor target="a" targetKey={key} setTarget={vi.fn()} mappings={mappings} />
+      </I18nProvider>
+    );
+    const { rerender } = render(ui('json:uid'));
+    expect(screen.getByRole('radio', { name: /select from/i })).toBeChecked();
+    rerender(ui('odrl:target'));
+    expect(screen.getByRole('radio', { name: /custom/i })).toBeChecked();
+  });
+});

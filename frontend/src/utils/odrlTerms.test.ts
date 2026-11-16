@@ -48,3 +48,12 @@ describe('odrlTerms', () => {
     expect(removeTerm({ 'odrl:target': 1, target: 2, keep: 3 }, 'target')).toEqual({ keep: 3 });
   });
 });
+
+import { spelledLike } from './odrlTerms';
+describe('spelledLike', () => {
+  it('follows the spelling of the sample key', () => {
+    expect(spelledLike('odrl:constraint', 'or')).toBe('odrl:or');
+    expect(spelledLike('constraint', 'or')).toBe('or');
+    expect(spelledLike('http://www.w3.org/ns/odrl/2/refinement', 'xone')).toBe('http://www.w3.org/ns/odrl/2/xone');
+  });
+});

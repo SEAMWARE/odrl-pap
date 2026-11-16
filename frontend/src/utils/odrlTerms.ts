@@ -49,3 +49,13 @@ export function removeTerm(obj: Obj, term: string): Obj {
   aliases(termOf(term)).forEach((key) => delete copy[key]);
   return copy;
 }
+
+/**
+ * The term spelled like a key that is already in use: `odrl:` prefixed, bare or as the full IRI.
+ * Lets a new sibling term follow the spelling the object already uses.
+ */
+export function spelledLike(sampleKey: string, term: string): string {
+  if (sampleKey.startsWith(ODRL_NAMESPACE)) return `${ODRL_NAMESPACE}${term}`;
+  if (sampleKey.startsWith(ODRL_PREFIX)) return `${ODRL_PREFIX}${term}`;
+  return term;
+}
