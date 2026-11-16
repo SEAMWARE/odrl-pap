@@ -15,6 +15,7 @@ import type { Mappings } from '../services/api';
 import { useI18n } from '../i18n';
 import ConstraintBuilder from './ConstraintBuilder';
 import NamespacedDropdown from './NamespacedDropdown';
+import { isCollectionOfType, newPartyCollection } from './collectionType';
 
 interface AssigneeEditorProps {
   /** Current assignee value (string identifier or PartyCollection object). */
@@ -27,13 +28,9 @@ interface AssigneeEditorProps {
   locked?: boolean;
 }
 
-/** Checks whether the assignee is a PartyCollection object. */
+/** Checks whether the assignee is a PartyCollection object (`PartyCollection` or `odrl:PartyCollection`). */
 function isPartyCollection(assignee: unknown): boolean {
-  return (
-    typeof assignee === 'object' &&
-    assignee !== null &&
-    (assignee as Record<string, unknown>)['@type'] === 'PartyCollection'
-  );
+  return isCollectionOfType(assignee, 'PartyCollection');
 }
 
 /**
@@ -56,7 +53,7 @@ const AssigneeEditor = ({ assignee, setAssignee, mappings, locked = false }: Ass
       setAssignee('');
       setSimpleAssigneeType('text');
     } else {
-      setAssignee({ '@type': 'PartyCollection', 'odrl:refinement': [] });
+      setAssignee(newPartyCollection());
     }
   };
 

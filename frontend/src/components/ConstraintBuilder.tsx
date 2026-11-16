@@ -5,17 +5,17 @@
  * namespace-grouped operand/operator dropdowns, clear logical grouping
  * labels (AND/OR/XONE), and visual card styling for each constraint.
  */
+import { useState } from 'react';
 import { Form, Row, Col, Button, Stack, Card, Badge } from 'react-bootstrap';
 import type { Mappings } from '../services/api';
 import type { Mapping } from '../api';
 import { useI18n } from '../i18n';
 import NamespacedDropdown from './NamespacedDropdown';
+import { readConstraintGroup, type ConstraintGroup } from '../utils/constraints';
+import { getTerm, removeTerm, setTerm, spelledLike, termKey } from '../utils/odrlTerms';
 
 /** Default parent property that holds the constraint(s). */
 const DEFAULT_PROPERTY_KEY = 'odrl:constraint';
-
-/** Key under which a left operand is referenced by name. */
-const LEFT_OPERAND_KEY = 'odrl:leftOperand';
 
 interface ConstraintBuilderProps {
   /** Parent object containing the constraint field (see {@link ConstraintBuilderProps.propertyKey}). */
@@ -36,9 +36,9 @@ interface ConstraintBuilderProps {
 
 /** Represents a single constraint's data shape. */
 interface ConstraintData {
-  'odrl:leftOperand'?: { '@id': string };
-  'odrl:operator'?: { '@id': string };
-  'odrl:rightOperand'?: { '@id'?: string; '@value'?: string; '@type'?: string };
+  'odrl:leftOperand'?: { '@id': string } | string;
+  'odrl:operator'?: { '@id': string } | string;
+  'odrl:rightOperand'?: { '@id'?: string; '@value'?: string; '@type'?: string } | string;
   [key: string]: unknown;
 }
 
@@ -54,40 +54,19 @@ function getParameterCount(operands: Mapping[], operandName: string): number {
 const ANDSEQUENCE_TYPE = 'andSequence';
 
 /**
- * Reads the constraints held by a parent's constraint property.
- *
- * Handles the three shapes ODRL allows: a logical constraint (`odrl:or` /
- * `odrl:xone` / `odrl:and` / `odrl:andSequence`), a list (an implicit AND) and a lone constraint object, which
- * templates commonly emit. Returns `undefined` when there is nothing to read.
+ * Reads the constraints held by a parent's constraint property, whatever shape they were written
+ * in (see {@link readConstraintGroup}). Returns `undefined` when there is nothing to read.
  */
 function readConstraints(
-  constraint: Record<string, unknown> | ConstraintData[] | undefined,
-): { logicalType: string; constraints: ConstraintData[] } | undefined {
-  if (!constraint) return undefined;
-  if (Array.isArray(constraint)) {
-    return { logicalType: 'and', constraints: constraint };
-  }
-  if (typeof constraint !== 'object') return undefined;
-  if (constraint['@type'] === 'odrl:LogicalConstraint') {
-    if (constraint['odrl:or']) {
-      return { logicalType: 'or', constraints: constraint['odrl:or'] as ConstraintData[] };
-    }
-    if (constraint['odrl:xone']) {
-      return { logicalType: 'xone', constraints: constraint['odrl:xone'] as ConstraintData[] };
-    }
-    if (constraint['odrl:and']) {
-      return { logicalType: 'and', constraints: constraint['odrl:and'] as ConstraintData[] };
-    }
-    if (constraint['odrl:andSequence']) {
-      return { logicalType: ANDSEQUENCE_TYPE, constraints: constraint['odrl:andSequence'] as ConstraintData[] };
-    }
-    return undefined;
-  }
-  // A single constraint object (a lone constraint/refinement rather than an array):
-  // load it as a one-element list so it becomes editable instead of being dropped.
-  return { logicalType: 'and', constraints: [constraint as ConstraintData] };
+  constraint: unknown,
+): (Omit<ConstraintGroup, 'constraints'> & { constraints: ConstraintData[] }) | undefined {
+  return readConstraintGroup(constraint) as
+    | (Omit<ConstraintGroup, 'constraints'> & { constraints: ConstraintData[] })
+    | undefined;
 }
 
+/** Whether a constraint has anything in it; a constraint without a single key cannot be mapped by the backend. */
+const isFilled = (constraint: ConstraintData): boolean => Object.keys(constraint).length > 0;
 /**
  * Returns the left operand selected in the given constraint.
  *
@@ -96,8 +75,11 @@ function readConstraints(
  * its value (`"http:bodyValue": "$.my.property"`).
  */
 function getLeftOperandId(constraint: ConstraintData, operands: Mapping[]): string {
-  const referenced = constraint[LEFT_OPERAND_KEY] as { '@id'?: string } | undefined;
-  if (referenced?.['@id']) {
+  const referenced = getTerm(constraint, 'leftOperand') as ConstraintData['odrl:leftOperand'] | undefined;
+  if (typeof referenced === 'string' && referenced) {
+    return referenced;
+  }
+  if (referenced && typeof referenced === 'object' && referenced['@id']) {
     return referenced['@id'];
   }
   return Object.keys(constraint).find((key) => operands.some((operand) => operand.name === key)) ?? '';
@@ -122,10 +104,39 @@ function getLeftOperandParameter(constraint: ConstraintData, operandName: string
  * Determines whether a right operand uses a named (URI) or literal value.
  */
 function getRightOperandType(constraint: ConstraintData): 'named' | 'literal' {
-  const rightOperand = constraint['odrl:rightOperand'];
+  const rightOperand = getTerm(constraint, 'rightOperand') as ConstraintData['odrl:rightOperand'];
   if (!rightOperand) return 'named';
+  // A plain string is a literal value (e.g. "/items").
+  if (typeof rightOperand === 'string') return 'literal';
   if (rightOperand['@value'] !== undefined) return 'literal';
   return 'named';
+}
+
+/** Reads the right operand as a value object; a plain string becomes `{ '@value': string }`. */
+function getRightOperandObject(
+  constraint: ConstraintData,
+): { '@id'?: string; '@value'?: string; '@type'?: string } {
+  const rightOperand = getTerm(constraint, 'rightOperand') as ConstraintData['odrl:rightOperand'];
+  if (typeof rightOperand === 'string') return { '@value': rightOperand };
+  return rightOperand ?? {};
+}
+
+/**
+ * A literal right operand with its parts updated. An empty datatype is dropped rather than written
+ * as `"@type": ""`, which is not a valid datatype.
+ */
+function literal(
+  current: { '@id'?: string; '@value'?: string; '@type'?: string },
+  patch: { '@value'?: string; '@type'?: string },
+): { '@value'?: string; '@type'?: string } {
+  const { '@type': type, ...rest } = { ...current, ...patch };
+  return type ? { ...rest, '@type': type } : rest;
+}
+
+/** Reads the `@id` of a reference property that may also be a plain string (e.g. the operator). */
+function getReferenceId(value: { '@id'?: string } | string | undefined): string {
+  if (typeof value === 'string') return value;
+  return value?.['@id'] || '';
 }
 
 /**
@@ -148,26 +159,42 @@ const ConstraintBuilder = ({
   // changed in the same render the effects swapped them back and forth forever ("Maximum update
   // depth exceeded", the value flickering), whenever the editor opened a policy that had
   // constraints or the user typed quickly.
-  const parentConstraint = parent[propertyKey] as Record<string, unknown> | ConstraintData[] | undefined;
+  // ODRL terms may be spelled prefixed or bare; the key the parent already uses is the one written.
+  const constraintKey = termKey(parent, propertyKey);
+  const parentConstraint = parent[constraintKey];
   const held = readConstraints(parentConstraint);
-  const internalConstraints: ConstraintData[] = held?.constraints ?? [];
+  // A constraint just added has nothing in it yet. It is shown as a blank row but only written to the
+  // policy once the user fills something in, so the policy never holds an empty constraint.
+  const [hasBlankRow, setHasBlankRow] = useState(false);
+  const internalConstraints: ConstraintData[] = [...(held?.constraints ?? []), ...(hasBlankRow ? [{}] : [])];
   const logicalType = held?.logicalType ?? 'and';
   const locked = lockedProp || logicalType === ANDSEQUENCE_TYPE;
 
   /** Writes a list (and, optionally, a new logical grouping) into the parent. */
-  const write = (constraints: ConstraintData[], type: string = logicalType) => {
-    setParent({
-      ...parent,
-      [propertyKey]:
-        type === 'and'
-          ? constraints
-          : { '@type': 'odrl:LogicalConstraint', [`odrl:${type}`]: constraints },
-    });
+  const write = (rows: ConstraintData[], type: string = logicalType) => {
+    const constraints = rows.filter(isFilled);
+    setHasBlankRow(constraints.length !== rows.length);
+    // A list written as a JSON-LD `@list` stays one.
+    const operands = held?.listWrapper ? { '@list': constraints } : constraints;
+    let written: unknown;
+    if (held?.logical && type === held.logicalType) {
+      // The grouping is unchanged: keep the group object (its @type, or none) as it was loaded.
+      written = { ...held.logical.original, [held.logical.key]: operands };
+    } else if (type === 'and') {
+      written = operands;
+    } else {
+      // A new group follows the spelling the policy already uses for the constraint key.
+      written = {
+        '@type': spelledLike(constraintKey, 'LogicalConstraint'),
+        [spelledLike(constraintKey, type)]: operands,
+      };
+    }
+    setParent({ ...parent, [constraintKey]: written });
   };
 
   const handleConstraintChange = (index: number, field: string, value: unknown) => {
     const newConstraints = [...internalConstraints];
-    newConstraints[index] = { ...newConstraints[index], [field]: value };
+    newConstraints[index] = setTerm(newConstraints[index], field, value);
     write(newConstraints);
   };
 
@@ -190,8 +217,8 @@ const ConstraintBuilder = ({
     const previousOperand = getLeftOperandId(current, leftOperands);
     const previousParameter = getLeftOperandParameter(current, previousOperand);
 
-    const updated: ConstraintData = { ...current };
-    delete updated[LEFT_OPERAND_KEY];
+    const leftOperandKey = termKey(current, 'leftOperand');
+    const updated: ConstraintData = removeTerm(current, 'leftOperand');
     leftOperands.forEach((operand) => {
       if (operand.name) {
         delete updated[operand.name];
@@ -202,14 +229,14 @@ const ConstraintBuilder = ({
       if (getParameterCount(leftOperands, operandName) > 0) {
         updated[operandName] = previousParameter;
       } else {
-        updated[LEFT_OPERAND_KEY] = { '@id': operandName };
+        updated[leftOperandKey] = { '@id': operandName };
       }
     }
     replaceConstraint(index, updated);
   };
 
   const addConstraint = () => {
-    write([...internalConstraints, {} as ConstraintData]);
+    setHasBlankRow(true);
   };
 
   const removeConstraint = (index: number) => {
@@ -222,7 +249,7 @@ const ConstraintBuilder = ({
     if (type === 'named') {
       handleConstraintChange(index, 'odrl:rightOperand', { '@id': '' });
     } else {
-      handleConstraintChange(index, 'odrl:rightOperand', { '@value': '', '@type': '' });
+      handleConstraintChange(index, 'odrl:rightOperand', { '@value': '' });
     }
   };
 
@@ -344,7 +371,7 @@ const ConstraintBuilder = ({
                 <Form.Label className="small fw-bold">{t.selectOperator}</Form.Label>
                 <NamespacedDropdown
                   items={operators}
-                  value={constraint['odrl:operator']?.['@id'] || ''}
+                  value={getReferenceId(getTerm(constraint, 'operator') as ConstraintData['odrl:operator'])}
                   onChange={(val) =>
                     handleConstraintChange(index, 'odrl:operator', { '@id': val })
                   }
@@ -375,7 +402,7 @@ const ConstraintBuilder = ({
                     {getRightOperandType(constraint) === 'named' ? (
                       <NamespacedDropdown
                         items={rightOperands}
-                        value={constraint['odrl:rightOperand']?.['@id'] || ''}
+                        value={getRightOperandObject(constraint)['@id'] || ''}
                         onChange={(val) =>
                           handleConstraintChange(index, 'odrl:rightOperand', { '@id': val })
                         }
@@ -388,12 +415,13 @@ const ConstraintBuilder = ({
                         <Form.Control
                           type="text"
                           placeholder={t.valuePlaceholder}
-                          value={constraint['odrl:rightOperand']?.['@value'] || ''}
+                          value={getRightOperandObject(constraint)['@value'] || ''}
                           onChange={(e) =>
-                            handleConstraintChange(index, 'odrl:rightOperand', {
-                              ...constraint['odrl:rightOperand'],
-                              '@value': e.target.value,
-                            })
+                            handleConstraintChange(
+                              index,
+                              'odrl:rightOperand',
+                              literal(getRightOperandObject(constraint), { '@value': e.target.value }),
+                            )
                           }
                           aria-label={`${t.valuePlaceholder} for constraint ${index + 1}`}
                           disabled={locked}
@@ -401,12 +429,13 @@ const ConstraintBuilder = ({
                         <Form.Control
                           type="text"
                           placeholder={t.typePlaceholder}
-                          value={constraint['odrl:rightOperand']?.['@type'] || ''}
+                          value={getRightOperandObject(constraint)['@type'] || ''}
                           onChange={(e) =>
-                            handleConstraintChange(index, 'odrl:rightOperand', {
-                              ...constraint['odrl:rightOperand'],
-                              '@type': e.target.value,
-                            })
+                            handleConstraintChange(
+                              index,
+                              'odrl:rightOperand',
+                              literal(getRightOperandObject(constraint), { '@type': e.target.value }),
+                            )
                           }
                           aria-label={`${t.typePlaceholder} for constraint ${index + 1}`}
                           disabled={locked}
@@ -423,7 +452,7 @@ const ConstraintBuilder = ({
 
       {/* Add constraint button */}
       <div>
-        <Button variant="outline-primary" onClick={addConstraint} disabled={locked}>
+        <Button variant="outline-primary" onClick={addConstraint} disabled={locked || hasBlankRow}>
           + {t.addConstraint}
         </Button>
       </div>

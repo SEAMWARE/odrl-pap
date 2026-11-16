@@ -34,6 +34,8 @@ export interface ThemeConfig {
   'odrl-danger-color': string;
   /** Info indicator color. */
   'odrl-info-color': string;
+  /** Warning indicator color. */
+  'odrl-warning-color': string;
   /** Box shadow for cards. */
   'odrl-card-shadow': string;
   /** Text and icon color on a primary-colored fill (e.g. primary buttons). */
@@ -59,6 +61,7 @@ export const lightTheme: ThemeConfig = {
   'odrl-success-color': '#198754',
   'odrl-danger-color': '#dc3545',
   'odrl-info-color': '#0dcaf0',
+  'odrl-warning-color': '#997404',
   'odrl-card-shadow': '0 0.125rem 0.25rem rgba(0,0,0,0.075)',
   'odrl-primary-text-color': '#FFFFFF',
   'odrl-card-radius': '0.375rem',
@@ -80,6 +83,7 @@ export const darkTheme: ThemeConfig = {
   'odrl-success-color': '#20c997',
   'odrl-danger-color': '#e74c3c',
   'odrl-info-color': '#17a2b8',
+  'odrl-warning-color': '#ffc107',
   'odrl-card-shadow': '0 0.125rem 0.25rem rgba(0,0,0,0.3)',
   'odrl-primary-text-color': '#FFFFFF',
   'odrl-card-radius': '0.375rem',
