@@ -117,6 +117,18 @@ function getRightOperandObject(
   return rightOperand ?? {};
 }
 
+/**
+ * A literal right operand with its parts updated. An empty datatype is dropped rather than written
+ * as `"@type": ""`, which is not a valid datatype.
+ */
+function literal(
+  current: { '@id'?: string; '@value'?: string; '@type'?: string },
+  patch: { '@value'?: string; '@type'?: string },
+): { '@value'?: string; '@type'?: string } {
+  const { '@type': type, ...rest } = { ...current, ...patch };
+  return type ? { ...rest, '@type': type } : rest;
+}
+
 /** Reads the `@id` of a reference property that may also be a plain string (e.g. the operator). */
 function getReferenceId(value: { '@id'?: string } | string | undefined): string {
   if (typeof value === 'string') return value;
@@ -221,7 +233,7 @@ const ConstraintBuilder = ({
     if (type === 'named') {
       handleConstraintChange(index, 'odrl:rightOperand', { '@id': '' });
     } else {
-      handleConstraintChange(index, 'odrl:rightOperand', { '@value': '', '@type': '' });
+      handleConstraintChange(index, 'odrl:rightOperand', { '@value': '' });
     }
   };
 
@@ -389,10 +401,11 @@ const ConstraintBuilder = ({
                           placeholder={t.valuePlaceholder}
                           value={getRightOperandObject(constraint)['@value'] || ''}
                           onChange={(e) =>
-                            handleConstraintChange(index, 'odrl:rightOperand', {
-                              ...getRightOperandObject(constraint),
-                              '@value': e.target.value,
-                            })
+                            handleConstraintChange(
+                              index,
+                              'odrl:rightOperand',
+                              literal(getRightOperandObject(constraint), { '@value': e.target.value }),
+                            )
                           }
                           aria-label={`${t.valuePlaceholder} for constraint ${index + 1}`}
                           disabled={locked}
@@ -402,10 +415,11 @@ const ConstraintBuilder = ({
                           placeholder={t.typePlaceholder}
                           value={getRightOperandObject(constraint)['@type'] || ''}
                           onChange={(e) =>
-                            handleConstraintChange(index, 'odrl:rightOperand', {
-                              ...getRightOperandObject(constraint),
-                              '@type': e.target.value,
-                            })
+                            handleConstraintChange(
+                              index,
+                              'odrl:rightOperand',
+                              literal(getRightOperandObject(constraint), { '@type': e.target.value }),
+                            )
                           }
                           aria-label={`${t.typePlaceholder} for constraint ${index + 1}`}
                           disabled={locked}

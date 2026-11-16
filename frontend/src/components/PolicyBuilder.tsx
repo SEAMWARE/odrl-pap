@@ -68,6 +68,16 @@ interface PolicyBuilderProps {
   showSummary?: boolean;
 }
 
+/** The action as the dropdown shows it: a string, or the `@id` of an `{"@id": ...}` action. */
+function actionId(action: unknown): string {
+  if (typeof action === 'string') return action;
+  if (typeof action === 'object' && action !== null && !Array.isArray(action)) {
+    const id = (action as Record<string, unknown>)['@id'];
+    if (typeof id === 'string') return id;
+  }
+  return '';
+}
+
 /**
  * Renders a numbered section header with help text.
  * Optionally shows a lock icon and template field description.
@@ -289,7 +299,7 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
               <Form.Group>
                 <NamespacedDropdown
                   items={mappings.actions ?? []}
-                  value={typeof getTerm(permission, 'action') === 'string' ? (getTerm(permission, 'action') as string) : ''}
+                  value={actionId(getTerm(permission, 'action'))}
                   onChange={(val) => handlePermissionChange('action', val)}
                   placeholder={t.selectAction}
                   ariaLabel={t.stepAction}
