@@ -115,7 +115,7 @@ Entries are added with `addContextEntry` (`utils/jsonLdContext.ts`), which keeps
 
 The Builder shows a notice (`data-testid="unsupported-parts-notice"`) naming the parts present: those four terms at policy level, and `assigner` inside the edited permission. The keys are not touched when the permission is edited; their values keep object identity.
 
-Both notices (this one and the multiple-permissions one) are `info` alerts, so in the web component they take their colours from `--odrl-info-color`. Alerts follow the status tokens `--odrl-danger-color`, `--odrl-success-color`, `--odrl-info-color` and `--odrl-warning-color` (`theme/theme.css`, `.odrl-embedded-root .alert-*`).
+Both notices (this one and the multiple-permissions one) are `info` alerts, so in the web component they take their colours from `--odrl-info-color`. Alerts follow the status tokens `--odrl-danger-color`, `--odrl-success-color`, `--odrl-info-color` and `--odrl-warning-color` (`theme/theme.css`, `.odrl-embedded-root .alert-*`): the status colour tints the background (10%) and the border (35%), and the text is the status colour mixed 40/60 with `--odrl-text-color`. With the default presets the text/background contrast measured in the rendered component is 5.3 to 7.7:1 (light) and 7.4 to 9.5:1 (dark) for info, success, danger and warning.
 
 ## 9. Raw input and render errors
 
