@@ -23,6 +23,7 @@
   --odrl-success-color: #198754;
   --odrl-danger-color: #dc3545;
   --odrl-info-color: #0dcaf0;
+  --odrl-warning-color: #997404;
   --odrl-card-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
   --odrl-primary-text-color: #FFFFFF;
   --odrl-card-radius: 0.375rem;
@@ -50,6 +51,7 @@
   --odrl-success-color: #20c997;
   --odrl-danger-color: #e74c3c;
   --odrl-info-color: #17a2b8;
+  --odrl-warning-color: #ffc107;
   --odrl-card-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.3);
   --odrl-primary-text-color: #FFFFFF;
   --odrl-card-radius: 0.375rem;
@@ -361,21 +363,34 @@ body {
   --bs-table-border-color: var(--odrl-border-color);
 }
 
-/* Alerts follow the status tokens. */
+/*
+ * Alerts follow the status tokens. The status colour tints the background and the border; the text
+ * is the status colour pulled towards --odrl-text-color, so it keeps its hue but reads at 4.5:1 or
+ * more on the tint with the default presets (a plain status colour does not on light backgrounds,
+ * and --odrl-info-color #0dcaf0 reads at 1.8:1).
+ */
 .odrl-embedded-root .alert-danger {
-  --bs-alert-color: var(--odrl-danger-color);
-  --bs-alert-bg: color-mix(in srgb, var(--odrl-danger-color) 10%, transparent);
-  --bs-alert-border-color: color-mix(in srgb, var(--odrl-danger-color) 35%, transparent);
+  --alert-status: var(--odrl-danger-color);
 }
 
 .odrl-embedded-root .alert-success {
-  --bs-alert-color: var(--odrl-success-color);
-  --bs-alert-bg: color-mix(in srgb, var(--odrl-success-color) 10%, transparent);
-  --bs-alert-border-color: color-mix(in srgb, var(--odrl-success-color) 35%, transparent);
+  --alert-status: var(--odrl-success-color);
 }
 
 .odrl-embedded-root .alert-info {
-  --bs-alert-color: var(--odrl-info-color);
-  --bs-alert-bg: color-mix(in srgb, var(--odrl-info-color) 10%, transparent);
-  --bs-alert-border-color: color-mix(in srgb, var(--odrl-info-color) 35%, transparent);
+  --alert-status: var(--odrl-info-color);
+}
+
+.odrl-embedded-root .alert-warning {
+  --alert-status: var(--odrl-warning-color);
+}
+
+.odrl-embedded-root .alert-danger,
+.odrl-embedded-root .alert-success,
+.odrl-embedded-root .alert-info,
+.odrl-embedded-root .alert-warning {
+  --bs-alert-color: color-mix(in srgb, var(--alert-status) 40%, var(--odrl-text-color));
+  --bs-alert-bg: color-mix(in srgb, var(--alert-status) 10%, transparent);
+  --bs-alert-border-color: color-mix(in srgb, var(--alert-status) 35%, transparent);
+  --bs-alert-link-color: var(--bs-alert-color);
 }

@@ -27,10 +27,14 @@ import type { FieldTemplate } from '../types';
 import type { OdrlPolicyJson } from '../services/api';
 import type { Mappings } from '../api';
 import ConstraintBuilder from './ConstraintBuilder';
+import ErrorBoundary from './ErrorBoundary';
 import TargetEditor from './TargetEditor';
 import AssigneeEditor from './AssigneeEditor';
 import PolicySummary from './PolicySummary';
 import NamespacedDropdown from './NamespacedDropdown';
+import { permissionCount, readPermission, writePermission } from '../utils/permission';
+import { findTermKey, getTerm, setTerm } from '../utils/odrlTerms';
+import { findTargetKey, targetKeysOf, writeTarget } from '../utils/target';
 
 /** Step number constants for the guided workflow. */
 const STEP_TARGET = 1;
@@ -62,6 +66,28 @@ interface PolicyBuilderProps {
    * hidden; the form then takes the full width. Defaults to true.
    */
   showSummary?: boolean;
+}
+
+/** Policy-level parts the PAP backend never maps (it maps `permission` only). */
+const IGNORED_POLICY_TERMS = ['prohibition', 'obligation', 'assigner', 'profile'];
+
+/** The ignored parts present in the policy, or in the permission being edited (`assigner`). */
+function ignoredParts(policy: Record<string, unknown>, permission: Record<string, unknown>): string[] {
+  const present = IGNORED_POLICY_TERMS.filter((term) => findTermKey(policy, term) !== undefined);
+  if (findTermKey(permission, 'assigner') !== undefined && !present.includes('assigner')) {
+    present.push('assigner');
+  }
+  return present;
+}
+
+/** The action as the dropdown shows it: a string, or the `@id` of an `{"@id": ...}` action. */
+function actionId(action: unknown): string {
+  if (typeof action === 'string') return action;
+  if (typeof action === 'object' && action !== null && !Array.isArray(action)) {
+    const id = (action as Record<string, unknown>)['@id'];
+    if (typeof id === 'string') return id;
+  }
+  return '';
 }
 
 /**
@@ -151,20 +177,12 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
 
   /** Updates a single field inside `odrl:permission`. */
   const handlePermissionChange = (field: string, value: unknown) => {
-    const newPolicy = { ...policy };
-    if (!newPolicy['odrl:permission']) {
-      newPolicy['odrl:permission'] = {};
-    }
-    newPolicy['odrl:permission'] = {
-      ...newPolicy['odrl:permission'],
-      [field]: value,
-    };
-    setPolicy(newPolicy);
+    setPermission(setTerm(readPermission(policy), field, value));
   };
 
-  /** Replaces the entire permission object. */
+  /** Replaces the edited permission, keeping the array shape and the other permissions. */
   const setPermission = (newPermission: unknown) => {
-    setPolicy({ ...policy, 'odrl:permission': newPermission });
+    setPolicy(writePermission(policy, newPermission) as OdrlPolicyJson);
   };
 
   // --- Loading state ---
@@ -189,7 +207,11 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
     );
   }
 
-  const permission = policy['odrl:permission'] || {};
+  const permission = readPermission(policy);
+  const targetKeys = targetKeysOf(mappings);
+  const targetKey = findTargetKey(permission, targetKeys);
+  const hasSeveralPermissions = permissionCount(policy) > 1;
+  const unsupportedParts = ignoredParts(policy, permission);
 
   const targetLocked = isFieldLocked(PATH_TARGET);
   const assigneeLocked = isFieldLocked(PATH_ASSIGNEE);
@@ -230,6 +252,18 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
             </Alert>
           )}
 
+          {unsupportedParts.length > 0 && (
+            <Alert variant="info" className="mb-0" data-testid="unsupported-parts-notice">
+              {t.unsupportedPartsNotice.replace('{parts}', unsupportedParts.join(', '))}
+            </Alert>
+          )}
+
+          {hasSeveralPermissions && (
+            <Alert variant="info" className="mb-0" data-testid="multiple-permissions-notice">
+              {t.multiplePermissionsNotice}
+            </Alert>
+          )}
+
           {/* Step 1: Target */}
           <Card style={{ boxShadow: 'var(--odrl-card-shadow)' }}>
             <SectionHeader
@@ -242,8 +276,9 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
             />
             <Card.Body>
               <TargetEditor
-                target={permission['odrl:target']}
-                setTarget={(target) => handlePermissionChange('odrl:target', target)}
+                target={targetKey === undefined ? undefined : permission[targetKey]}
+                targetKey={targetKey}
+                setTarget={(target, key) => setPermission(writeTarget(permission, target, key, targetKeys))}
                 mappings={mappings}
                 locked={targetLocked}
               />
@@ -262,8 +297,8 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
             />
             <Card.Body>
               <AssigneeEditor
-                assignee={permission['odrl:assignee']}
-                setAssignee={(assignee) => handlePermissionChange('odrl:assignee', assignee)}
+                assignee={getTerm(permission, 'assignee')}
+                setAssignee={(assignee) => handlePermissionChange('assignee', assignee)}
                 mappings={mappings}
                 locked={assigneeLocked}
               />
@@ -284,8 +319,8 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
               <Form.Group>
                 <NamespacedDropdown
                   items={mappings.actions ?? []}
-                  value={permission['odrl:action'] || ''}
-                  onChange={(val) => handlePermissionChange('odrl:action', val)}
+                  value={actionId(getTerm(permission, 'action'))}
+                  onChange={(val) => handlePermissionChange('action', val)}
                   placeholder={t.selectAction}
                   ariaLabel={t.stepAction}
                   disabled={actionLocked}
@@ -324,7 +359,9 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
       {showSummary && (
         <Col lg={4}>
           <div className="sticky-top" style={{ top: '1rem' }}>
-            <PolicySummary policy={policy} />
+            <ErrorBoundary resetKey={policy}>
+              <PolicySummary policy={policy} />
+            </ErrorBoundary>
           </div>
         </Col>
       )}

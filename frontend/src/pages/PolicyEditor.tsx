@@ -26,17 +26,14 @@ import { TestRequest } from '../api/models/TestRequest';
 import type { GenericJsonInput } from '../api/models/GenericJsonInput';
 import type { ValidationMode } from '../components/ValidationEditor';
 import PolicyBuilder from '../components/PolicyBuilder';
+import ErrorBoundary from '../components/ErrorBoundary';
 import ValidationEditor from '../components/ValidationEditor';
 import ValidationResult from '../components/ValidationResult';
 import TemplateSelector from '../components/TemplateSelector';
 import TemplateFiller from '../components/TemplateFiller';
 import { useI18n } from '../i18n';
 import { createNewPolicy } from '../constants/policyDefaults';
-import {
-  isJsonLdContextObject,
-  jsonLdContextEntryIri,
-  type JsonLdContextObject,
-} from '../utils/jsonLdContext';
+import { addContextEntry, listContextEntries, removeContextPrefix } from '../utils/jsonLdContext';
 
 /** Session storage key for persisting the last HTTP test request. */
 const SESSION_KEY_TEST_REQUEST = 'odrl-pap-test-request';
@@ -280,13 +277,17 @@ const PolicyEditor = () => {
   const handleRawTextChange = useCallback((text: string) => {
     setRawText(text);
     try {
-      const parsed = JSON.parse(text) as OdrlPolicyJson;
-      setPolicy(parsed);
+      const parsed: unknown = JSON.parse(text);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        setJsonError(t.jsonNotObject);
+        return;
+      }
+      setPolicy(parsed as OdrlPolicyJson);
       setJsonError('');
     } catch (err: unknown) {
       setJsonError(err instanceof Error ? err.message : t.jsonInvalid);
     }
-  }, [t.jsonInvalid]);
+  }, [t.jsonInvalid, t.jsonNotObject]);
 
   /**
    * Adds a new prefix:URI entry to the policy's `@context`.
@@ -298,21 +299,13 @@ const PolicyEditor = () => {
   const handleAddContext = useCallback(() => {
     if (!newCtxPrefix.trim() || !newCtxUri.trim()) return;
 
-    const currentCtx = (policy as Record<string, unknown>)['@context'];
-    let contextObj: JsonLdContextObject;
+    const updatedContext = addContextEntry(
+      (policy as Record<string, unknown>)['@context'],
+      newCtxPrefix.trim(),
+      newCtxUri.trim(),
+    );
 
-    if (isJsonLdContextObject(currentCtx)) {
-      contextObj = { ...currentCtx };
-    } else if (typeof currentCtx === 'string') {
-      // Convert a plain-string context to a namespaced object
-      contextObj = { odrl: currentCtx };
-    } else {
-      contextObj = {};
-    }
-
-    contextObj[newCtxPrefix.trim()] = newCtxUri.trim();
-
-    const updatedPolicy = { ...policy, '@context': contextObj } as OdrlPolicyJson;
+    const updatedPolicy = { ...policy, '@context': updatedContext } as OdrlPolicyJson;
     setPolicy(updatedPolicy);
     setRawText(JSON.stringify(updatedPolicy, null, 2));
     setJsonError('');
@@ -326,15 +319,13 @@ const PolicyEditor = () => {
    * @param prefix - The key to remove.
    */
   const handleRemoveContext = useCallback((prefix: string) => {
-    const currentCtx = (policy as Record<string, unknown>)['@context'];
-    if (isJsonLdContextObject(currentCtx)) {
-      const copy = { ...currentCtx };
-      delete copy[prefix];
-      const updatedPolicy = { ...policy, '@context': copy } as OdrlPolicyJson;
-      setPolicy(updatedPolicy);
-      setRawText(JSON.stringify(updatedPolicy, null, 2));
-      setJsonError('');
-    }
+    const updatedPolicy = {
+      ...policy,
+      '@context': removeContextPrefix((policy as Record<string, unknown>)['@context'], prefix),
+    } as OdrlPolicyJson;
+    setPolicy(updatedPolicy);
+    setRawText(JSON.stringify(updatedPolicy, null, 2));
+    setJsonError('');
   }, [policy]);
 
   /**
@@ -544,7 +535,9 @@ const PolicyEditor = () => {
           title={t.tabBuilder}
           disabled={createdFromTemplate}
         >
-          <PolicyBuilder policy={policy} setPolicy={setPolicy} />
+          <ErrorBoundary resetKey={policy}>
+            <PolicyBuilder policy={policy} setPolicy={setPolicy} />
+          </ErrorBoundary>
         </Tab>
         <Tab
           eventKey={TAB_KEY_ODRL}
@@ -555,36 +548,34 @@ const PolicyEditor = () => {
           <div className="mb-3 p-3 border rounded" style={{ backgroundColor: 'var(--odrl-card-bg, #f8f9fa)' }}>
             <h6 className="mb-2">{t.contextTitle}</h6>
             {(() => {
-              const ctx = (policy as Record<string, unknown>)['@context'];
-              if (isJsonLdContextObject(ctx)) {
-                return (
-                  <div className="mb-2 d-flex flex-wrap gap-1">
-                    {Object.entries(ctx).map(([prefix, entry]) => {
-                      const uri = jsonLdContextEntryIri(entry);
-                      return (
-                        <Badge
-                          key={prefix}
-                          bg="secondary"
-                          className="d-inline-flex align-items-center gap-1 px-2 py-1"
-                          title={uri}
-                        >
-                          <strong>{prefix}</strong>: {uri}
-                          <CloseButton
-                            variant="white"
-                            style={{ fontSize: '0.5rem' }}
-                            onClick={() => handleRemoveContext(prefix)}
-                            aria-label={`${t.removeContext} ${prefix}`}
-                          />
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                );
-              }
-              if (typeof ctx === 'string') {
-                return <p className="text-muted small mb-2">{ctx}</p>;
-              }
-              return null;
+              const entries = listContextEntries((policy as Record<string, unknown>)['@context']);
+              if (entries.length === 0) return null;
+              return (
+                <div className="mb-2 d-flex flex-wrap gap-1">
+                  {entries.map(({ prefix, uri }) =>
+                    prefix === undefined ? (
+                      <Badge key={`ctx:${uri}`} bg="light" text="dark" className="px-2 py-1" title={uri}>
+                        {uri}
+                      </Badge>
+                    ) : (
+                      <Badge
+                        key={prefix}
+                        bg="secondary"
+                        className="d-inline-flex align-items-center gap-1 px-2 py-1"
+                        title={uri}
+                      >
+                        <strong>{prefix}</strong>: {uri}
+                        <CloseButton
+                          variant="white"
+                          style={{ fontSize: '0.5rem' }}
+                          onClick={() => handleRemoveContext(prefix)}
+                          aria-label={`${t.removeContext} ${prefix}`}
+                        />
+                      </Badge>
+                    ),
+                  )}
+                </div>
+              );
             })()}
             <InputGroup size="sm">
               <Form.Control
