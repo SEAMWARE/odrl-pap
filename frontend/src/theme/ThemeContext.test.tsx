@@ -230,6 +230,7 @@ describe('ThemeProvider in component tree', () => {
       'odrl-success-color',
       'odrl-danger-color',
       'odrl-info-color',
+      'odrl-warning-color',
       'odrl-card-shadow',
     ];
 

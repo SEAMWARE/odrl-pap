@@ -252,13 +252,13 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
           )}
 
           {unsupportedParts.length > 0 && (
-            <Alert variant="warning" className="mb-0" data-testid="unsupported-parts-notice">
+            <Alert variant="info" className="mb-0" data-testid="unsupported-parts-notice">
               {t.unsupportedPartsNotice.replace('{parts}', unsupportedParts.join(', '))}
             </Alert>
           )}
 
           {hasSeveralPermissions && (
-            <Alert variant="warning" className="mb-0" data-testid="multiple-permissions-notice">
+            <Alert variant="info" className="mb-0" data-testid="multiple-permissions-notice">
               {t.multiplePermissionsNotice}
             </Alert>
           )}

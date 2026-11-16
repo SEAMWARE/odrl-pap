@@ -115,6 +115,8 @@ Entries are added with `addContextEntry` (`utils/jsonLdContext.ts`), which keeps
 
 The Builder shows a notice (`data-testid="unsupported-parts-notice"`) naming the parts present: those four terms at policy level, and `assigner` inside the edited permission. The keys are not touched when the permission is edited; their values keep object identity.
 
+Both notices (this one and the multiple-permissions one) are `info` alerts, so in the web component they take their colours from `--odrl-info-color`. Alerts follow the status tokens `--odrl-danger-color`, `--odrl-success-color`, `--odrl-info-color` and `--odrl-warning-color` (`theme/theme.css`, `.odrl-embedded-root .alert-*`).
+
 ## 9. Raw input and render errors
 
 - **Raw tabs** (page and web component): text that parses to anything other than a JSON object (`null`, array, number, string, boolean) is rejected with the message "The policy must be a JSON object."; the policy state and the `policy-changed` event are not updated. Invalid JSON keeps showing the parser message.
