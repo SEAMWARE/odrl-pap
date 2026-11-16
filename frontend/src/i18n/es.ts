@@ -29,6 +29,7 @@ export const es: I18nStrings = {
   policyBuilder: {
     title: 'Constructor de políticas',
     loadingMappings: 'Cargando los mapeos de la política...',
+    multiplePermissionsNotice: 'Esta política tiene varios permisos. Aquí solo se puede editar el primero; los demás se conservan sin cambios. Usa el editor ODRL en bruto para modificarlos.',
     errorLoadingMappings: 'No se pudieron cargar los mapeos de la política. Inténtalo de nuevo.',
     stepTarget: 'Objetivo',
     stepTargetHelp: 'Define a qué recurso o activo se aplica esta política. Puede ser una URL concreta, un endpoint de API o una clase de recursos.',

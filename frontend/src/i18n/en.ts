@@ -29,6 +29,7 @@ export const en = {
   policyBuilder: {
     title: 'Policy Builder',
     loadingMappings: 'Loading policy mappings...',
+    multiplePermissionsNotice: 'This policy has several permissions. Only the first one can be edited here; the others are kept unchanged. Use the raw ODRL editor to change them.',
     errorLoadingMappings: 'Failed to load policy mappings. Please try again.',
     stepTarget: 'Target',
     stepTargetHelp: 'Define what resource or asset this policy applies to. This could be a specific URL, an API endpoint, or a class of resources.',

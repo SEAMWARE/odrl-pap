@@ -31,6 +31,7 @@ import TargetEditor from './TargetEditor';
 import AssigneeEditor from './AssigneeEditor';
 import PolicySummary from './PolicySummary';
 import NamespacedDropdown from './NamespacedDropdown';
+import { permissionCount, readPermission, writePermission } from '../utils/permission';
 
 /** Step number constants for the guided workflow. */
 const STEP_TARGET = 1;
@@ -151,20 +152,12 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
 
   /** Updates a single field inside `odrl:permission`. */
   const handlePermissionChange = (field: string, value: unknown) => {
-    const newPolicy = { ...policy };
-    if (!newPolicy['odrl:permission']) {
-      newPolicy['odrl:permission'] = {};
-    }
-    newPolicy['odrl:permission'] = {
-      ...newPolicy['odrl:permission'],
-      [field]: value,
-    };
-    setPolicy(newPolicy);
+    setPermission({ ...readPermission(policy), [field]: value });
   };
 
-  /** Replaces the entire permission object. */
+  /** Replaces the edited permission, keeping the array shape and the other permissions. */
   const setPermission = (newPermission: unknown) => {
-    setPolicy({ ...policy, 'odrl:permission': newPermission });
+    setPolicy(writePermission(policy, newPermission) as OdrlPolicyJson);
   };
 
   // --- Loading state ---
@@ -189,7 +182,8 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
     );
   }
 
-  const permission = policy['odrl:permission'] || {};
+  const permission = readPermission(policy);
+  const hasSeveralPermissions = permissionCount(policy) > 1;
 
   const targetLocked = isFieldLocked(PATH_TARGET);
   const assigneeLocked = isFieldLocked(PATH_ASSIGNEE);
@@ -227,6 +221,12 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
                   </div>
                 )}
               </div>
+            </Alert>
+          )}
+
+          {hasSeveralPermissions && (
+            <Alert variant="warning" className="mb-0" data-testid="multiple-permissions-notice">
+              {t.multiplePermissionsNotice}
             </Alert>
           )}
 
@@ -284,7 +284,7 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
               <Form.Group>
                 <NamespacedDropdown
                   items={mappings.actions ?? []}
-                  value={permission['odrl:action'] || ''}
+                  value={typeof permission['odrl:action'] === 'string' ? permission['odrl:action'] : ''}
                   onChange={(val) => handlePermissionChange('odrl:action', val)}
                   placeholder={t.selectAction}
                   ariaLabel={t.stepAction}

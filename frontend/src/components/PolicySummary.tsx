@@ -9,6 +9,7 @@ import { Card, ListGroup, Badge, Stack, Button, Collapse } from 'react-bootstrap
 import { useState, useCallback } from 'react';
 import type { OdrlPolicyJson } from '../services/api';
 import { useI18n } from '../i18n';
+import { readPermission } from '../utils/permission';
 
 /** Delay in milliseconds before "Copied!" reverts to "Copy". */
 const COPY_FEEDBACK_DELAY_MS = 2000;
@@ -102,7 +103,7 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
 
   if (!policy) return null;
 
-  const permission = (policy['odrl:permission'] || {}) as Record<string, unknown>;
+  const permission = readPermission(policy);
   const target = permission['odrl:target'];
   const assignee = permission['odrl:assignee'];
   const action = permission['odrl:action'];
