@@ -33,6 +33,7 @@ import AssigneeEditor from './AssigneeEditor';
 import PolicySummary from './PolicySummary';
 import NamespacedDropdown from './NamespacedDropdown';
 import { permissionCount, readPermission, writePermission } from '../utils/permission';
+import { getTerm, setTerm } from '../utils/odrlTerms';
 
 /** Step number constants for the guided workflow. */
 const STEP_TARGET = 1;
@@ -153,7 +154,7 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
 
   /** Updates a single field inside `odrl:permission`. */
   const handlePermissionChange = (field: string, value: unknown) => {
-    setPermission({ ...readPermission(policy), [field]: value });
+    setPermission(setTerm(readPermission(policy), field, value));
   };
 
   /** Replaces the edited permission, keeping the array shape and the other permissions. */
@@ -243,8 +244,8 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
             />
             <Card.Body>
               <TargetEditor
-                target={permission['odrl:target']}
-                setTarget={(target) => handlePermissionChange('odrl:target', target)}
+                target={getTerm(permission, 'target')}
+                setTarget={(target) => handlePermissionChange('target', target)}
                 mappings={mappings}
                 locked={targetLocked}
               />
@@ -263,8 +264,8 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
             />
             <Card.Body>
               <AssigneeEditor
-                assignee={permission['odrl:assignee']}
-                setAssignee={(assignee) => handlePermissionChange('odrl:assignee', assignee)}
+                assignee={getTerm(permission, 'assignee')}
+                setAssignee={(assignee) => handlePermissionChange('assignee', assignee)}
                 mappings={mappings}
                 locked={assigneeLocked}
               />
@@ -285,8 +286,8 @@ const PolicyBuilder = ({ policy, setPolicy, fieldTemplate, mappings: providedMap
               <Form.Group>
                 <NamespacedDropdown
                   items={mappings.actions ?? []}
-                  value={typeof permission['odrl:action'] === 'string' ? permission['odrl:action'] : ''}
-                  onChange={(val) => handlePermissionChange('odrl:action', val)}
+                  value={typeof getTerm(permission, 'action') === 'string' ? (getTerm(permission, 'action') as string) : ''}
+                  onChange={(val) => handlePermissionChange('action', val)}
                   placeholder={t.selectAction}
                   ariaLabel={t.stepAction}
                   disabled={actionLocked}

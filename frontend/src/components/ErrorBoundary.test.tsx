@@ -40,11 +40,16 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('kaboom');
   });
 
-  it('contains the crash of the Builder given a null policy', () => {
+  it('contains the crash of the Builder given a policy it cannot read', () => {
+    const unreadable = {
+      get 'odrl:permission'(): never {
+        throw new Error('unreadable policy');
+      },
+    };
     render(
       <I18nProvider>
         <ErrorBoundary>
-          <PolicyBuilder policy={null as unknown as OdrlPolicyJson} setPolicy={() => {}} mappings={MAPPINGS} />
+          <PolicyBuilder policy={unreadable as unknown as OdrlPolicyJson} setPolicy={() => {}} mappings={MAPPINGS} />
         </ErrorBoundary>
         <span>raw tab still here</span>
       </I18nProvider>,

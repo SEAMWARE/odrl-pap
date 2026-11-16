@@ -10,6 +10,7 @@ import { useState, useCallback } from 'react';
 import type { OdrlPolicyJson } from '../services/api';
 import { useI18n } from '../i18n';
 import { readPermission } from '../utils/permission';
+import { findTermKey, getTerm } from '../utils/odrlTerms';
 import { readConstraintGroup, toConstraintArray } from '../utils/constraints';
 
 /** Delay in milliseconds before "Copied!" reverts to "Copy". */
@@ -35,7 +36,11 @@ const renderOperand = (operand: unknown, notSet: string): string => {
 /**
  * Keys of a constraint that never hold the left operand.
  */
-const NON_LEFT_OPERAND_KEYS = ['@type', '@id', 'odrl:operator', 'odrl:rightOperand'];
+const NON_LEFT_OPERAND_KEYS = [
+  '@type',
+  '@id',
+  ...['operator', 'rightOperand'].flatMap((term) => [`odrl:${term}`, term]),
+];
 
 /**
  * Renders the left operand of a constraint as a display string.
@@ -45,10 +50,13 @@ const NON_LEFT_OPERAND_KEYS = ['@type', '@id', 'odrl:operator', 'odrl:rightOpera
  * (`"http:bodyValue": "$.my.property"`). Both forms are rendered as `operand: parameter`.
  */
 const renderLeftOperand = (constraint: Record<string, unknown>, notSet: string): string => {
-  if (constraint['odrl:leftOperand']) {
-    return renderOperand(constraint['odrl:leftOperand'], notSet);
+  const referenced = getTerm(constraint, 'leftOperand');
+  if (referenced) {
+    return renderOperand(referenced, notSet);
   }
-  const operandKey = Object.keys(constraint).find((key) => !NON_LEFT_OPERAND_KEYS.includes(key));
+  const operandKey = Object.keys(constraint).find(
+    (key) => !NON_LEFT_OPERAND_KEYS.includes(key) && findTermKey(constraint, 'leftOperand') !== key,
+  );
   if (!operandKey) return notSet;
 
   const parameter = renderOperand(constraint[operandKey], '');
@@ -105,10 +113,10 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
   if (!policy) return null;
 
   const permission = readPermission(policy);
-  const target = permission['odrl:target'];
-  const assignee = permission['odrl:assignee'];
-  const action = permission['odrl:action'];
-  const constraint = permission['odrl:constraint'];
+  const target = getTerm(permission, 'target');
+  const assignee = getTerm(permission, 'assignee');
+  const action = getTerm(permission, 'action');
+  const constraint = getTerm(permission, 'constraint');
 
   const renderConstraintItem = (c: Record<string, unknown>, index: number) => (
     <ListGroup.Item key={index} as="li" className="d-flex justify-content-between align-items-start">
@@ -116,8 +124,8 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
         <div className="fw-bold">{t.constraint}</div>
         <Stack direction="horizontal" gap={2}>
           <Badge bg="secondary">{renderLeftOperand(c, notSet)}</Badge>
-          <span className="fw-bold text-primary">{renderOperand(c['odrl:operator'], notSet)}</span>
-          <Badge bg="secondary">{renderOperand(c['odrl:rightOperand'], notSet)}</Badge>
+          <span className="fw-bold text-primary">{renderOperand(getTerm(c, 'operator'), notSet)}</span>
+          <Badge bg="secondary">{renderOperand(getTerm(c, 'rightOperand'), notSet)}</Badge>
         </Stack>
       </div>
     </ListGroup.Item>
@@ -153,7 +161,7 @@ const PolicySummary = ({ policy }: PolicySummaryProps) => {
       return (
         <>
           {name}: {obj['@type'] as string}
-          {renderRefinements(obj['odrl:refinement'])}
+          {renderRefinements(getTerm(obj, 'refinement'))}
         </>
       );
     }

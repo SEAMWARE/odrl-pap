@@ -11,12 +11,10 @@ import type { Mapping } from '../api';
 import { useI18n } from '../i18n';
 import NamespacedDropdown from './NamespacedDropdown';
 import { readConstraintGroup } from '../utils/constraints';
+import { getTerm, removeTerm, setTerm, termKey } from '../utils/odrlTerms';
 
 /** Default parent property that holds the constraint(s). */
 const DEFAULT_PROPERTY_KEY = 'odrl:constraint';
-
-/** Key under which a left operand is referenced by name. */
-const LEFT_OPERAND_KEY = 'odrl:leftOperand';
 
 interface ConstraintBuilderProps {
   /** Parent object containing the constraint field (see {@link ConstraintBuilderProps.propertyKey}). */
@@ -73,7 +71,7 @@ function readConstraints(
  * its value (`"http:bodyValue": "$.my.property"`).
  */
 function getLeftOperandId(constraint: ConstraintData, operands: Mapping[]): string {
-  const referenced = constraint[LEFT_OPERAND_KEY];
+  const referenced = getTerm(constraint, 'leftOperand') as ConstraintData['odrl:leftOperand'] | undefined;
   if (typeof referenced === 'string' && referenced) {
     return referenced;
   }
@@ -102,7 +100,7 @@ function getLeftOperandParameter(constraint: ConstraintData, operandName: string
  * Determines whether a right operand uses a named (URI) or literal value.
  */
 function getRightOperandType(constraint: ConstraintData): 'named' | 'literal' {
-  const rightOperand = constraint['odrl:rightOperand'];
+  const rightOperand = getTerm(constraint, 'rightOperand') as ConstraintData['odrl:rightOperand'];
   if (!rightOperand) return 'named';
   // A plain string is a literal value (e.g. "/items").
   if (typeof rightOperand === 'string') return 'literal';
@@ -114,7 +112,7 @@ function getRightOperandType(constraint: ConstraintData): 'named' | 'literal' {
 function getRightOperandObject(
   constraint: ConstraintData,
 ): { '@id'?: string; '@value'?: string; '@type'?: string } {
-  const rightOperand = constraint['odrl:rightOperand'];
+  const rightOperand = getTerm(constraint, 'rightOperand') as ConstraintData['odrl:rightOperand'];
   if (typeof rightOperand === 'string') return { '@value': rightOperand };
   return rightOperand ?? {};
 }
@@ -145,7 +143,9 @@ const ConstraintBuilder = ({
   // changed in the same render the effects swapped them back and forth forever ("Maximum update
   // depth exceeded", the value flickering), whenever the editor opened a policy that had
   // constraints or the user typed quickly.
-  const parentConstraint = parent[propertyKey];
+  // ODRL terms may be spelled prefixed or bare; the key the parent already uses is the one written.
+  const constraintKey = termKey(parent, propertyKey);
+  const parentConstraint = parent[constraintKey];
   const held = readConstraints(parentConstraint);
   const internalConstraints: ConstraintData[] = held?.constraints ?? [];
   const logicalType = held?.logicalType ?? 'and';
@@ -157,7 +157,7 @@ const ConstraintBuilder = ({
     const operands = held?.listWrapper ? { '@list': constraints } : constraints;
     setParent({
       ...parent,
-      [propertyKey]:
+      [constraintKey]:
         type === 'and'
           ? operands
           : { '@type': 'odrl:LogicalConstraint', [`odrl:${type}`]: operands },
@@ -166,7 +166,7 @@ const ConstraintBuilder = ({
 
   const handleConstraintChange = (index: number, field: string, value: unknown) => {
     const newConstraints = [...internalConstraints];
-    newConstraints[index] = { ...newConstraints[index], [field]: value };
+    newConstraints[index] = setTerm(newConstraints[index], field, value);
     write(newConstraints);
   };
 
@@ -189,8 +189,8 @@ const ConstraintBuilder = ({
     const previousOperand = getLeftOperandId(current, leftOperands);
     const previousParameter = getLeftOperandParameter(current, previousOperand);
 
-    const updated: ConstraintData = { ...current };
-    delete updated[LEFT_OPERAND_KEY];
+    const leftOperandKey = termKey(current, 'leftOperand');
+    const updated: ConstraintData = removeTerm(current, 'leftOperand');
     leftOperands.forEach((operand) => {
       if (operand.name) {
         delete updated[operand.name];
@@ -201,7 +201,7 @@ const ConstraintBuilder = ({
       if (getParameterCount(leftOperands, operandName) > 0) {
         updated[operandName] = previousParameter;
       } else {
-        updated[LEFT_OPERAND_KEY] = { '@id': operandName };
+        updated[leftOperandKey] = { '@id': operandName };
       }
     }
     replaceConstraint(index, updated);
@@ -343,7 +343,7 @@ const ConstraintBuilder = ({
                 <Form.Label className="small fw-bold">{t.selectOperator}</Form.Label>
                 <NamespacedDropdown
                   items={operators}
-                  value={getReferenceId(constraint['odrl:operator'])}
+                  value={getReferenceId(getTerm(constraint, 'operator') as ConstraintData['odrl:operator'])}
                   onChange={(val) =>
                     handleConstraintChange(index, 'odrl:operator', { '@id': val })
                   }
