@@ -90,7 +90,15 @@ COPY --chown=185 target/quarkus-app/quarkus/ /deployments/quarkus/
 
 EXPOSE 8080
 USER 185
-ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+# Java4Shell (CVE-2026-114938): the AVX-512 VBMI Base64 intrinsic in OpenJDK
+# >= 17.0.6 miscalculates the output buffer size for input with unexpected
+# padding and writes past the buffer. This image still ships OpenJDK 17.0.10
+# and Red Hat has not published a patched ubi8/openjdk-17 yet, so disable the
+# intrinsic, as BSI and Red Hat (RHSB-2026-018) advise. Quarkus decodes
+# base64 from bearer tokens before the request is authenticated, so the
+# vulnerable decoder is reachable pre-auth in JVM mode.
+# Remove this flag once the base image ships OpenJDK >= 17.0.21.1.
+ENV JAVA_OPTS_APPEND="-XX:-UseBASE64Intrinsics -Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"
 
 ENTRYPOINT [ "/opt/jboss/container/java/run/run-java.sh" ]
